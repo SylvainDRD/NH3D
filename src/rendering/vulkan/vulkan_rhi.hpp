@@ -99,20 +99,18 @@ private:
     VkQueue _presentQueue;
 
     VkSwapchainKHR _swapchain;
-    std::vector<RID> _swapchainTextures;
+    std::vector<VulkanTexture*> _swapchainTextures;
 
     VkCommandPool _commandPool;
 
     static constexpr uint32_t MaxFramesInFlight = 2;
     std::array<VkCommandBuffer, MaxFramesInFlight> _commandBuffers;
     std::array<VkFence, MaxFramesInFlight> _frameFences;
-    std::array<RID, MaxFramesInFlight> _renderTargets;
+    std::array<VulkanTexture*, MaxFramesInFlight> _renderTargets;
 
     std::array<VkSemaphore, MaxFramesInFlight> _presentSemaphores;
     std::vector<VkSemaphore> _renderSemaphores;
 
-    mutable ResourceAllocator<VulkanTexture> _textures;
-    mutable ResourceAllocator<VulkanBuffer> _buffers;
     Uptr<VulkanDescriptorSetPool<MaxFramesInFlight>> _descriptorSetPoolCompute = nullptr;
 
     Uptr<VulkanComputePipeline> _computePipeline = nullptr;
@@ -120,17 +118,5 @@ private:
 
     mutable uint32_t _frameId = 1;
 };
-
-template <class... Ts>
-inline RID VulkanRHI::allocateTexture(Ts... args)
-{
-    return _buffers.allocate(std::forward<Ts>(args)...);
-}
-
-template <class... Ts>
-inline RID VulkanRHI::allocateBuffer(Ts... args)
-{
-    return _textures.allocate(_allocator, std::forward<Ts>(args)...);
-}
 
 }

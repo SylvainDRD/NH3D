@@ -30,7 +30,6 @@ VulkanComputePipeline::VulkanComputePipeline(VkDevice device, VkDescriptorSetLay
     }
 }
 
-
 void VulkanComputePipeline::dispatch(VkCommandBuffer commandBuffer, Vec3i kernelSize)
 {
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, _pipeline);

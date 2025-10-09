@@ -1,127 +1,96 @@
 #pragma once
 
+#include <cstddef>
 #include <misc/utils.hpp>
 #include <rendering/core/rhi_concept.hpp>
+#include <sys/stat.h>
+#include <utility>
 
 namespace NH3D {
 
-// TODO: rework eventually, this trashes the cache too much
-template <UnmanagedResource T>
+// TODO: rework eventually, trashes the cache
+template <Resource T>
 class ResourceAllocator {
     NH3D_NO_COPY_MOVE(ResourceAllocator<T>)
 public:
-    ResourceAllocator();
+    [[nodiscard]] static inline T& getResource(RID rid);
 
-    ~ResourceAllocator();
-
-    inline T& getResource(RID rid);
+    static inline void reserve(size_t capacity);
 
     template <class... Args>
-    inline RID allocate(Args... args);
+    static inline RID allocate(Args... args);
 
-    inline void release(RID rid);
+    static inline void release(const IRHI& rhi, RID rid);
 
-    inline void clear(const IRHI& rhi);
+    static inline void clear(const IRHI& rhi);
 
 private:
-    std::vector<T> _resources;
-    std::vector<RIDType> _ridToIndex;
-    std::vector<RID> _indexToRid;
-    std::vector<RID> _availableRids;
+    static std::vector<T> _resources;
+    static std::vector<RID> _availableRids;
 };
 
-template <UnmanagedResource T>
-inline ResourceAllocator<T>::ResourceAllocator()
-{
-    const uint32_t PreallocatedSize = 2000;
-    _resources.reserve(PreallocatedSize);
-    _ridToIndex.reserve(PreallocatedSize);
-    _indexToRid.reserve(PreallocatedSize);
-    _availableRids.reserve(PreallocatedSize);
+template <Resource T>
+std::vector<T> ResourceAllocator<T>::_resources;
+
+template <Resource T>
+std::vector<RID> ResourceAllocator<T>::_availableRids;
+
+template <Resource T>
+inline void ResourceAllocator<T>::reserve(size_t capacity) {
+    _resources.reserve(capacity);
+    _availableRids.reserve(capacity);
 }
 
-template <UnmanagedResource T>
-inline ResourceAllocator<T>::~ResourceAllocator()
+template <Resource T>
+[[nodiscard]] inline T& ResourceAllocator<T>::getResource(RID rid)
 {
-    _resources.clear();
+    NH3D_ASSERT(rid != InvalidRID && rid < _resources.size(), "Attempting to fetch a resource with an invalid RID");
+
+    return _resources[rid];
 }
 
-template <UnmanagedResource T>
-inline T& ResourceAllocator<T>::getResource(RID rid)
-{
-    NH3D_ASSERT(rid != InvalidRID, "Attempting to fetch a resource with an invalid RID");
-    NH3D_ASSERT(rid < _ridToIndex.size(), "Attempting to fetch a resource with a deleted RID");
-    NH3D_ASSERT(_ridToIndex[rid] < _resources.size(), "Attempting to access non existing resource");
-
-    return _resources[_ridToIndex[rid]];
-}
-
-template <UnmanagedResource T>
+template <Resource T>
 template <class... Args>
 inline RID ResourceAllocator<T>::allocate(Args... args)
 {
-    RID newRid;
+    RID rid;
 
-    // TODO
     if (!_availableRids.empty()) {
-        newRid = _availableRids.back();
+        rid = _availableRids.back();
         _availableRids.pop_back();
-        _ridToIndex[newRid] = _resources.size();
+        _resources[rid] = T{std::forward<Args>(args)...};
     } else {
-        newRid = _ridToIndex.size();
-        _ridToIndex.emplace_back(_resources.size());
+        rid = _resources.size();
+        _resources.emplace_back(std::forward<Args>(args)...);
     }
 
-    _resources.emplace_back(std::forward<Args>(args)...);
-    _indexToRid.emplace_back(newRid);
-
-    return newRid;
+    return rid;
 }
 
-template <UnmanagedResource T>
-inline void ResourceAllocator<T>::release(RID rid)
+template <Resource T>
+inline void ResourceAllocator<T>::release(const IRHI& rhi, RID rid)
 {
-    // TODO: test this shit
+    NH3D_ASSERT(rid != InvalidRID && rid < _resources.size(), "Attempting to fetch a resource with an invalid RID");
+    NH3D_ASSERT(_resources[rid].isValid(), "Attempting to release an invalid resource");
 
-    // Example:
-    // Resources: 10 2 4 5 3
-    // RID to Resource: X X 1 4 2 3 X X X X 0
-    // Resource to RID: 10 2 4 5 3
-
-    // Example action: Delete RID 10
-    RIDType indexToDelete = _ridToIndex[rid];
-    RIDType resourceIndex = _indexToRid.back();
-    RIDType indexToMove = _ridToIndex[resourceIndex];
-
-    // indexToDelete = 0
-    // resourceIndex = 3
-    // indexToMove = 4
-    std::swap(_resources[indexToDelete], _resources[indexToMove]);
-    std::swap(_indexToRid[indexToDelete], _indexToRid[indexToMove]);
-    _resources.resize(_resources.size() - 1);
-    _indexToRid.resize(_resources.size() - 1);
-    _ridToIndex.resize(_ridToIndex.size() - 1);
-    _ridToIndex[indexToDelete] = resourceIndex;
-
-    // Example:
-    // Resources: 3 2 4 5 (10)
-    // RID to Resource: X X 1 4 2 3 X X X X (0)
-    // Resource to RID: 0 2 4 5 (10)
-
-    // Resources: 3 2 4 5
-    // RID to Resource: X X 1 4 2 0 X X X X X
+    if (!_resources[rid].isValid()) {
+        NH3D_WARN("Attempting to release an invalid resource");
+        return;
+    }
+    _resources[rid].release(rhi);
+    _availableRids.emplace_back(rid);
 }
 
-template <UnmanagedResource T>
+template <Resource T>
 inline void ResourceAllocator<T>::clear(const IRHI& rhi)
 {
     for (T& resource : _resources) {
-        resource.release(rhi);
+        if (resource.isValid()) {
+            resource.release(rhi);
+        }
     }
 
     _resources.clear();
-    _indexToRid.clear();
-    _ridToIndex.clear();
     _availableRids.clear();
 }
 

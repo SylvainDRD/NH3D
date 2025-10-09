@@ -133,8 +133,12 @@ VkRenderingAttachmentInfo VulkanTexture::getAttachmentInfo() const
     };
 }
 
-void VulkanTexture::insertBarrier(VkCommandBuffer commandBuffer, VkImageLayout newLayout)
+void VulkanTexture::insertBarrier(VkCommandBuffer commandBuffer)
 {
+    changeLayoutBarrier(commandBuffer, _layout);
+}
+
+void VulkanTexture::changeLayoutBarrier(VkCommandBuffer commandBuffer, VkImageLayout newLayout) {
     VkImageMemoryBarrier2 barrier {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
         .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,

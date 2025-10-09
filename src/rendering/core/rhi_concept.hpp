@@ -22,7 +22,10 @@ template <typename T>
 concept Releasable = requires(T resource, const IRHI& rhi) { { resource.release(rhi) } -> std::same_as<void>; };
 
 template <typename T>
-concept UnmanagedResource = std::movable<T> && Releasable<T>;
+concept Resource = std::movable<T> && Releasable<T> && 
+requires(T resource) { 
+    { resource.isValid() } -> std::same_as<bool>; 
+};
 
 template <typename E>
 concept IsValidBufferUsageFlagsEnum = std::is_enum_v<E> && requires {

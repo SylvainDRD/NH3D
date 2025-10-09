@@ -27,6 +27,8 @@ public:
 
     void release(const IRHI& rhi);
 
+    [[nodiscard]] inline bool isValid() const { return _image != nullptr; }
+
     [[nodiscard]] inline uint32_t getWidth() const { return _extent.width; }
 
     [[nodiscard]] inline uint32_t getHeight() const { return _extent.height; }
@@ -37,7 +39,9 @@ public:
 
     [[nodiscard]] VkRenderingAttachmentInfo getAttachmentInfo() const;
 
-    void insertBarrier(VkCommandBuffer commandBuffer, VkImageLayout layout);
+    void insertBarrier(VkCommandBuffer commandBuffer);
+
+    void changeLayoutBarrier(VkCommandBuffer commandBuffer, VkImageLayout newLayout);
 
     void clear(VkCommandBuffer commandBuffer, Color color);
 

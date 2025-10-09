@@ -130,7 +130,6 @@ VulkanGraphicsPipeline::VulkanGraphicsPipeline(VkDevice device, VkDescriptorSetL
 }
 
 void VulkanGraphicsPipeline::draw(VkCommandBuffer commandBuffer, VkExtent2D extent, const std::vector<VkRenderingAttachmentInfo>& attachments, VkRenderingAttachmentInfo depthAttachment, VkRenderingAttachmentInfo stencilAttachment)
-
 {
     VkRenderingInfo renderingInfo {
         .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
