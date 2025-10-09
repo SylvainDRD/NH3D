@@ -1,7 +1,7 @@
 #pragma once
 
 #include <misc/utils.hpp>
-#include <rendering/core/rhi_interface.hpp>
+#include <rendering/core/rhi_concept.hpp>
 
 namespace NH3D {
 

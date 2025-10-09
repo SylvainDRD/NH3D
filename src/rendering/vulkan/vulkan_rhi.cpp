@@ -8,7 +8,8 @@
 #include <misc/utils.hpp>
 #include <rendering/render_graph/render_graph.hpp>
 #include <rendering/vulkan/vulkan_descriptor_set_pool.hpp>
-#include <rendering/vulkan/vulkan_pipeline.hpp>
+#include <rendering/vulkan/vulkan_compute_pipeline.hpp>
+#include <rendering/vulkan/vulkan_graphics_pipeline.hpp>
 #include <rendering/vulkan/vulkan_texture.hpp>
 #include <sys/types.h>
 #include <unordered_set>
@@ -51,8 +52,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
     vkGetSwapchainImagesKHR(_device, _swapchain, &swapchainImageCount, swapchainImages.data());
 
     for (int i = 0; i < swapchainImageCount; ++i) {
-        RID rid = _textures.allocate(this, swapchainImages[i], surfaceFormat, VkExtent3D { Window.getWidth(), Window.getHeight(), 1 }, VK_IMAGE_ASPECT_COLOR_BIT);
-        _swapchainTextures[i] = &_textures.getResource(rid);
+        _swapchainTextures[i] = _textures.allocate(this, swapchainImages[i], surfaceFormat, VkExtent3D { Window.getWidth(), Window.getHeight(), 1 }, VK_IMAGE_ASPECT_COLOR_BIT);
     }
 
     _commandPool = createCommandPool(_device, queues.GraphicsQueueFamilyID);
@@ -67,33 +67,32 @@ VulkanRHI::VulkanRHI(const Window& Window)
     for (uint32_t i = 0; i < MaxFramesInFlight; ++i) {
         _presentSemaphores[i] = createSemaphore(_device);
         _frameFences[i] = createFence(_device);
-        _renderTargets[i] = &_textures.getResource(
-            _textures.allocate(
-                this,
-                VK_FORMAT_R16G16B16A16_SFLOAT,
-                VkExtent3D { Window.getWidth(), Window.getHeight(), 1 },
-                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-                VK_IMAGE_ASPECT_COLOR_BIT));
+        _renderTargets[i] = _textures.allocate(
+            this,
+            VK_FORMAT_R16G16B16A16_SFLOAT,
+            VkExtent3D { Window.getWidth(), Window.getHeight(), 1 },
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+            VK_IMAGE_ASPECT_COLOR_BIT);
     }
 
-    // _descriptorSetPoolCompute = std::make_unique<VulkanDescriptorSetPool<MaxFramesInFlight>>(_device,
-    //     VK_SHADER_STAGE_COMPUTE_BIT,
-    //     std::initializer_list<VkDescriptorType> { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE },
-    //     1000);
+    _descriptorSetPoolCompute = std::make_unique<VulkanDescriptorSetPool<MaxFramesInFlight>>(_device,
+        VK_SHADER_STAGE_COMPUTE_BIT,
+        std::initializer_list<VkDescriptorType> { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE },
+        1000);
 
-    _computePipeline = std::make_unique<VulkanPipeline>(
+    _computePipeline = std::make_unique<VulkanComputePipeline>(
         _device,
         _descriptorSetPoolCompute->getLayout(),
-        PROJECT_DIR "src/renderer/shaders/.cache/gradient.comp.spv");
+        PROJECT_DIR "src/rendering/shaders/.cache/gradient.comp.spv");
 
-    _graphicsPipeline = std::make_unique<VulkanPipeline>(_device,
+    _graphicsPipeline = std::make_unique<VulkanGraphicsPipeline>(_device,
         nullptr,
         VulkanGraphicsPipeline::ShaderData {
-            .vertexShaderPath = PROJECT_DIR "src/renderer/shaders/.cache/triangle.vert.spv",
-            .fragmentShaderPath = PROJECT_DIR "src/renderer/shaders/.cache/triangle.frag.spv",
-            .colorAttachmentFormats { _renderTargets[0]->getFormat() } });
+            .vertexShaderPath = PROJECT_DIR "src/rendering/shaders/.cache/triangle.vert.spv",
+            .fragmentShaderPath = PROJECT_DIR "src/rendering/shaders/.cache/triangle.frag.spv",
+            .colorAttachmentFormats { _textures.getResource(_renderTargets[0]).getFormat() } });
 
-    MeshComponent<VulkanRHI> mesh { *this, {}, {} };
+    // MeshComponent<VulkanRHI> mesh { *this, {}, {} };
 }
 
 VulkanRHI::~VulkanRHI()
@@ -104,9 +103,8 @@ VulkanRHI::~VulkanRHI()
     _computePipeline->release(_device);
     _graphicsPipeline->release(_device);
 
-    // TODO
-    // _textures.clear(*this);
-    // _buffers.clear(*this);
+    _textures.clear(*this);
+    _buffers.clear(*this);
 
     for (uint32_t i = 0; i < MaxFramesInFlight; ++i) {
         vkDestroyFence(_device, _frameFences[i], nullptr);
@@ -155,33 +153,34 @@ void VulkanRHI::render(const RenderGraph& rdag) const
 
     beginCommandBuffer(commandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
-    VulkanTexture* renderTarget = _renderTargets[frameInFlightId];
-    renderTarget->insertBarrier(commandBuffer, VK_IMAGE_LAYOUT_GENERAL);
+    VulkanTexture& renderTarget = _textures.getResource(_renderTargets[frameInFlightId]);
+    renderTarget.insertBarrier(commandBuffer, VK_IMAGE_LAYOUT_GENERAL);
 
     VkDescriptorSet descriptorSet = _descriptorSetPoolCompute->getDescriptorSet(_device, frameInFlightId);
 
     // update DS, bind pipeline, bind DS, dispatch
     VkDescriptorImageInfo imageInfo {
-        .imageView = renderTarget->getView(),
+        .imageView = renderTarget.getView(),
         .imageLayout = VK_IMAGE_LAYOUT_GENERAL
     };
     _descriptorSetPoolCompute->updateDescriptorSet(_device, commandBuffer, descriptorSet, _computePipeline->getLayout(), imageInfo);
     _descriptorSetPoolCompute->bind(commandBuffer, descriptorSet, VK_PIPELINE_BIND_POINT_COMPUTE, _computePipeline->getLayout());
-    _computePipeline->dispatch(commandBuffer, { std::ceil(renderTarget->getWidth() / 8.f), std::ceil(renderTarget->getHeight() / 8.f), 1 });
+    _computePipeline->dispatch(commandBuffer, { std::ceil(renderTarget.getWidth() / 8.f), std::ceil(renderTarget.getHeight() / 8.f), 1 });
 
-    renderTarget->insertBarrier(commandBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    renderTarget.insertBarrier(commandBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
     // TODO: watch for the tiny vector allocations
     _graphicsPipeline->draw(commandBuffer,
-        { renderTarget->getWidth(), renderTarget->getHeight() },
-        { renderTarget->getAttachmentInfo() });
+        { renderTarget.getWidth(), renderTarget.getHeight() },
+        { renderTarget.getAttachmentInfo() });
 
-    renderTarget->insertBarrier(commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    renderTarget.insertBarrier(commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
-    _swapchainTextures[swapchainImageId]->insertBarrier(commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    renderTarget->blit(commandBuffer, *_swapchainTextures[swapchainImageId]);
+    VulkanTexture& swapchainImage = _textures.getResource(_swapchainTextures[swapchainImageId]);
+    swapchainImage.insertBarrier(commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    renderTarget.blit(commandBuffer, swapchainImage);
 
-    _swapchainTextures[swapchainImageId]->insertBarrier(commandBuffer, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+    swapchainImage.insertBarrier(commandBuffer, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
     vkEndCommandBuffer(commandBuffer);
     submitCommandBuffer(_graphicsQueue,
@@ -523,15 +522,6 @@ void VulkanRHI::beginCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBuffe
     }
 
     vkBeginCommandBuffer(commandBuffer, &cbBeginInfo);
-}
-
-VkImageSubresourceRange VulkanRHI::makeSubresourceRange(VkImageAspectFlags aspectFlags) const
-{
-    return {
-        .aspectMask = aspectFlags,
-        .levelCount = VK_REMAINING_MIP_LEVELS,
-        .layerCount = VK_REMAINING_ARRAY_LAYERS,
-    };
 }
 
 VkSemaphoreSubmitInfo VulkanRHI::makeSemaphoreSubmitInfo(VkSemaphore semaphore, VkPipelineStageFlags2 stageMask) const

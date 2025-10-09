@@ -1,17 +1,18 @@
 #pragma once
 
 #include <misc/utils.hpp>
-#include <rendering/core/rhi_interface.hpp>
+#include <rendering/core/rhi_concept.hpp>
 
 namespace NH3D {
 
+// TODO: rework eventually, this trashes the cache too much
 template <UnmanagedResource T>
-class ResourceManager {
-    NH3D_NO_COPY_MOVE(ResourceManager<T>)
+class ResourceAllocator {
+    NH3D_NO_COPY_MOVE(ResourceAllocator<T>)
 public:
-ResourceManager();
+    ResourceAllocator();
 
-    ~ResourceManager();
+    ~ResourceAllocator();
 
     inline T& getResource(RID rid);
 
@@ -23,14 +24,14 @@ ResourceManager();
     inline void clear(const IRHI& rhi);
 
 private:
-    std::vector<T> _resources; // TODO: specialize the class for SOA and better cache coherency?
+    std::vector<T> _resources;
     std::vector<RIDType> _ridToIndex;
     std::vector<RID> _indexToRid;
     std::vector<RID> _availableRids;
 };
 
 template <UnmanagedResource T>
-inline ResourceManager<T>::ResourceManager()
+inline ResourceAllocator<T>::ResourceAllocator()
 {
     const uint32_t PreallocatedSize = 2000;
     _resources.reserve(PreallocatedSize);
@@ -40,13 +41,13 @@ inline ResourceManager<T>::ResourceManager()
 }
 
 template <UnmanagedResource T>
-inline ResourceManager<T>::~ResourceManager()
+inline ResourceAllocator<T>::~ResourceAllocator()
 {
     _resources.clear();
 }
 
 template <UnmanagedResource T>
-inline T& ResourceManager<T>::getResource(RID rid)
+inline T& ResourceAllocator<T>::getResource(RID rid)
 {
     NH3D_ASSERT(rid != InvalidRID, "Attempting to fetch a resource with an invalid RID");
     NH3D_ASSERT(rid < _ridToIndex.size(), "Attempting to fetch a resource with a deleted RID");
@@ -57,7 +58,7 @@ inline T& ResourceManager<T>::getResource(RID rid)
 
 template <UnmanagedResource T>
 template <class... Args>
-inline RID ResourceManager<T>::allocate(Args... args)
+inline RID ResourceAllocator<T>::allocate(Args... args)
 {
     RID newRid;
 
@@ -78,7 +79,7 @@ inline RID ResourceManager<T>::allocate(Args... args)
 }
 
 template <UnmanagedResource T>
-inline void ResourceManager<T>::release(RID rid)
+inline void ResourceAllocator<T>::release(RID rid)
 {
     // TODO: test this shit
 
@@ -112,7 +113,7 @@ inline void ResourceManager<T>::release(RID rid)
 }
 
 template <UnmanagedResource T>
-inline void ResourceManager<T>::clear(const IRHI& rhi)
+inline void ResourceAllocator<T>::clear(const IRHI& rhi)
 {
     for (T& resource : _resources) {
         resource.release(rhi);

@@ -1,6 +1,6 @@
 #include "engine.hpp"
 #include <memory>
-#include <rendering/rendering_dag/rendering_dag.hpp>
+#include <rendering/render_graph/render_graph.hpp>
 #include <rendering/vulkan/vulkan_rhi.hpp>
 
 namespace NH3D {
@@ -16,8 +16,7 @@ Engine::~Engine() { }
 void Engine::run()
 {
     while (!_window.windowClosing()) {
-
-        _rhi->render(RenderingDAG {});
+        _rhi->render(RenderGraph {});
         _window.update();
     }
 }

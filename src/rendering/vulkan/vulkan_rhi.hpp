@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <misc/utils.hpp>
 #include <rendering/core/resource_manager.hpp>
-#include <rendering/core/rhi_interface.hpp>
+#include <rendering/core/rhi_concept.hpp>
 #include <rendering/render_graph/render_graph.hpp>
 #include <rendering/vulkan/vulkan_buffer.hpp>
 #include <rendering/vulkan/vulkan_enums.hpp>
@@ -19,7 +19,8 @@ namespace NH3D {
 class Window;
 template <uint32_t>
 class VulkanDescriptorSetPool;
-class VulkanPipeline;
+class VulkanComputePipeline;
+class VulkanGraphicsPipeline;
 
 class VulkanRHI : public IRHI {
     NH3D_NO_COPY_MOVE(VulkanRHI)
@@ -39,6 +40,12 @@ public:
     inline VmaAllocator getAllocator() const { return _allocator; }
 
     inline VkCommandBuffer getCommandBuffer() const { return _commandBuffers[_frameId % MaxFramesInFlight]; }
+
+    template <class... Ts>
+    inline RID allocateTexture(Ts... args);
+
+    template <class... Ts>
+    inline RID allocateBuffer(Ts... args);
 
     virtual void render(const RenderGraph& rdag) const override;
 
@@ -69,8 +76,6 @@ private:
     VkFence createFence(VkDevice device) const;
 
     void beginCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferUsageFlags flags, bool resetCommandBuffer = true) const;
-
-    VkImageSubresourceRange makeSubresourceRange(VkImageAspectFlags aspectFlags) const;
 
     VkSemaphoreSubmitInfo makeSemaphoreSubmitInfo(VkSemaphore semaphore, VkPipelineStageFlags2 stageMask) const;
 
@@ -106,24 +111,24 @@ private:
     std::array<VkSemaphore, MaxFramesInFlight> _presentSemaphores;
     std::vector<VkSemaphore> _renderSemaphores;
 
-    // ResourceAllocator<VulkanTexture> _textures;
-    // ResourceAllocator<VulkanBuffer> _buffers;
+    mutable ResourceAllocator<VulkanTexture> _textures;
+    mutable ResourceAllocator<VulkanBuffer> _buffers;
     Uptr<VulkanDescriptorSetPool<MaxFramesInFlight>> _descriptorSetPoolCompute = nullptr;
 
-    Uptr<VulkanPipeline> _computePipeline = nullptr;
-    Uptr<VulkanPipeline> _graphicsPipeline = nullptr;
+    Uptr<VulkanComputePipeline> _computePipeline = nullptr;
+    Uptr<VulkanGraphicsPipeline> _graphicsPipeline = nullptr;
 
     mutable uint32_t _frameId = 1;
 };
 
 template <class... Ts>
-RID VulkanRHI::allocateTexture(Ts... args)
+inline RID VulkanRHI::allocateTexture(Ts... args)
 {
     return _buffers.allocate(std::forward<Ts>(args)...);
 }
 
 template <class... Ts>
-RID VulkanRHI::allocateBuffer(Ts... args)
+inline RID VulkanRHI::allocateBuffer(Ts... args)
 {
     return _textures.allocate(_allocator, std::forward<Ts>(args)...);
 }

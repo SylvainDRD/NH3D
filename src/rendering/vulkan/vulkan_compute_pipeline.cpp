@@ -1,5 +1,3 @@
-#pragma once
-
 #include "rendering/vulkan/vulkan_compute_pipeline.hpp"
 #include "rendering/vulkan/vulkan_pipeline.hpp"
 
