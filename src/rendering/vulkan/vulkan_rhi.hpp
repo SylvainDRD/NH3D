@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <misc/utils.hpp>
 #include <rendering/core/resource_manager.hpp>
-#include <rendering/core/rhi_concept.hpp>
+#include <rendering/core/rhi_interface.hpp>
 #include <rendering/render_graph/render_graph.hpp>
 #include <rendering/vulkan/vulkan_buffer.hpp>
 #include <rendering/vulkan/vulkan_enums.hpp>
@@ -25,10 +25,6 @@ class VulkanGraphicsPipeline;
 class VulkanRHI : public IRHI {
     NH3D_NO_COPY_MOVE(VulkanRHI)
 public:
-    using BufferUsageFlagsType = VulkanBufferUsageFlags;
-    using MemoryUsageType = VulkanMemoryUsage;
-
-public:
     VulkanRHI() = delete;
 
     VulkanRHI(const Window& _window);
@@ -40,12 +36,6 @@ public:
     inline VmaAllocator getAllocator() const { return _allocator; }
 
     inline VkCommandBuffer getCommandBuffer() const { return _commandBuffers[_frameId % MaxFramesInFlight]; }
-
-    template <class... Ts>
-    inline RID allocateTexture(Ts... args);
-
-    template <class... Ts>
-    inline RID allocateBuffer(Ts... args);
 
     virtual void render(const RenderGraph& rdag) const override;
 

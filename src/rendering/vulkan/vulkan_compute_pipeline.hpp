@@ -1,7 +1,8 @@
 #pragma once
 
-#include <misc/utils.hpp>
 #include <filesystem>
+#include <misc/types.hpp>
+#include <misc/utils.hpp>
 #include <rendering/vulkan/vulkan_pipeline.hpp>
 
 namespace NH3D {
@@ -11,7 +12,7 @@ class VulkanComputePipeline : public VulkanPipeline {
 public:
     VulkanComputePipeline(VkDevice device, VkDescriptorSetLayout layout, std::filesystem::path computeShaderPath);
 
-    void dispatch(VkCommandBuffer commandBuffer, Vec3i kernelSize);
+    void dispatch(VkCommandBuffer commandBuffer, vec3i kernelSize);
 };
 
 }

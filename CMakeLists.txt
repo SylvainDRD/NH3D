@@ -14,11 +14,14 @@ add_definitions(-DPROJECT_NAME="${binary}"
 				-DPROJECT_DIR="${CMAKE_SOURCE_DIR}/")
 
 file(GLOB_RECURSE sources 	${CMAKE_SOURCE_DIR}/src/*.cpp
+							${CMAKE_SOURCE_DIR}/src/scene/*.cpp
+							${CMAKE_SOURCE_DIR}/src/scene/ecs/*.cpp
+							${CMAKE_SOURCE_DIR}/src/scene/ecs/components/*.cpp
 							${CMAKE_SOURCE_DIR}/src/general/*.cpp
 							${CMAKE_SOURCE_DIR}/src/utils/*.cpp
-							${CMAKE_SOURCE_DIR}/src/renderer/*.cpp
-							${CMAKE_SOURCE_DIR}/src/renderer/rendering_dag/*.cpp
-							${CMAKE_SOURCE_DIR}/src/renderer/vulkan/*.cpp
+							${CMAKE_SOURCE_DIR}/src/rendering/*.cpp
+							${CMAKE_SOURCE_DIR}/src/rendering/render_graph/*.cpp
+							${CMAKE_SOURCE_DIR}/src/rendering/vulkan/*.cpp
 						  )
 
 add_executable(${binary} ${sources})
@@ -48,4 +51,17 @@ add_dependencies(${binary} glfw)
 
 add_subdirectory(${external}/VulkanMemoryAllocator)
 target_include_directories(${binary} PRIVATE ${external}/VulkanMemoryAllocator/include)
-target_link_libraries(${binary} GPUOpen::VulkanMemoryAllocator)
+link_libraries(GPUOpen::VulkanMemoryAllocator)
+
+add_subdirectory(${external}/json)
+target_include_directories(${binary} PRIVATE ${external}/json/include)
+
+set(TINYGLTF_INSTALL OFF CACHE INTERNAL "Disable TinyGLTF install" FORCE)
+set(TINYGLTF_INSTALL_VENDOR OFF CACHE INTERNAL "Disable TinyGLTF dependency install" FORCE)
+add_subdirectory(${external}/tinygltf)
+target_include_directories(${binary} PRIVATE ${external}/tinygltf)
+
+if(TRUE) 
+	enable_testing() # Needs to be in at the top level to ctest doesn't shit itself
+	add_subdirectory(${CMAKE_SOURCE_DIR}/tests)
+endif()

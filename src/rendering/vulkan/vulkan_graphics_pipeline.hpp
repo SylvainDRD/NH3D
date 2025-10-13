@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <misc/utils.hpp>
+#include <misc/types.hpp>
 #include <rendering/vulkan/vulkan_pipeline.hpp>
 
 namespace NH3D {

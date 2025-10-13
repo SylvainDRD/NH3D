@@ -4,7 +4,7 @@
 
 namespace NH3D {
 
-VulkanBuffer::VulkanBuffer(VmaAllocator allocator, uint32_t size, VkBufferUsageFlags usageFlags, VmaMemoryUsage memoryUsage)
+VulkanBuffer::VulkanBuffer(const VulkanRHI& rhi, uint32_t size, VkBufferUsageFlags usageFlags, VmaMemoryUsage memoryUsage)
 {
     VkBufferCreateInfo bufferCreateInfo {
         .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -17,7 +17,7 @@ VulkanBuffer::VulkanBuffer(VmaAllocator allocator, uint32_t size, VkBufferUsageF
         .usage = memoryUsage
     };
 
-    if (vmaCreateBuffer(allocator, &bufferCreateInfo, &allocationCreateInfo, &_buffer, &_allocation, &_allocationInfo) != VK_SUCCESS) {
+    if (vmaCreateBuffer(rhi.getAllocator(), &bufferCreateInfo, &allocationCreateInfo, &_buffer, &_allocation, &_allocationInfo) != VK_SUCCESS) {
         NH3D_ABORT_VK("Vulkan buffer creation failed");
     }
 }

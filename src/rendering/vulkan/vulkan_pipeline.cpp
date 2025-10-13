@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
-#include <misc/utils.hpp>
+#include <misc/types.hpp>
 #include <vulkan/vulkan_core.h>
 
 namespace NH3D {

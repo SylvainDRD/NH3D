@@ -2,6 +2,7 @@
 #include <memory>
 #include <rendering/render_graph/render_graph.hpp>
 #include <rendering/vulkan/vulkan_rhi.hpp>
+#include <scene/scene.hpp>
 
 namespace NH3D {
 
@@ -16,7 +17,7 @@ Engine::~Engine() { }
 void Engine::run()
 {
     while (!_window.windowClosing()) {
-        _rhi->render(RenderGraph {});
+        _rhi->render(RenderGraph {Scene("TODO :)")});
         _window.update();
     }
 }

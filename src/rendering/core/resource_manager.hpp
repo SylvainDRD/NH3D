@@ -2,7 +2,8 @@
 
 #include <cstddef>
 #include <misc/utils.hpp>
-#include <rendering/core/rhi_concept.hpp>
+#include <misc/types.hpp>
+#include <rendering/core/rhi_interface.hpp>
 #include <sys/stat.h>
 #include <utility>
 

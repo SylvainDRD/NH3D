@@ -59,7 +59,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
     ResourceAllocator<VulkanTexture>::reserve(capacity);
     ResourceAllocator<VulkanBuffer>::reserve(capacity);
     for (int i = 0; i < swapchainImageCount; ++i) {
-        RID rid = ResourceAllocator<VulkanTexture>::allocate(this, swapchainImages[i], surfaceFormat, VkExtent3D { Window.getWidth(), Window.getHeight(), 1 }, VK_IMAGE_ASPECT_COLOR_BIT);
+        RID rid = ResourceAllocator<VulkanTexture>::allocate(std::cref(*this), swapchainImages[i], surfaceFormat, VkExtent3D { Window.getWidth(), Window.getHeight(), 1 }, VK_IMAGE_ASPECT_COLOR_BIT);
         _swapchainTextures[i] = &ResourceAllocator<VulkanTexture>::getResource(rid);
     }
 
@@ -77,7 +77,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
         _frameFences[i] = createFence(_device);
 
         RID rid = ResourceAllocator<VulkanTexture>::allocate(
-            this,
+            std::cref(*this),
             VK_FORMAT_R16G16B16A16_SFLOAT,
             VkExtent3D { Window.getWidth(), Window.getHeight(), 1 },
             static_cast<VkImageUsageFlags>(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT),

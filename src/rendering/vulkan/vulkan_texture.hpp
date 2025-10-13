@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <misc/types.hpp>
 #include <misc/utils.hpp>
-#include <rendering/core/rhi_concept.hpp>
+#include <rendering/core/rhi_interface.hpp>
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_core.h>
@@ -17,9 +17,9 @@ class VulkanTexture {
 public:
     VulkanTexture() = default;
 
-    VulkanTexture(VulkanRHI* rhi, VkImage image, VkFormat format, VkExtent3D extent, VkImageAspectFlags aspect);
+    VulkanTexture(const VulkanRHI& rhi, VkImage image, VkFormat format, VkExtent3D extent, VkImageAspectFlags aspect);
 
-    VulkanTexture(VulkanRHI* rhi, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, VkImageAspectFlags aspect, bool mipmap = true);
+    VulkanTexture(const VulkanRHI& rhi, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, VkImageAspectFlags aspect, bool mipmap = true);
 
     VulkanTexture(VulkanTexture&& other);
 
@@ -43,7 +43,7 @@ public:
 
     void changeLayoutBarrier(VkCommandBuffer commandBuffer, VkImageLayout newLayout);
 
-    void clear(VkCommandBuffer commandBuffer, Color color);
+    void clear(VkCommandBuffer commandBuffer, color4 color);
 
     void blit(VkCommandBuffer commandBuffer, VulkanTexture& dst);
 

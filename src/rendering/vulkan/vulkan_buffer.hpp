@@ -1,18 +1,20 @@
 #pragma once
 
 #include <misc/utils.hpp>
-#include <rendering/core/rhi_concept.hpp>
+#include <rendering/core/rhi_interface.hpp>
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan_core.h>
 
 namespace NH3D {
+
+class VulkanRHI;
 
 class VulkanBuffer {
     NH3D_NO_COPY(VulkanBuffer)
 public:
     VulkanBuffer() = delete;
 
-    VulkanBuffer(VmaAllocator allocator, uint32_t size, VkBufferUsageFlags usageFlags, VmaMemoryUsage memoryUsage);
+    VulkanBuffer(const VulkanRHI& rhi, uint32_t size, VkBufferUsageFlags usageFlags, VmaMemoryUsage memoryUsage);
 
     VulkanBuffer(VulkanBuffer&& other);
 

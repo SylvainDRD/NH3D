@@ -2,7 +2,6 @@
 
 #include <iostream>
 #include <limits>
-#include <misc/types.hpp>
 
 namespace NH3D {
 

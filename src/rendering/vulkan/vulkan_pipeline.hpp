@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <misc/utils.hpp>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace NH3D {

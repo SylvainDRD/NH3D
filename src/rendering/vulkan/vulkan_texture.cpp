@@ -5,7 +5,7 @@
 
 namespace NH3D {
 
-VulkanTexture::VulkanTexture(VulkanRHI* rhi, VkImage image, VkFormat format, VkExtent3D extent, VkImageAspectFlags aspect)
+VulkanTexture::VulkanTexture(const VulkanRHI& rhi, VkImage image, VkFormat format, VkExtent3D extent, VkImageAspectFlags aspect)
     : _image { image }
     , _format { format }
     , _extent { extent }
@@ -23,12 +23,12 @@ VulkanTexture::VulkanTexture(VulkanRHI* rhi, VkImage image, VkFormat format, VkE
             .layerCount = 1 }
     };
 
-    if (vkCreateImageView(rhi->getVkDevice(), &viewCreateInfo, nullptr, &_view) != VK_SUCCESS) {
+    if (vkCreateImageView(rhi.getVkDevice(), &viewCreateInfo, nullptr, &_view) != VK_SUCCESS) {
         NH3D_ABORT_VK("Vulkan image view creation failed");
     }
 }
 
-VulkanTexture::VulkanTexture(VulkanRHI* rhi, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, VkImageAspectFlags aspect, bool mipmap)
+VulkanTexture::VulkanTexture(const VulkanRHI& rhi, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, VkImageAspectFlags aspect, bool mipmap)
     : _format { format }
     , _extent { extent }
 {
@@ -50,7 +50,7 @@ VulkanTexture::VulkanTexture(VulkanRHI* rhi, VkFormat format, VkExtent3D extent,
         .requiredFlags = VkMemoryPropertyFlags { VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT }
     };
 
-    if (vmaCreateImage(rhi->getAllocator(), &imageCreateInfo, &allocCreateInfo, &_image, &_allocation, nullptr) != VK_SUCCESS) {
+    if (vmaCreateImage(rhi.getAllocator(), &imageCreateInfo, &allocCreateInfo, &_image, &_allocation, nullptr) != VK_SUCCESS) {
         NH3D_ABORT_VK("VMA image creation failed");
     }
 
@@ -67,7 +67,7 @@ VulkanTexture::VulkanTexture(VulkanRHI* rhi, VkFormat format, VkExtent3D extent,
             .layerCount = 1 }
     };
 
-    if (vkCreateImageView(rhi->getVkDevice(), &viewCreateInfo, nullptr, &_view) != VK_SUCCESS) {
+    if (vkCreateImageView(rhi.getVkDevice(), &viewCreateInfo, nullptr, &_view) != VK_SUCCESS) {
         NH3D_ABORT_VK("Failed to create Vulkan image view");
     }
 }
@@ -165,7 +165,7 @@ void VulkanTexture::changeLayoutBarrier(VkCommandBuffer commandBuffer, VkImageLa
     vkCmdPipelineBarrier2(commandBuffer, &depInfo);
 }
 
-void VulkanTexture::clear(VkCommandBuffer commandBuffer, Color color)
+void VulkanTexture::clear(VkCommandBuffer commandBuffer, color4 color)
 {
     VkImageSubresourceRange imageRange = VkImageSubresourceRange { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
         .levelCount = VK_REMAINING_MIP_LEVELS,

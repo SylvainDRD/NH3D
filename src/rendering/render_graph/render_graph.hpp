@@ -1,20 +1,19 @@
 #pragma once
 
 #include <misc/utils.hpp>
-#include <rendering/core/rhi_concept.hpp>
+#include <rendering/core/rhi_interface.hpp>
 
 namespace NH3D {
 
+class Scene;
+
 class Command {
-    
 };
 
 class RenderGraph {
     NH3D_NO_COPY_MOVE(RenderGraph)
 public:
-    RenderGraph() = default;
-
-    void clear();
+    RenderGraph(const Scene& scene);
 
 private:
     // std::vector<RenderingCommand*> _commands;

@@ -1,0 +1,18 @@
+#pragma once
+
+namespace NH3D {
+
+enum BufferUsageFlags {
+    NH3D_BUFFER_USAGE_STORAGE_BUFFER_BIT = 0,
+    NH3D_BUFFER_USAGE_SRC_TRANSFER_BIT,
+    NH3D_BUFFER_USAGE_DST_TRANSFER_BIT,
+    NH3D_BUFFER_USAGE_MAX
+};
+
+enum BufferMemoryUsage {
+    NH3D_MEM_USAGE_GPU_ONLY = 0,
+    NH3D_MEM_USAGE_CPU_ONLY,
+    NH3D_MEM_USAGE_MAX
+};
+
+}

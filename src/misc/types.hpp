@@ -14,15 +14,15 @@ static constexpr RID InvalidRID = std::numeric_limits<RID>::max();
 template <class T>
 using Uptr = std::unique_ptr<T>;
 
-using Vec2 = glm::vec2;
-using Vec3 = glm::vec3;
-using Vec4 = glm::vec4;
-using Color = Vec4;
-using Vec2i = glm::ivec2;
-using Vec3i = glm::ivec3;
-using Vec4i = glm::ivec4;
-using Vec2u = glm::uvec2;
-using Vec3u = glm::uvec3;
-using Vec4u = glm::uvec4;
+using vec2 = glm::vec2;
+using vec3 = glm::vec3;
+using vec4 = glm::vec4;
+using color4 = vec4;
+using vec2i = glm::ivec2;
+using vec3i = glm::ivec3;
+using vec4i = glm::ivec4;
+using vec2u = glm::uvec2;
+using vec3u = glm::uvec3;
+using vec4u = glm::uvec4;
 
 } 
