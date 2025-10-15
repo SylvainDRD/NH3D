@@ -9,6 +9,20 @@ namespace NH3D {
 
 class VulkanRHI;
 
+struct _VulkanBuffer {
+    // TODO
+    using ResourceType = Buffer;
+
+    struct Hot {
+        VkBuffer _buffer;
+    };
+
+    struct Cold {
+        VmaAllocation _allocation = nullptr;
+        VmaAllocationInfo _allocationInfo {}; // Necessary to keep?
+    };
+};
+
 class VulkanBuffer {
     NH3D_NO_COPY(VulkanBuffer)
 public:

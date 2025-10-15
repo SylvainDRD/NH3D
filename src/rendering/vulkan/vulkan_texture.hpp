@@ -4,6 +4,7 @@
 #include <misc/types.hpp>
 #include <misc/utils.hpp>
 #include <rendering/core/rhi_interface.hpp>
+#include <rendering/core/texture.hpp>
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_core.h>
@@ -11,6 +12,22 @@
 namespace NH3D {
 
 class VulkanRHI;
+
+struct _VulkanTexture {
+    using ResourceType = Texture;
+
+    struct Hot {
+        VkImage _image;
+        VkImageView _view;
+    };
+
+    struct Cold {
+        VkFormat _format;
+        VkExtent3D _extent;
+        VkImageLayout _layout = VK_IMAGE_LAYOUT_UNDEFINED;
+        VmaAllocation _allocation = nullptr;
+    };
+};
 
 class VulkanTexture {
     NH3D_NO_COPY(VulkanTexture)

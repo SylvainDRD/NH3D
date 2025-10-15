@@ -1,5 +1,9 @@
 #pragma once
 
+// Resources have to be included before the resource manager, otherwise clang will complain
+#include "rendering/vulkan/vulkan_buffer.hpp"
+#include "rendering/vulkan/vulkan_texture.hpp"
+
 #include <array>
 #include <cstdint>
 #include <misc/utils.hpp>
@@ -102,6 +106,8 @@ private:
     std::vector<VkSemaphore> _renderSemaphores;
 
     Uptr<VulkanDescriptorSetPool<MaxFramesInFlight>> _descriptorSetPoolCompute = nullptr;
+
+    ResourceManager _resourceManager;
 
     Uptr<VulkanComputePipeline> _computePipeline = nullptr;
     Uptr<VulkanGraphicsPipeline> _graphicsPipeline = nullptr;

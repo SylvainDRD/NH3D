@@ -1,98 +1,118 @@
 #pragma once
 
 #include <cstddef>
-#include <misc/utils.hpp>
 #include <misc/types.hpp>
+#include <misc/utils.hpp>
+#include <rendering/core/buffer.hpp>
+#include <rendering/core/handle.hpp>
 #include <rendering/core/rhi_interface.hpp>
-#include <sys/stat.h>
-#include <utility>
+#include <rendering/core/split_pool.hpp>
+#include <rendering/core/texture.hpp>
+#include <type_traits>
 
 namespace NH3D {
 
-// TODO: rework eventually, trashes the cache
-template <Resource T>
-class ResourceAllocator {
-    NH3D_NO_COPY_MOVE(ResourceAllocator<T>)
+struct VulkanTexture;
+struct VulkanBuffer;
+
+class ResourceManager {
+    NH3D_NO_COPY_MOVE(ResourceManager)
 public:
-    [[nodiscard]] static inline T& getResource(RID rid);
+    ResourceManager();
 
-    static inline void reserve(size_t capacity);
+    template <typename T>
+    [[nodiscard]] inline T::Hot& getHotData(Handle<typename T::ResourceType> handle);
 
-    template <class... Args>
-    static inline RID allocate(Args... args);
+    template <typename T>
+    [[nodiscard]] inline T::Cold& getColdData(Handle<typename T::ResourceType> handle);
 
-    static inline void release(const IRHI& rhi, RID rid);
+    template <typename T>
+    [[nodiscard]] inline Handle<typename T::ResourceType> store(typename T::Hot&& hotData, typename T::Cold&& coldData);
 
-    static inline void clear(const IRHI& rhi);
+    template <typename T>
+    inline void release(const IRHI& rhi, Handle<typename T::ResourceType> handle);
+
+    template <typename T>
+    inline void clear(const IRHI& rhi);
 
 private:
-    static std::vector<T> _resources;
-    static std::vector<RID> _availableRids;
+    template <typename T>
+    constexpr SplitPool<T>& getPool() const;
+
+private:
+    // Vulkan
+    SplitPool<VulkanTexture> _vulkanTextureData;
+    SplitPool<VulkanBuffer> _vulkanBufferData;
+
+    // TODO: DX12 ...
+
+    // Note: tuple based declaration would require feeding every single type at declaration time, which sucks
 };
 
-template <Resource T>
-std::vector<T> ResourceAllocator<T>::_resources;
-
-template <Resource T>
-std::vector<RID> ResourceAllocator<T>::_availableRids;
-
-template <Resource T>
-inline void ResourceAllocator<T>::reserve(size_t capacity) {
-    _resources.reserve(capacity);
-    _availableRids.reserve(capacity);
+ResourceManager::ResourceManager()
+{
+    _vulkanTextureData.reserve();
+    _vulkanBufferData.reserve();
 }
 
-template <Resource T>
-[[nodiscard]] inline T& ResourceAllocator<T>::getResource(RID rid)
+template <typename T>
+constexpr SplitPool<T>& ResourceManager::getPool() const
 {
-    NH3D_ASSERT(rid != InvalidRID && rid < _resources.size(), "Attempting to fetch a resource with an invalid RID");
-
-    return _resources[rid];
-}
-
-template <Resource T>
-template <class... Args>
-inline RID ResourceAllocator<T>::allocate(Args... args)
-{
-    RID rid;
-
-    if (!_availableRids.empty()) {
-        rid = _availableRids.back();
-        _availableRids.pop_back();
-        _resources[rid] = T{std::forward<Args>(args)...};
-    } else {
-        rid = _resources.size();
-        _resources.emplace_back(std::forward<Args>(args)...);
+    SplitPool<T>* pool;
+    if constexpr (std::is_same_v<VulkanTexture, T>) {
+        pool = &_vulkanTextureData;
+    } else if constexpr (std::is_same_v<VulkanBuffer, T>) {
+        pool = &_vulkanBufferData;
     }
 
-    return rid;
+    return *pool;
 }
 
-template <Resource T>
-inline void ResourceAllocator<T>::release(const IRHI& rhi, RID rid)
+template <typename T>
+[[nodiscard]] inline typename T::Hot& ResourceManager::getHotData(Handle<typename T::ResourceType> handle)
 {
-    NH3D_ASSERT(rid != InvalidRID && rid < _resources.size(), "Attempting to fetch a resource with an invalid RID");
-    NH3D_ASSERT(_resources[rid].isValid(), "Attempting to release an invalid resource");
+    SplitPool<T> pool = getPool<T>();
 
-    if (!_resources[rid].isValid()) {
-        NH3D_WARN("Attempting to release an invalid resource");
-        return;
-    }
-    _resources[rid].release(rhi);
-    _availableRids.emplace_back(rid);
+    // TODO: customize assertion message using https://github.com/Neargye/nameof
+    NH3D_ASSERT(handle.index < pool.size(), "Attempting to fetch a resource with an invalid handle");
+
+    return pool.getHot(handle);
 }
 
-template <Resource T>
-inline void ResourceAllocator<T>::clear(const IRHI& rhi)
+template <typename T>
+[[nodiscard]] inline typename T::Cold& ResourceManager::getColdData(Handle<typename T::ResourceType> handle)
 {
-    for (T& resource : _resources) {
-        if (resource.isValid()) {
-            resource.release(rhi);
-        }
-    }
+    SplitPool<T> pool = getPool<T>();
 
-    _resources.clear();
-    _availableRids.clear();
+    // TODO: customize assertion message using https://github.com/Neargye/nameof
+    NH3D_ASSERT(handle.index < pool.size(), "Attempting to fetch a resource with an invalid handle");
+
+    return pool.getCold(handle);
+}
+
+template <typename T>
+inline Handle<typename T::ResourceType> store(typename T::Hot&& hotData, typename T::Cold&& coldData)
+{
+    SplitPool<T> pool = getPool<T>();
+
+    return pool.store(std::forward(hotData), std::forward(coldData));
+}
+
+template <typename T>
+inline void ResourceManager::release(const IRHI& rhi, Handle<typename T::ResourceType> handle)
+{
+    SplitPool<T> pool = getPool<T>();
+
+    // TODO: customize assertion message using https://github.com/Neargye/nameof
+    NH3D_ASSERT(handle.index < pool.size(), "Attempting to fetch a resource with an invalid handle");
+
+    pool.release(handle);
+}
+
+inline void ResourceManager::clear(const IRHI& rhi)
+{
+    _vulkanTextureData.clear(rhi);
+    _vulkanBufferData.clear(rhi);
 }
 
 }

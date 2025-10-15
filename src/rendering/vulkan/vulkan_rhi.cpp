@@ -1,7 +1,8 @@
 #include "vulkan_rhi.hpp"
-#include "misc/types.hpp"
-#include "rendering/core/resource_manager.hpp"
-#include "rendering/vulkan/vulkan_buffer.hpp"
+#include <misc/types.hpp>
+#include <rendering/vulkan/resources.hpp>
+#include <rendering/core/resource_manager.hpp>
+#include <rendering/vulkan/vulkan_buffer.hpp>
 // #include <components/mesh_component.hpp>
 #include <cmath>
 #include <cstddef>
@@ -15,7 +16,6 @@
 #include <rendering/vulkan/vulkan_descriptor_set_pool.hpp>
 #include <rendering/vulkan/vulkan_graphics_pipeline.hpp>
 #include <rendering/vulkan/vulkan_texture.hpp>
-#include <sys/types.h>
 #include <unordered_set>
 #include <vulkan/vulkan_core.h>
 #define VMA_IMPLEMENTATION
@@ -43,7 +43,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
     vkGetDeviceQueue(_device, queues.GraphicsQueueFamilyID, 0, &_graphicsQueue);
     vkGetDeviceQueue(_device, queues.PresentQueueFamilyID, 0, &_presentQueue);
 
-    // The extent provided should match the surface, hopefully glfw
+    // The extent provided should match the surface, hopefully glfw does it right
     auto [swapchain, surfaceFormat] = createSwapchain(_device, _gpu, _surface, queues, { Window.getWidth(), Window.getHeight() });
     _swapchain = swapchain;
 
@@ -56,11 +56,11 @@ VulkanRHI::VulkanRHI(const Window& Window)
     vkGetSwapchainImagesKHR(_device, _swapchain, &swapchainImageCount, swapchainImages.data());
 
     const size_t capacity = 2000;
-    ResourceAllocator<VulkanTexture>::reserve(capacity);
-    ResourceAllocator<VulkanBuffer>::reserve(capacity);
+    ResourceManager<VulkanTexture>::reserve(capacity);
+    ResourceManager<VulkanBuffer>::reserve(capacity);
     for (int i = 0; i < swapchainImageCount; ++i) {
-        RID rid = ResourceAllocator<VulkanTexture>::allocate(std::cref(*this), swapchainImages[i], surfaceFormat, VkExtent3D { Window.getWidth(), Window.getHeight(), 1 }, VK_IMAGE_ASPECT_COLOR_BIT);
-        _swapchainTextures[i] = &ResourceAllocator<VulkanTexture>::getResource(rid);
+        Handle rid = ResourceManager<VulkanTexture>::allocate(std::cref(*this), swapchainImages[i], surfaceFormat, VkExtent3D { Window.getWidth(), Window.getHeight(), 1 }, VK_IMAGE_ASPECT_COLOR_BIT);
+        _swapchainTextures[i] = &ResourceManager<VulkanTexture>::getResource(rid);
     }
 
     _commandPool = createCommandPool(_device, queues.GraphicsQueueFamilyID);
@@ -76,14 +76,14 @@ VulkanRHI::VulkanRHI(const Window& Window)
         _presentSemaphores[i] = createSemaphore(_device);
         _frameFences[i] = createFence(_device);
 
-        RID rid = ResourceAllocator<VulkanTexture>::allocate(
+        Handle rid = ResourceManager<VulkanTexture>::allocate(
             std::cref(*this),
             VK_FORMAT_R16G16B16A16_SFLOAT,
             VkExtent3D { Window.getWidth(), Window.getHeight(), 1 },
             static_cast<VkImageUsageFlags>(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT),
             VK_IMAGE_ASPECT_COLOR_BIT);
 
-        _renderTargets[i] = &ResourceAllocator<VulkanTexture>::getResource(rid);
+        _renderTargets[i] = &ResourceManager<VulkanTexture>::getResource(rid);
     }
 
     _descriptorSetPoolCompute = std::make_unique<VulkanDescriptorSetPool<MaxFramesInFlight>>(_device,
@@ -114,8 +114,8 @@ VulkanRHI::~VulkanRHI()
     _computePipeline->release(_device);
     _graphicsPipeline->release(_device);
 
-    ResourceAllocator<VulkanTexture>::clear(*this);
-    ResourceAllocator<VulkanBuffer>::clear(*this);
+    ResourceManager<VulkanTexture>::clear(*this);
+    ResourceManager<VulkanBuffer>::clear(*this);
 
     for (uint32_t i = 0; i < MaxFramesInFlight; ++i) {
         vkDestroyFence(_device, _frameFences[i], nullptr);

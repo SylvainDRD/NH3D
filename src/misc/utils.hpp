@@ -35,6 +35,8 @@ namespace NH3D {
     T& operator=(const T&&) = delete;
 #define NH3D_NO_COPY_MOVE(T) NH3D_NO_COPY(T) NH3D_NO_MOVE(T)
 
+#define NH3D_STATIC_ASSERT static_assert
+
 #ifdef NH3D_DEBUG
 #define NH3D_DEBUGLOG(msg) std::cout << "\033[96m[DEBUG]: " << msg << _NH3D_ENDLOG
 #define NH3D_DEBUGLOG_VK(msg) std::cout << "\033[96m[VK DEBUG]: " << msg << _NH3D_ENDLOG

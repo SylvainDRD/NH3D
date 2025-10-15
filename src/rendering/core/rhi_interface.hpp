@@ -2,12 +2,15 @@
 
 #include <concepts>
 #include <misc/utils.hpp>
-#include <type_traits>
+#include <rendering/core/handle.hpp>
+#include <rendering/core/texture.hpp>
+#include <rendering/core/buffer.hpp>
 
 namespace NH3D {
 
 class RenderGraph;
 
+// TODO: singleton
 class IRHI {
     NH3D_NO_COPY_MOVE(IRHI)
 public:
@@ -15,19 +18,17 @@ public:
 
     virtual ~IRHI() = default;
 
+    virtual void initialize() = 0;
+
+    virtual Handle<Texture> createTexture(const Texture::CreateInfo& info) = 0;
+
+    virtual Handle<Texture> createBuffer(const Buffer::CreateInfo& info) = 0;
+    
+    virtual void destroyTexture(const Handle<Texture> handle) = 0;
+
+    virtual void destroyBuffer(const Handle<Buffer> handle) = 0;
+
     virtual void render(const RenderGraph& graph) const = 0;
 };
-
-template <typename T>
-concept Releasable = requires(T resource, const IRHI& rhi) { { resource.release(rhi) } -> std::same_as<void>; };
-
-template <typename T>
-concept Resource = std::movable<T> && Releasable<T> && 
-requires(T resource) { 
-    { resource.isValid() } -> std::same_as<bool>; 
-};
-
-template <typename T>
-concept RHI = std::derived_from<T, IRHI>;
 
 }

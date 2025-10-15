@@ -1,15 +1,11 @@
 #pragma once
 
+#include <cstdint>
 #include <glm/glm.hpp>
-#include <limits>
 #include <memory>
 #include <misc/utils.hpp>
 
 namespace NH3D {
-
-using RIDType = uint32_t;
-using RID = RIDType;
-static constexpr RID InvalidRID = std::numeric_limits<RID>::max();
 
 template <class T>
 using Uptr = std::unique_ptr<T>;
@@ -25,4 +21,9 @@ using vec2u = glm::uvec2;
 using vec3u = glm::uvec3;
 using vec4u = glm::uvec4;
 
-} 
+using uint8 = uint8_t;
+using byte = uint8_t;
+using uint32 = uint32_t;
+using uint64 = uint64_t;
+
+}
