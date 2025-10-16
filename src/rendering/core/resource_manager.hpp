@@ -5,7 +5,7 @@
 #include <misc/utils.hpp>
 #include <rendering/core/buffer.hpp>
 #include <rendering/core/handle.hpp>
-#include <rendering/core/rhi_interface.hpp>
+#include <rendering/core/rhi.hpp>
 #include <rendering/core/split_pool.hpp>
 #include <rendering/core/texture.hpp>
 #include <type_traits>
@@ -32,7 +32,6 @@ public:
     template <typename T>
     inline void release(const IRHI& rhi, Handle<typename T::ResourceType> handle);
 
-    template <typename T>
     inline void clear(const IRHI& rhi);
 
 private:
@@ -95,7 +94,7 @@ inline Handle<typename T::ResourceType> store(typename T::Hot&& hotData, typenam
 {
     SplitPool<T> pool = getPool<T>();
 
-    return pool.store(std::forward(hotData), std::forward(coldData));
+    return pool.store(std::forward<typename T::Hot>(hotData), std::forward<typename T::Cold>(coldData));
 }
 
 template <typename T>
@@ -104,9 +103,9 @@ inline void ResourceManager::release(const IRHI& rhi, Handle<typename T::Resourc
     SplitPool<T> pool = getPool<T>();
 
     // TODO: customize assertion message using https://github.com/Neargye/nameof
-    NH3D_ASSERT(handle.index < pool.size(), "Attempting to fetch a resource with an invalid handle");
+    NH3D_ASSERT(handle.index < pool.size(), "Attempting to release a resource with an invalid handle");
 
-    pool.release(handle);
+    T::release(rhi, pool.getHotData(handle), pool.getColdData(handle));
 }
 
 inline void ResourceManager::clear(const IRHI& rhi)

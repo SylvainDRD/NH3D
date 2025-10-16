@@ -4,7 +4,7 @@
 
 namespace NH3D {
 
-VulkanBuffer::VulkanBuffer(const VulkanRHI& rhi, uint32_t size, VkBufferUsageFlags usageFlags, VmaMemoryUsage memoryUsage)
+std::pair<VkBuffer, VulkanBuffer::Allocation> VulkanBuffer::create(const VulkanRHI& rhi, uint32_t size, VkBufferUsageFlags usageFlags, VmaMemoryUsage memoryUsage)
 {
     VkBufferCreateInfo bufferCreateInfo {
         .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -17,33 +17,21 @@ VulkanBuffer::VulkanBuffer(const VulkanRHI& rhi, uint32_t size, VkBufferUsageFla
         .usage = memoryUsage
     };
 
-    if (vmaCreateBuffer(rhi.getAllocator(), &bufferCreateInfo, &allocationCreateInfo, &_buffer, &_allocation, &_allocationInfo) != VK_SUCCESS) {
+    VkBuffer buffer;
+    VmaAllocation allocation;
+    VmaAllocationInfo allocationInfo;
+    if (vmaCreateBuffer(rhi.getAllocator(), &bufferCreateInfo, &allocationCreateInfo, &buffer, &allocation, &allocationInfo) != VK_SUCCESS) {
         NH3D_ABORT_VK("Vulkan buffer creation failed");
     }
+
+    return { buffer, { allocation, allocationInfo } };
 }
 
-VulkanBuffer::VulkanBuffer(VulkanBuffer&& other) {
-    _buffer = other._buffer;
-    other._buffer = nullptr;
-    _allocation = other._allocation;
-    other._allocation = nullptr;
-    _allocationInfo = other._allocationInfo;
-}
-
-VulkanBuffer& VulkanBuffer::operator=(VulkanBuffer&& other) {
-    _buffer = other._buffer;
-    other._buffer = nullptr;
-    _allocation = other._allocation;
-    other._allocation = nullptr;
-    _allocationInfo = other._allocationInfo;
-
-    return *this;
-}
-
-void VulkanBuffer::release(const IRHI& rhi) {
+void VulkanBuffer::release(const IRHI& rhi, VkBuffer& buffer, Allocation& allocation)
+{
     const VulkanRHI& vrhi = static_cast<const VulkanRHI&>(rhi);
 
-    vmaDestroyBuffer(vrhi.getAllocator(), _buffer, _allocation);
+    vmaDestroyBuffer(vrhi.getAllocator(), buffer, allocation.allocation);
 }
 
 }

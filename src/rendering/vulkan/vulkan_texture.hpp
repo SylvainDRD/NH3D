@@ -1,9 +1,8 @@
 #pragma once
 
-#include <cstdint>
 #include <misc/types.hpp>
 #include <misc/utils.hpp>
-#include <rendering/core/rhi_interface.hpp>
+#include <rendering/core/rhi.hpp>
 #include <rendering/core/texture.hpp>
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.hpp>
@@ -13,64 +12,42 @@ namespace NH3D {
 
 class VulkanRHI;
 
-struct _VulkanTexture {
+struct VulkanTexture {
     using ResourceType = Texture;
 
-    struct Hot {
-        VkImage _image;
-        VkImageView _view;
+    struct ImageView {
+        VkImage image;
+        VkImageView view;
     };
+    using Hot = ImageView;
 
-    struct Cold {
-        VkFormat _format;
-        VkExtent3D _extent;
-        VkImageLayout _layout = VK_IMAGE_LAYOUT_UNDEFINED;
-        VmaAllocation _allocation = nullptr;
+    struct Meta {
+        VkFormat format;
+        VkExtent3D extent;
+        VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
+        VmaAllocation allocation = nullptr;
     };
-};
+    using Cold = Meta;
 
-class VulkanTexture {
-    NH3D_NO_COPY(VulkanTexture)
-public:
-    VulkanTexture() = default;
+    // Typically used for swapchain images
+    [[nodiscard]] static std::pair<ImageView, Meta> create(const VulkanRHI& rhi, VkFormat format, VkExtent3D extent, VkImageAspectFlags aspect);
 
-    VulkanTexture(const VulkanRHI& rhi, VkImage image, VkFormat format, VkExtent3D extent, VkImageAspectFlags aspect);
+    [[nodiscard]] static std::pair<ImageView, Meta> create(const VulkanRHI& rhi, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, VkImageAspectFlags aspect, bool mipmap = true);
 
-    VulkanTexture(const VulkanRHI& rhi, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, VkImageAspectFlags aspect, bool mipmap = true);
+    // Used generically by the ResourceManager, must be API agnostic, non-const ref for invalidation 
+    static void release(const IRHI& rhi, ImageView& imageViewData, Meta& metadata);
 
-    VulkanTexture(VulkanTexture&& other);
+    // Used generically by the ResourceManager, must be API agnostic
+    [[nodiscard]] static inline bool valid(const ImageView& imageViewData, const Meta& metadata) { return imageViewData._image != nullptr; }
 
-    VulkanTexture& operator=(VulkanTexture&& other);
+    /// Helper functions
+    static void insertBarrier(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout layout);
 
-    void release(const IRHI& rhi);
+    static void changeLayoutBarrier(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout &layout, VkImageLayout newLayout);
 
-    [[nodiscard]] inline bool isValid() const { return _image != nullptr; }
+    static void clear(VkCommandBuffer commandBuffer, VkImage image,  color4 color);
 
-    [[nodiscard]] inline uint32_t getWidth() const { return _extent.width; }
-
-    [[nodiscard]] inline uint32_t getHeight() const { return _extent.height; }
-
-    [[nodiscard]] inline VkImageView getView() const { return _view; }
-
-    [[nodiscard]] inline VkFormat getFormat() const { return _format; }
-
-    [[nodiscard]] VkRenderingAttachmentInfo getAttachmentInfo() const;
-
-    void insertBarrier(VkCommandBuffer commandBuffer);
-
-    void changeLayoutBarrier(VkCommandBuffer commandBuffer, VkImageLayout newLayout);
-
-    void clear(VkCommandBuffer commandBuffer, color4 color);
-
-    void blit(VkCommandBuffer commandBuffer, VulkanTexture& dst);
-
-private:
-    VkImage _image;
-    VkImageView _view;
-    VkFormat _format;
-    VkExtent3D _extent;
-    VkImageLayout _layout = VK_IMAGE_LAYOUT_UNDEFINED;
-    VmaAllocation _allocation = nullptr;
+    static void blit(VkCommandBuffer commandBuffer, VkImage srcImage, VkExtent3D srcExtent, VkImage dstImage, VkExtent3D dstExtent);
 };
 
 }

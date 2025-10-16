@@ -1,14 +1,14 @@
 #pragma once
 
-#include <concepts>
 #include <misc/utils.hpp>
+#include <rendering/core/buffer.hpp>
 #include <rendering/core/handle.hpp>
 #include <rendering/core/texture.hpp>
-#include <rendering/core/buffer.hpp>
 
 namespace NH3D {
 
 class RenderGraph;
+class Window;
 
 // TODO: singleton
 class IRHI {
@@ -18,17 +18,16 @@ public:
 
     virtual ~IRHI() = default;
 
-    virtual void initialize() = 0;
+    [[nodiscard]] virtual Handle<Texture> createTexture(const Texture::CreateInfo& info) = 0;
 
-    virtual Handle<Texture> createTexture(const Texture::CreateInfo& info) = 0;
-
-    virtual Handle<Texture> createBuffer(const Buffer::CreateInfo& info) = 0;
-    
     virtual void destroyTexture(const Handle<Texture> handle) = 0;
+    
+    [[nodiscard]] virtual Handle<Texture> createBuffer(const Buffer::CreateInfo& info) = 0;
 
     virtual void destroyBuffer(const Handle<Buffer> handle) = 0;
 
     virtual void render(const RenderGraph& graph) const = 0;
+
 };
 
 }

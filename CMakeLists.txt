@@ -33,6 +33,12 @@ endif()
 
 target_compile_features(${binary} PRIVATE cxx_std_20) 
 
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+	target_compile_options(${binary} PRIVATE -Wswitch)
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+	target_compile_options(${binary} PRIVATE /We4062)
+endif()
+
 # External dependencies
 find_package(Vulkan REQUIRED)
 

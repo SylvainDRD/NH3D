@@ -55,12 +55,9 @@ VulkanRHI::VulkanRHI(const Window& Window)
     _swapchainTextures.resize(swapchainImageCount);
     vkGetSwapchainImagesKHR(_device, _swapchain, &swapchainImageCount, swapchainImages.data());
 
-    const size_t capacity = 2000;
-    ResourceManager<VulkanTexture>::reserve(capacity);
-    ResourceManager<VulkanBuffer>::reserve(capacity);
     for (int i = 0; i < swapchainImageCount; ++i) {
-        Handle rid = ResourceManager<VulkanTexture>::allocate(std::cref(*this), swapchainImages[i], surfaceFormat, VkExtent3D { Window.getWidth(), Window.getHeight(), 1 }, VK_IMAGE_ASPECT_COLOR_BIT);
-        _swapchainTextures[i] = &ResourceManager<VulkanTexture>::getResource(rid);
+        Handle rid = ResourceManager::allocate(std::cref(*this), swapchainImages[i], surfaceFormat, VkExtent3D { Window.getWidth(), Window.getHeight(), 1 }, VK_IMAGE_ASPECT_COLOR_BIT);
+        _swapchainTextures[i] = &ResourceManager::getResource(rid);
     }
 
     _commandPool = createCommandPool(_device, queues.GraphicsQueueFamilyID);
@@ -76,14 +73,14 @@ VulkanRHI::VulkanRHI(const Window& Window)
         _presentSemaphores[i] = createSemaphore(_device);
         _frameFences[i] = createFence(_device);
 
-        Handle rid = ResourceManager<VulkanTexture>::allocate(
+        Handle rid = ResourceManager::allocate(
             std::cref(*this),
             VK_FORMAT_R16G16B16A16_SFLOAT,
             VkExtent3D { Window.getWidth(), Window.getHeight(), 1 },
             static_cast<VkImageUsageFlags>(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT),
             VK_IMAGE_ASPECT_COLOR_BIT);
 
-        _renderTargets[i] = &ResourceManager<VulkanTexture>::getResource(rid);
+        _renderTargets[i] = &ResourceManager::getResource(rid);
     }
 
     _descriptorSetPoolCompute = std::make_unique<VulkanDescriptorSetPool<MaxFramesInFlight>>(_device,
@@ -102,9 +99,31 @@ VulkanRHI::VulkanRHI(const Window& Window)
             .vertexShaderPath = PROJECT_DIR "src/rendering/shaders/.cache/triangle.vert.spv",
             .fragmentShaderPath = PROJECT_DIR "src/rendering/shaders/.cache/triangle.frag.spv",
             .colorAttachmentFormats { _renderTargets[0]->getFormat() } });
-
-    // MeshComponent<VulkanRHI> mesh { *this, {}, {} };
 }
+
+
+Handle<Texture> VulkanRHI::createTexture(const Texture::CreateInfo& info) {
+    auto &&[imageViewData, metadata] = VulkanTexture::create(*this, info.format, info.size, info.usage);
+
+    _resourceManager.store<VulkanTexture>(std::move(imageViewData), std::move(metadata));
+}
+
+void VulkanRHI::destroyTexture(const Handle<Texture> handle) {
+
+}
+
+Handle<Texture> VulkanRHI::createBuffer(const Buffer::CreateInfo& info) {
+
+}
+
+void VulkanRHI::destroyBuffer(const Handle<Buffer> handle) {
+
+}
+
+void VulkanRHI::render(const RenderGraph& graph) const {
+
+}
+
 
 VulkanRHI::~VulkanRHI()
 {
@@ -114,8 +133,8 @@ VulkanRHI::~VulkanRHI()
     _computePipeline->release(_device);
     _graphicsPipeline->release(_device);
 
-    ResourceManager<VulkanTexture>::clear(*this);
-    ResourceManager<VulkanBuffer>::clear(*this);
+    ResourceManager::clear(*this);
+    ResourceManager::clear(*this);
 
     for (uint32_t i = 0; i < MaxFramesInFlight; ++i) {
         vkDestroyFence(_device, _frameFences[i], nullptr);

@@ -1,5 +1,6 @@
 #include "vk_mem_alloc.h"
 #include "vulkan/vulkan_core.h"
+#include <cstdint>
 #include <gtest/gtest.h>
 #include <rendering/core/enums.hpp>
 #include <rendering/vulkan/vulkan_enums.hpp>
@@ -8,19 +9,23 @@ namespace NH3D::Test {
 
 TEST(VulkanEnumTest, BufferUsageFlagsMapping)
 {
-    EXPECT_EQ(BufferUsageFlags::NH3D_BUFFER_USAGE_MAX, sizeof(_Private::VulkanBufferUsageFlags) / sizeof(_Private::VulkanBufferUsageFlags[0]));
+    EXPECT_EQ(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, MapBufferUsageFlagBits(BufferUsageFlagBits::STORAGE_BUFFER_BIT));
+    EXPECT_EQ(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, MapBufferUsageFlagBits(BufferUsageFlagBits::SRC_TRANSFER_BIT));
+    EXPECT_EQ(VK_BUFFER_USAGE_TRANSFER_DST_BIT, MapBufferUsageFlagBits(BufferUsageFlagBits::DST_TRANSFER_BIT));
 
-    EXPECT_EQ(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, MapBufferUsageFlagBits(BufferUsageFlags::NH3D_BUFFER_USAGE_STORAGE_BUFFER_BIT));
-    EXPECT_EQ(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, MapBufferUsageFlagBits(BufferUsageFlags::NH3D_BUFFER_USAGE_SRC_TRANSFER_BIT));
-    EXPECT_EQ(VK_BUFFER_USAGE_TRANSFER_DST_BIT, MapBufferUsageFlagBits(BufferUsageFlags::NH3D_BUFFER_USAGE_DST_TRANSFER_BIT));
+    // TODO: rewrite to test both individual values and combinations
 }
 
 TEST(VulkanEnumTest, BufferMemoryUsageMapping)
 {
-    EXPECT_EQ(BufferMemoryUsage::NH3D_MEM_USAGE_MAX, sizeof(_Private::VulkanMemoryUsageFlags) / sizeof(_Private::VulkanMemoryUsageFlags[0]));
+    constexpr VmaMemoryUsage Expected[] = { VMA_MEMORY_USAGE_GPU_ONLY, VMA_MEMORY_USAGE_CPU_ONLY, VMA_MEMORY_USAGE_CPU_TO_GPU, VMA_MEMORY_USAGE_GPU_TO_CPU };
 
-    EXPECT_EQ(VMA_MEMORY_USAGE_GPU_ONLY, MapBufferMemoryUsage(BufferMemoryUsage::NH3D_MEM_USAGE_GPU_ONLY));
-    EXPECT_EQ(VMA_MEMORY_USAGE_CPU_ONLY, MapBufferMemoryUsage(BufferMemoryUsage::NH3D_MEM_USAGE_CPU_ONLY));
+    constexpr uint32_t TestCases = sizeof(Expected) / sizeof(VmaMemoryUsage);
+    EXPECT_EQ(TestCases, BufferMemoryUsage::MAX);
+
+    for (uint32_t i = 0; i < std::max(TestCases, static_cast<uint32_t>(BufferMemoryUsage::MAX)); ++i) {
+        EXPECT_EQ(MapBufferMemoryUsage(static_cast<BufferMemoryUsage>(i)), Expected[i]);
+    }
 }
 
 }

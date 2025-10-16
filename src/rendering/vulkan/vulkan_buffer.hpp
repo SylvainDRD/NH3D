@@ -1,7 +1,9 @@
 #pragma once
 
 #include <misc/utils.hpp>
-#include <rendering/core/rhi_interface.hpp>
+#include <misc/types.hpp>
+#include <rendering/core/buffer.hpp>
+#include <rendering/core/rhi.hpp>
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan_core.h>
 
@@ -9,39 +11,26 @@ namespace NH3D {
 
 class VulkanRHI;
 
-struct _VulkanBuffer {
+struct VulkanBuffer {
     // TODO
     using ResourceType = Buffer;
 
-    struct Hot {
-        VkBuffer _buffer;
+    using Hot = VkBuffer;
+
+    struct Allocation {
+        VmaAllocation allocation;
+        VmaAllocationInfo allocationInfo; // TODO: check if required
     };
+    using Cold = Allocation;
 
-    struct Cold {
-        VmaAllocation _allocation = nullptr;
-        VmaAllocationInfo _allocationInfo {}; // Necessary to keep?
-    };
-};
+    static std::pair<VkBuffer, Allocation> create(const VulkanRHI& rhi, uint32_t size, VkBufferUsageFlags usageFlags, VmaMemoryUsage memoryUsage);
 
-class VulkanBuffer {
-    NH3D_NO_COPY(VulkanBuffer)
-public:
-    VulkanBuffer() = delete;
+    // Used generically by the ResourceManager, must be API agnostic, non-const ref for invalidation
+    static void release(const IRHI& rhi, VkBuffer& buffer, Allocation& allocation);
 
-    VulkanBuffer(const VulkanRHI& rhi, uint32_t size, VkBufferUsageFlags usageFlags, VmaMemoryUsage memoryUsage);
-
-    VulkanBuffer(VulkanBuffer&& other);
-
-    VulkanBuffer& operator=(VulkanBuffer&& other);
-
-    void release(const IRHI& rhi);
-
-    [[nodiscard]] bool isValid() const { return _buffer != nullptr; }
-
-private:
-    VkBuffer _buffer;
-    VmaAllocation _allocation = nullptr;
-    VmaAllocationInfo _allocationInfo {}; // Necessary to keep?
+    // Used generically by the ResourceManager, must be API agnostic
+    [[nodiscard]] static inline bool valid(const VkBuffer& buffer, const Allocation& allocation) { return buffer != nullptr; }
+    
 };
 
 }

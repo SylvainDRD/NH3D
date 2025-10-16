@@ -8,7 +8,7 @@
 #include <cstdint>
 #include <misc/utils.hpp>
 #include <rendering/core/resource_manager.hpp>
-#include <rendering/core/rhi_interface.hpp>
+#include <rendering/core/rhi.hpp>
 #include <rendering/render_graph/render_graph.hpp>
 #include <rendering/vulkan/vulkan_buffer.hpp>
 #include <rendering/vulkan/vulkan_enums.hpp>
@@ -41,7 +41,15 @@ public:
 
     inline VkCommandBuffer getCommandBuffer() const { return _commandBuffers[_frameId % MaxFramesInFlight]; }
 
-    virtual void render(const RenderGraph& rdag) const override;
+    virtual Handle<Texture> createTexture(const Texture::CreateInfo& info) override;
+
+    virtual void destroyTexture(const Handle<Texture> handle) override;
+    
+    virtual Handle<Texture> createBuffer(const Buffer::CreateInfo& info) override;
+
+    virtual void destroyBuffer(const Handle<Buffer> handle) override;
+
+    virtual void render(const RenderGraph& graph) const override;
 
 private:
     struct PhysicalDeviceQueueFamilyID {

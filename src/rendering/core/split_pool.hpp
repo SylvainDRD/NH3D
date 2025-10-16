@@ -1,7 +1,10 @@
 #pragma once
 
-#include "rendering/core/handle.hpp"
+#include <cstddef>
 #include <misc/utils.hpp>
+#include <rendering/core/handle.hpp>
+#include <rendering/core/rhi.hpp>
+#include <utility>
 #include <vector>
 
 namespace NH3D {
@@ -10,26 +13,92 @@ template <typename T>
 class SplitPool {
     NH3D_NO_COPY(SplitPool)
 public:
-    SplitPool() = default;
+    using Hot = typename T::Hot;
+    using Cold = typename T::Cold;
+    using HandleType = Handle<typename T::ResourceType>;
 
-    inline void reserve();
+    SplitPool(size_t preallocSize, size_t freelistSize);
 
     [[nodiscard]] inline size_t size() const;
 
-    [[nodiscard]] inline typename T::Hot& getHotData(Handle<typename T::ResourceType> handle);
+    [[nodiscard]] inline Hot& getHotData(HandleType handle);
 
-    [[nodiscard]] inline typename T::Cold& getColdData(Handle<typename T::ResourceType> handle);
+    [[nodiscard]] inline Cold& getColdData(HandleType handle);
 
-    [[nodiscard]] inline Handle<typename T::ResourceType> store(typename T::Hot&& hotData, typename T::Cold&& coldData); 
-    
-    inline void release(Handle<typename T::ResourceType>); 
+    [[nodiscard]] inline HandleType store(Hot&& hotData, Cold&& coldData);
+
+    inline void release(const IRHI& rhi, HandleType handle);
+
+    inline void clear(const IRHI& rhi);
 
 private:
-    std::vector<typename T::Hot> _hot;
-    std::vector<typename T::Cold> _cold;
-    std::vector<Handle<typename T::ResourceType>> _availableHandles;
+    std::vector<Hot> _hot;
+    std::vector<Cold> _cold;
+    std::vector<HandleType> _availableHandles;
 };
 
-// TODO
+template <typename T>
+[[nodiscard]] inline SplitPool<T>::SplitPool(size_t preallocSize, size_t freelistSize)
+{
+    _hot.reserve(preallocSize);
+    _cold.reserve(preallocSize);
+    _availableHandles.reserve(freelistSize);
+}
+
+template <typename T>
+[[nodiscard]] inline size_t SplitPool<T>::size() const
+{
+    NH3D_ASSERT(_hot.size() == _cold.size(), "Hot and cold data size mismatch");
+    return _hot.size();
+}
+
+template <typename T>
+[[nodiscard]] inline SplitPool<T>::Hot& SplitPool<T>::getHotData(HandleType handle)
+{
+    NH3D_ASSERT(handle.index < _hot.size(), "Invalid handle index");
+    return _hot[handle.index];
+}
+
+template <typename T>
+[[nodiscard]] inline SplitPool<T>::Cold& SplitPool<T>::getColdData(HandleType handle)
+{
+    NH3D_ASSERT(handle.index < _cold.size(), "Invalid handle index");
+    return _cold[handle.index];
+}
+
+template <typename T>
+[[nodiscard]] inline SplitPool<T>::HandleType SplitPool<T>::store(Hot&& hotData, Cold&& coldData)
+{
+    HandleType handle;
+    if (!_availableHandles.empty()) {
+        handle = _availableHandles.back();
+        _availableHandles.pop_back();
+    } else {
+        handle = _hot.size();
+    }
+
+    _hot.emplace_back(std::forward<Hot>(hotData));
+    _cold.emplace_back(std::forward<Cold>(coldData));
+
+    return handle;
+}
+
+template <typename T>
+inline void SplitPool<T>::clear(const IRHI& rhi)
+{
+    for (uint32 i = 0; i < _hot.size(); ++i) {
+        const HandleType handle { i };
+        Hot& hot = getHotData(handle);
+        Cold& cold = getColdData(handle);
+
+        if (T::valid(hot, cold)) {
+            T::release(rhi, hot, cold);
+        }
+    }
+
+    _hot.clear();
+    _cold.clear();
+    _availableHandles.clear();
+}
 
 }
