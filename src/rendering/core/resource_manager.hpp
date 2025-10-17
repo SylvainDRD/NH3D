@@ -50,8 +50,8 @@ private:
 
 ResourceManager::ResourceManager()
 {
-    _vulkanTextureData.reserve();
-    _vulkanBufferData.reserve();
+    _vulkanTextureData.reserve(1000);
+    _vulkanBufferData.reserve(1000);
 }
 
 template <typename T>

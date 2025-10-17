@@ -4,7 +4,7 @@
 
 namespace NH3D {
 
-std::pair<VkBuffer, VulkanBuffer::Allocation> VulkanBuffer::create(const VulkanRHI& rhi, uint32_t size, VkBufferUsageFlags usageFlags, VmaMemoryUsage memoryUsage)
+std::pair<VkBuffer, VulkanBuffer::Allocation> VulkanBuffer::create(const VulkanRHI& rhi, size_t size, VkBufferUsageFlags usageFlags, VmaMemoryUsage memoryUsage)
 {
     VkBufferCreateInfo bufferCreateInfo {
         .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,

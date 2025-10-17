@@ -22,7 +22,7 @@ public:
 
     virtual void destroyTexture(const Handle<Texture> handle) = 0;
     
-    [[nodiscard]] virtual Handle<Texture> createBuffer(const Buffer::CreateInfo& info) = 0;
+    [[nodiscard]] virtual Handle<Buffer> createBuffer(const Buffer::CreateInfo& info) = 0;
 
     virtual void destroyBuffer(const Handle<Buffer> handle) = 0;
 

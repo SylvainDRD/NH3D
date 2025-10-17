@@ -1,57 +1,93 @@
 #pragma once
 
+#include <cstdint>
+
 namespace NH3D {
 
-enum class TextureFormat {
-    R8_SINT,
+enum class TextureFormat : uint32_t {
     R8_UINT,
+    R8_SINT,
     R16_SINT,
     R16_UINT,
     R16_SFLOAT,
     R32_SINT,
     R32_UINT,
     R32_SFLOAT,
-    RG8_SINT,
     RG8_UINT,
-    RG16_SINT,
+    RG8_SINT,
+    RG8_UNORM,
+    RG8_SNORM,
     RG16_UINT,
+    RG16_SINT,
     RG16_SFLOAT,
-    RG32_SINT,
+    RG16_UNORM,
+    RG16_SNORM,
     RG32_UINT,
+    RG32_SINT,
     RG32_SFLOAT,
-    RGB8_SINT,
     RGB8_UINT,
+    RGB8_SINT,
     RGB8_SRGB,
-    RGB16_SINT,
+    RGB8_UNORM,
+    RGB8_SNORM,
     RGB16_UINT,
+    RGB16_SINT,
     RGB16_SFLOAT,
-    RGB32_SINT,
+    RGB16_UNORM,
+    RGB16_SNORM,
     RGB32_UINT,
+    RGB32_SINT,
     RGB32_SFLOAT,
-    RGBA8_SINT,
     RGBA8_UINT,
+    RGBA8_SINT,
     RGBA8_SRGB,
-    RGBA16_SINT,
+    RGBA8_UNORM,
+    RGBA8_SNORM,
     RGBA16_UINT,
+    RGBA16_SINT,
     RGBA16_SFLOAT,
-    RGBA32_SINT,
+    RGBA16_UNORM,
+    RGBA16_SNORM,
     RGBA32_UINT,
+    RGBA32_SINT,
     RGBA32_SFLOAT,
-    MAX
+    NH3D_TEXTURE_FORMAT_MAX
 };
 
-enum class BufferUsageFlagBits {
-    STORAGE_BUFFER_BIT = 0,
-    SRC_TRANSFER_BIT = 1,
-    DST_TRANSFER_BIT = 2
+// TODO: check if DX12 friendly
+using TextureUsageFlags = uint32_t;
+enum TextureUsageFlagBits : uint32_t {
+    USAGE_COLOR_BIT = 1 << 0,
+    USAGE_DEPTH_STENCIL_BIT = 1 << 1,
+    USAGE_STORAGE_BIT = 1 << 2,
+    USAGE_SAMPLED_BIT = 1 << 3,
+    USAGE_INPUT_BIT = 1 << 4,
+    NH3D_TEXTURE_USAGE_MAX = 1 << 5
 };
 
-enum class BufferMemoryUsage {
+// TODO: check if DX12 friendly
+using TextureAspectFlags = uint32_t;
+enum TextureAspectFlagBits : uint32_t {
+    ASPECT_COLOR_BIT = 1 << 0,
+    ASPECT_DEPTH_BIT = 1 << 1,
+    ASPECT_STENCIL_BIT = 1 << 2,
+    NH3D_TEXTURE_ASPECT_MAX = 1 << 3
+};
+
+using BufferUsageFlags = uint32_t;
+enum BufferUsageFlagBits : uint32_t {
+    STORAGE_BUFFER_BIT = 1 << 0,
+    SRC_TRANSFER_BIT = 1 << 1,
+    DST_TRANSFER_BIT = 1 << 2,
+    NH3D_BUFFER_USAGE_MAX = 1 << 3
+};
+
+enum class BufferMemoryUsage : uint32_t {
     GPU_ONLY = 0,
     CPU_ONLY,
-    CPU_GPU, 
+    CPU_GPU,
     GPU_CPU, // wtf is the difference
-    MAX
+    NH3D_BUFFER_MEMORY_USAGE_MAX
 };
 
 }

@@ -17,9 +17,9 @@ public:
 
     [[nodiscard]] VkSurfaceKHR createVkSurface(VkInstance instance) const;
 
-    inline uint32_t getWidth() const { return _width; }
+    [[nodiscard]] inline uint32_t getWidth() const { return _width; }
 
-    inline uint32_t getHeight() const { return _height; }
+    [[nodiscard]] inline uint32_t getHeight() const { return _height; }
 
     inline void update() { glfwPollEvents(); }
 

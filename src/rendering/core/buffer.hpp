@@ -1,10 +1,15 @@
 #pragma once
 
+#include <misc/types.hpp>
+#include <rendering/core/enums.hpp>
+
 namespace NH3D {
 
 struct Buffer {
     struct CreateInfo {
-        // TODO
+        size_t size; // in bytes
+        BufferUsageFlags usage;
+        BufferMemoryUsage memory;
     };
 };
 

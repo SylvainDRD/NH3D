@@ -1,22 +1,21 @@
 #include "vulkan_rhi.hpp"
-#include <misc/types.hpp>
-#include <rendering/vulkan/resources.hpp>
-#include <rendering/core/resource_manager.hpp>
-#include <rendering/vulkan/vulkan_buffer.hpp>
-// #include <components/mesh_component.hpp>
+#include "rendering/core/buffer.hpp"
+#include "rendering/core/enums.hpp"
+#include "rendering/vulkan/vulkan_enums.hpp"
 #include <cmath>
-#include <cstddef>
 #include <cstdint>
 #include <general/window.hpp>
 #include <initializer_list>
 #include <memory>
+#include <misc/types.hpp>
 #include <misc/utils.hpp>
+#include <rendering/core/resource_manager.hpp>
 #include <rendering/render_graph/render_graph.hpp>
+#include <rendering/vulkan/vulkan_buffer.hpp>
 #include <rendering/vulkan/vulkan_compute_pipeline.hpp>
 #include <rendering/vulkan/vulkan_descriptor_set_pool.hpp>
 #include <rendering/vulkan/vulkan_graphics_pipeline.hpp>
 #include <rendering/vulkan/vulkan_texture.hpp>
-#include <unordered_set>
 #include <vulkan/vulkan_core.h>
 #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
@@ -56,8 +55,8 @@ VulkanRHI::VulkanRHI(const Window& Window)
     vkGetSwapchainImagesKHR(_device, _swapchain, &swapchainImageCount, swapchainImages.data());
 
     for (int i = 0; i < swapchainImageCount; ++i) {
-        Handle rid = ResourceManager::allocate(std::cref(*this), swapchainImages[i], surfaceFormat, VkExtent3D { Window.getWidth(), Window.getHeight(), 1 }, VK_IMAGE_ASPECT_COLOR_BIT);
-        _swapchainTextures[i] = &ResourceManager::getResource(rid);
+        auto&& [imageViewData, metadata] = VulkanTexture::wrapSwapchainImage(std::cref(*this), swapchainImages[i], surfaceFormat, VkExtent3D { Window.getWidth(), Window.getHeight(), 1 }, VK_IMAGE_ASPECT_COLOR_BIT);
+        _swapchainTextures[i] = _resourceManager.store<VulkanTexture>(std::move(imageViewData), std::move(metadata));
     }
 
     _commandPool = createCommandPool(_device, queues.GraphicsQueueFamilyID);
@@ -73,14 +72,12 @@ VulkanRHI::VulkanRHI(const Window& Window)
         _presentSemaphores[i] = createSemaphore(_device);
         _frameFences[i] = createFence(_device);
 
-        Handle rid = ResourceManager::allocate(
-            std::cref(*this),
-            VK_FORMAT_R16G16B16A16_SFLOAT,
-            VkExtent3D { Window.getWidth(), Window.getHeight(), 1 },
+        _renderTargets[i] = createTexture(
+            VK_FORMAT_R16G16B16_SFLOAT,
+            { Window.getWidth(), Window.getHeight(), 1 },
             static_cast<VkImageUsageFlags>(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT),
-            VK_IMAGE_ASPECT_COLOR_BIT);
-
-        _renderTargets[i] = &ResourceManager::getResource(rid);
+            VK_IMAGE_ASPECT_COLOR_BIT, 
+            true);
     }
 
     _descriptorSetPoolCompute = std::make_unique<VulkanDescriptorSetPool<MaxFramesInFlight>>(_device,
@@ -101,30 +98,6 @@ VulkanRHI::VulkanRHI(const Window& Window)
             .colorAttachmentFormats { _renderTargets[0]->getFormat() } });
 }
 
-
-Handle<Texture> VulkanRHI::createTexture(const Texture::CreateInfo& info) {
-    auto &&[imageViewData, metadata] = VulkanTexture::create(*this, info.format, info.size, info.usage);
-
-    _resourceManager.store<VulkanTexture>(std::move(imageViewData), std::move(metadata));
-}
-
-void VulkanRHI::destroyTexture(const Handle<Texture> handle) {
-
-}
-
-Handle<Texture> VulkanRHI::createBuffer(const Buffer::CreateInfo& info) {
-
-}
-
-void VulkanRHI::destroyBuffer(const Handle<Buffer> handle) {
-
-}
-
-void VulkanRHI::render(const RenderGraph& graph) const {
-
-}
-
-
 VulkanRHI::~VulkanRHI()
 {
     vkDeviceWaitIdle(_device);
@@ -133,8 +106,7 @@ VulkanRHI::~VulkanRHI()
     _computePipeline->release(_device);
     _graphicsPipeline->release(_device);
 
-    ResourceManager::clear(*this);
-    ResourceManager::clear(*this);
+    _resourceManager.clear(*this);
 
     for (uint32_t i = 0; i < MaxFramesInFlight; ++i) {
         vkDestroyFence(_device, _frameFences[i], nullptr);
@@ -163,10 +135,37 @@ VulkanRHI::~VulkanRHI()
     NH3D_LOG("Vulkan objects cleanup completed");
 }
 
-void VulkanRHI::render(const RenderGraph& rdag) const
+Handle<Texture> VulkanRHI::createTexture(const Texture::CreateInfo& info)
 {
-    // rdag.render<VulkanRHI>(this);
+    return createTexture(MapTextureFormat(info.format), { info.size.x, info.size.y, info.size.z }, MapTextureUsageFlags(info.usage), MapTextureAspectFlags(info.aspect), info.generateMipMaps);
+}
 
+Handle<Texture> VulkanRHI::createTexture( VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, VkImageAspectFlags aspect, bool generateMipMaps) {
+    auto&& [imageViewData, metadata] = VulkanTexture::create(*this, format, extent, usage, aspect, generateMipMaps);
+    
+    return _resourceManager.store<VulkanTexture>(std::move(imageViewData), std::move(metadata));
+}
+
+
+void VulkanRHI::destroyTexture(const Handle<Texture> handle)
+{
+    _resourceManager.release<VulkanTexture>(*this, handle);
+}
+
+Handle<Buffer> VulkanRHI::createBuffer(const Buffer::CreateInfo& info)
+{
+    auto&& [buffer, allocation] = VulkanBuffer::create(*this, info.size, MapBufferUsageFlags(info.usage), MapBufferMemoryUsage(info.memory));
+
+    return _resourceManager.store<VulkanBuffer>(std::move(buffer), std::move(allocation));
+}
+
+void VulkanRHI::destroyBuffer(const Handle<Buffer> handle)
+{
+    _resourceManager.release<VulkanBuffer>(*this, handle);
+}
+
+void VulkanRHI::render(const RenderGraph& graph) const
+{
     const uint32_t frameInFlightId = _frameId % MaxFramesInFlight;
 
     if (vkWaitForFences(_device, 1, &_frameFences[frameInFlightId], VK_TRUE, NH3D_MAX_T(uint64_t)) != VK_SUCCESS) {

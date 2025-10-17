@@ -5,30 +5,7 @@
 
 namespace NH3D {
 
-std::pair<VulkanTexture::ImageView, VulkanTexture::Meta> VulkanTexture::create(VulkanRHI rhi, VkImage image, VkFormat format, VkExtent3D extent, VkImageAspectFlags aspect)
-{
-    VkImageViewCreateInfo viewCreateInfo {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-        .image = image,
-        .viewType = extent.depth == 1 ? VK_IMAGE_VIEW_TYPE_2D : VK_IMAGE_VIEW_TYPE_3D,
-        .format = format,
-        .subresourceRange = {
-            .aspectMask = aspect,
-            .baseMipLevel = 0,
-            .levelCount = 1,
-            .baseArrayLayer = 0,
-            .layerCount = 1 }
-    };
-
-    VkImageView view;
-    if (vkCreateImageView(rhi.getVkDevice(), &viewCreateInfo, nullptr, &view) != VK_SUCCESS) {
-        NH3D_ABORT_VK("Vulkan image view creation failed");
-    }
-
-    return { ImageView { image, view }, Meta { format, extent, VK_IMAGE_LAYOUT_UNDEFINED, nullptr } };
-}
-
-std::pair<VulkanTexture::ImageView, VulkanTexture::Meta> VulkanTexture::create(VulkanRHI rhi, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, VkImageAspectFlags aspect, bool mipmap)
+std::pair<VulkanTexture::ImageView, VulkanTexture::Meta> VulkanTexture::create(const VulkanRHI& rhi, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, VkImageAspectFlags aspect, bool generateMipMaps)
 {
     VkImageCreateInfo imageCreateInfo {
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -75,6 +52,29 @@ std::pair<VulkanTexture::ImageView, VulkanTexture::Meta> VulkanTexture::create(V
     return { ImageView { image, view }, Meta { format, extent, VK_IMAGE_LAYOUT_UNDEFINED, allocation } };
 }
 
+std::pair<VulkanTexture::ImageView, VulkanTexture::Meta> VulkanTexture::wrapSwapchainImage(const VulkanRHI& rhi, VkImage image, VkFormat format, VkExtent3D extent, VkImageAspectFlags aspect)
+{
+    VkImageViewCreateInfo viewCreateInfo {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .image = image,
+        .viewType = extent.depth == 1 ? VK_IMAGE_VIEW_TYPE_2D : VK_IMAGE_VIEW_TYPE_3D,
+        .format = format,
+        .subresourceRange = {
+            .aspectMask = aspect,
+            .baseMipLevel = 0,
+            .levelCount = 1,
+            .baseArrayLayer = 0,
+            .layerCount = 1 }
+    };
+
+    VkImageView view;
+    if (vkCreateImageView(rhi.getVkDevice(), &viewCreateInfo, nullptr, &view) != VK_SUCCESS) {
+        NH3D_ABORT_VK("Vulkan image view creation failed");
+    }
+
+    return { ImageView { image, view }, Meta { format, extent, VK_IMAGE_LAYOUT_UNDEFINED, nullptr } };
+}
+
 void VulkanTexture::release(const IRHI& rhi, ImageView& imageViewData, Meta& metadata)
 {
     const VulkanRHI& vrhi = static_cast<const VulkanRHI&>(rhi);
@@ -101,7 +101,7 @@ void VulkanTexture::insertBarrier(VkCommandBuffer commandBuffer, VkImage image, 
     changeLayoutBarrier(commandBuffer, image, layout, layout);
 }
 
-void VulkanTexture::changeLayoutBarrier(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout &layout, VkImageLayout newLayout)
+void VulkanTexture::changeLayoutBarrier(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout& layout, VkImageLayout newLayout)
 {
     VkImageMemoryBarrier2 barrier {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,

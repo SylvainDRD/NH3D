@@ -1,6 +1,9 @@
 #pragma once
 
 // Resources have to be included before the resource manager, otherwise clang will complain
+#include "rendering/core/buffer.hpp"
+#include "rendering/core/handle.hpp"
+#include "rendering/core/texture.hpp"
 #include "rendering/vulkan/vulkan_buffer.hpp"
 #include "rendering/vulkan/vulkan_texture.hpp"
 
@@ -45,7 +48,7 @@ public:
 
     virtual void destroyTexture(const Handle<Texture> handle) override;
     
-    virtual Handle<Texture> createBuffer(const Buffer::CreateInfo& info) override;
+    virtual Handle<Buffer> createBuffer(const Buffer::CreateInfo& info) override;
 
     virtual void destroyBuffer(const Handle<Buffer> handle) override;
 
@@ -58,6 +61,8 @@ private:
 
         bool isValid() const { return GraphicsQueueFamilyID != NH3D_MAX_T(uint32_t) && PresentQueueFamilyID != NH3D_MAX_T(uint32_t); }
     };
+
+    Handle<Texture> createTexture(VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, VkImageAspectFlags aspect, bool generateMipMaps);
 
     VkInstance createVkInstance(std::vector<const char*>&& requiredWindowExtensions) const;
 
@@ -101,14 +106,14 @@ private:
     VkQueue _presentQueue;
 
     VkSwapchainKHR _swapchain;
-    std::vector<VulkanTexture*> _swapchainTextures;
+    std::vector<Handle<Texture>> _swapchainTextures;
 
     VkCommandPool _commandPool;
 
     static constexpr uint32_t MaxFramesInFlight = 2;
     std::array<VkCommandBuffer, MaxFramesInFlight> _commandBuffers;
     std::array<VkFence, MaxFramesInFlight> _frameFences;
-    std::array<VulkanTexture*, MaxFramesInFlight> _renderTargets;
+    std::array<Handle<Texture>, MaxFramesInFlight> _renderTargets;
 
     std::array<VkSemaphore, MaxFramesInFlight> _presentSemaphores;
     std::vector<VkSemaphore> _renderSemaphores;
