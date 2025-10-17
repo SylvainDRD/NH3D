@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <misc/types.hpp>
 #include <misc/utils.hpp>
+#include <rendering/core/buffer.hpp>
+#include <rendering/core/handle.hpp>
 #include <rendering/core/rhi.hpp>
 
 namespace NH3D {
@@ -19,9 +21,9 @@ public:
     MeshComponent(const std::vector<VertexData>& vertexData, const std::vector<uint32_t>& indices);
 
 private:
-    RID _vertexData;
-    RID _indices;
-    // RHI::BufferAddress _vertexDataGPUAddress;
+    Handle<Buffer> _vertexData;
+    Handle<Buffer> _indices;
+    Buffer::Address _vertexDataAddress;
 };
 
 }

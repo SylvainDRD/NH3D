@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <misc/types.hpp>
 #include <misc/utils.hpp>
 #include <rendering/core/handle.hpp>
 #include <rendering/core/rhi.hpp>
@@ -74,7 +75,7 @@ template <typename T>
         handle = _availableHandles.back();
         _availableHandles.pop_back();
     } else {
-        handle = _hot.size();
+        handle = { static_cast<uint32>(_hot.size()) };
     }
 
     _hot.emplace_back(std::forward<Hot>(hotData));

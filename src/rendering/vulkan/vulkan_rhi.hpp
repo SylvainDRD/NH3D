@@ -120,7 +120,7 @@ private:
 
     Uptr<VulkanDescriptorSetPool<MaxFramesInFlight>> _descriptorSetPoolCompute = nullptr;
 
-    ResourceManager _resourceManager;
+    mutable ResourceManager _resourceManager;
 
     Uptr<VulkanComputePipeline> _computePipeline = nullptr;
     Uptr<VulkanGraphicsPipeline> _graphicsPipeline = nullptr;

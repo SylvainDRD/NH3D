@@ -79,7 +79,7 @@ TEST(VulkanEnumTest, TextureAspectFlagsMapping)
     EXPECT_EQ(1 << TestCases, static_cast<uint32_t>(TextureAspectFlagBits::NH3D_TEXTURE_ASPECT_MAX));
 
     for (uint32_t i = 0; i < TestCases; ++i) {
-        EXPECT_EQ(MapTextureAspectFlags(static_cast<TextureAspectFlags>(i)), Expected[i]);
+        EXPECT_EQ(MapTextureAspectFlags(static_cast<TextureAspectFlags>(1 << i)), Expected[i]);
     }
 }
 
@@ -117,7 +117,7 @@ TEST(VulkanEnumTest, TextureUsageFlagsMapping)
     EXPECT_EQ(1 << TestCases, static_cast<uint32_t>(TextureUsageFlagBits::NH3D_TEXTURE_USAGE_MAX));
 
     for (uint32_t i = 0; i < TestCases; ++i) {
-        EXPECT_EQ(MapTextureUsageFlags(static_cast<TextureUsageFlags>(i)), Expected[i]);
+        EXPECT_EQ(MapTextureUsageFlags(static_cast<TextureUsageFlags>(1 << i)), Expected[i]);
     }
 }
 
@@ -156,7 +156,7 @@ TEST(VulkanEnumTest, BufferUsageFlagsMapping)
     EXPECT_EQ(1 << TestCases, static_cast<uint32_t>(BufferUsageFlagBits::NH3D_BUFFER_USAGE_MAX));
 
     for (uint32_t i = 0; i < TestCases; ++i) {
-        EXPECT_EQ(MapBufferUsageFlags(static_cast<BufferUsageFlags>(i)), Expected[i]);
+        EXPECT_EQ(MapBufferUsageFlags(static_cast<BufferUsageFlags>(1 << i)), Expected[i]);
     }
 }
 
@@ -173,7 +173,7 @@ TEST(VulkanEnumTest, CombinedBufferUsageFlagsMapping)
     constexpr BufferUsageFlags Flags[] = {
         BufferUsageFlagBits::STORAGE_BUFFER_BIT | BufferUsageFlagBits::SRC_TRANSFER_BIT,
         BufferUsageFlagBits::SRC_TRANSFER_BIT | BufferUsageFlagBits::DST_TRANSFER_BIT,
-        BufferUsageFlagBits::STORAGE_BUFFER_BIT | BufferUsageFlagBits::SRC_TRANSFER_BIT | BufferUsageFlagBits::NH3D_BUFFER_USAGE_DST_TRANSFER_BIT
+        BufferUsageFlagBits::STORAGE_BUFFER_BIT | BufferUsageFlagBits::SRC_TRANSFER_BIT | BufferUsageFlagBits::DST_TRANSFER_BIT
     };
 
     for (uint32_t i = 0; i < TestCases; ++i) {
@@ -183,10 +183,15 @@ TEST(VulkanEnumTest, CombinedBufferUsageFlagsMapping)
 
 TEST(VulkanEnumTest, BufferMemoryUsageMapping)
 {
-    constexpr VmaMemoryUsage Expected[] = { VMA_MEMORY_USAGE_GPU_ONLY, VMA_MEMORY_USAGE_CPU_ONLY, VMA_MEMORY_USAGE_CPU_TO_GPU, VMA_MEMORY_USAGE_GPU_TO_CPU };
+    constexpr VmaMemoryUsage Expected[] = {
+        VMA_MEMORY_USAGE_GPU_ONLY,
+        VMA_MEMORY_USAGE_CPU_ONLY,
+        VMA_MEMORY_USAGE_CPU_TO_GPU,
+        VMA_MEMORY_USAGE_GPU_TO_CPU
+    };
 
     constexpr uint32_t TestCases = sizeof(Expected) / sizeof(VmaMemoryUsage);
-    EXPECT_EQ(TestCases, BufferMemoryUsage::NH3D_BUFFER_MEMORY_USAGE_MAX);
+    EXPECT_EQ(TestCases, static_cast<uint32_t>(BufferMemoryUsage::NH3D_BUFFER_MEMORY_USAGE_MAX));
 
     for (uint32_t i = 0; i < std::max(TestCases, static_cast<uint32_t>(BufferMemoryUsage::NH3D_BUFFER_MEMORY_USAGE_MAX)); ++i) {
         EXPECT_EQ(MapBufferMemoryUsage(static_cast<BufferMemoryUsage>(i)), Expected[i]);

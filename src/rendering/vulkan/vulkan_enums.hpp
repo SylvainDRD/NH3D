@@ -1,6 +1,5 @@
 #pragma once
 
-#include <misc/types.hpp>
 #include <misc/utils.hpp>
 #include <rendering/core/enums.hpp>
 #include <vk_mem_alloc.h>
@@ -113,18 +112,23 @@ inline VkImageUsageFlags MapTextureUsageFlags(TextureUsageFlags flag)
 {
     VkImageUsageFlags vkFlag = 0;
 
-    for (int i = 1; i < static_cast<uint32>(TextureUsageFlagBits::NH3D_TEXTURE_ATTACHMENT_MAX); i <<= 1) {
-        switch (static_cast<TextureUsageFlagBits>(static_cast<uint32>(flag) & i)) {
+    for (uint32_t i = 1; i < static_cast<uint32_t>(TextureUsageFlagBits::NH3D_TEXTURE_USAGE_MAX); i <<= 1) {
+        switch (static_cast<TextureUsageFlagBits>(static_cast<uint32_t>(flag) & i)) {
         case TextureUsageFlagBits::USAGE_COLOR_BIT:
             vkFlag |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+            break;
         case TextureUsageFlagBits::USAGE_DEPTH_STENCIL_BIT:
             vkFlag |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+            break;
         case TextureUsageFlagBits::USAGE_STORAGE_BIT:
             vkFlag |= VK_IMAGE_USAGE_STORAGE_BIT;
+            break;
         case TextureUsageFlagBits::USAGE_SAMPLED_BIT:
             vkFlag |= VK_IMAGE_USAGE_SAMPLED_BIT;
+            break;
         case TextureUsageFlagBits::USAGE_INPUT_BIT:
             vkFlag |= VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+            break;
         case TextureUsageFlagBits::NH3D_TEXTURE_USAGE_MAX:
             NH3D_ABORT("Invalid TextureUsageFlagBits set");
         }
@@ -137,16 +141,19 @@ inline VkImageAspectFlags MapTextureAspectFlags(TextureAspectFlags flag)
 {
     VkImageAspectFlags vkFlag = 0;
 
-    for (int i = 1; i < static_cast<uint32>(TextureAspectFlagBits::NH3D_TEXTURE_ASPECT_MAX); i <<= 1) {
-        switch (static_cast<TextureAspectFlagBits>(static_cast<uint32>(flag) & i)) {
+    for (uint32_t i = 1; i < static_cast<uint32_t>(TextureAspectFlagBits::NH3D_TEXTURE_ASPECT_MAX); i <<= 1) {
+        switch (static_cast<TextureAspectFlagBits>(static_cast<uint32_t>(flag) & i)) {
         case TextureAspectFlagBits::ASPECT_COLOR_BIT:
             vkFlag |= VK_IMAGE_ASPECT_COLOR_BIT;
+            break;
         case TextureAspectFlagBits::ASPECT_DEPTH_BIT:
             vkFlag |= VK_IMAGE_ASPECT_DEPTH_BIT;
+            break;
         case TextureAspectFlagBits::ASPECT_STENCIL_BIT:
             vkFlag |= VK_IMAGE_ASPECT_STENCIL_BIT;
+            break;
         case TextureAspectFlagBits::NH3D_TEXTURE_ASPECT_MAX:
-            NH3D_ABORT("Invalid BufferUsageFlagBits set");
+            NH3D_ABORT("Invalid TextureAspectFlagBits set");
         }
     }
 
@@ -157,14 +164,17 @@ inline VkBufferUsageFlags MapBufferUsageFlags(BufferUsageFlags flag)
 {
     VkBufferUsageFlags vkFlag = 0;
 
-    for (int i = 1; i < static_cast<uint32>(BufferUsageFlagBits::NH3D_BUFFER_USAGE_MAX); i <<= 1) {
-        switch (static_cast<BufferUsageFlagBits>(static_cast<uint32>(flag) & i)) {
+    for (uint32_t i = 1; i < static_cast<uint32_t>(BufferUsageFlagBits::NH3D_BUFFER_USAGE_MAX); i <<= 1) {
+        switch (static_cast<BufferUsageFlagBits>(static_cast<uint32_t>(flag) & i)) {
         case BufferUsageFlagBits::STORAGE_BUFFER_BIT:
             vkFlag |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+            break;
         case BufferUsageFlagBits::SRC_TRANSFER_BIT:
             vkFlag |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+            break;
         case BufferUsageFlagBits::DST_TRANSFER_BIT:
             vkFlag |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+            break;
         case BufferUsageFlagBits::NH3D_BUFFER_USAGE_MAX:
             NH3D_ABORT("Invalid BufferUsageFlagBits set");
         }
@@ -183,7 +193,7 @@ inline VmaMemoryUsage MapBufferMemoryUsage(BufferMemoryUsage flag)
     case BufferMemoryUsage::CPU_GPU:
         return VMA_MEMORY_USAGE_CPU_TO_GPU;
     case BufferMemoryUsage::GPU_CPU:
-        return VMA_MEMORY_USAGE_CPU_TO_GPU;
+        return VMA_MEMORY_USAGE_GPU_TO_CPU;
     case BufferMemoryUsage::NH3D_BUFFER_MEMORY_USAGE_MAX:
         NH3D_ABORT("Invalid BufferMemoryUsage value");
     }

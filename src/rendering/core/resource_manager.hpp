@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstddef>
 #include <misc/types.hpp>
 #include <misc/utils.hpp>
 #include <rendering/core/buffer.hpp>
@@ -18,7 +17,7 @@ struct VulkanBuffer;
 class ResourceManager {
     NH3D_NO_COPY_MOVE(ResourceManager)
 public:
-    ResourceManager();
+    inline ResourceManager();
 
     template <typename T>
     [[nodiscard]] inline T::Hot& getHotData(Handle<typename T::ResourceType> handle);
@@ -36,7 +35,7 @@ public:
 
 private:
     template <typename T>
-    constexpr SplitPool<T>& getPool() const;
+    constexpr SplitPool<T>& getPool();
 
 private:
     // Vulkan
@@ -48,51 +47,48 @@ private:
     // Note: tuple based declaration would require feeding every single type at declaration time, which sucks
 };
 
-ResourceManager::ResourceManager()
+inline ResourceManager::ResourceManager()
+    : _vulkanTextureData(20000, 10000)
+    , _vulkanBufferData(20000, 10000)
 {
-    _vulkanTextureData.reserve(1000);
-    _vulkanBufferData.reserve(1000);
 }
 
 template <typename T>
-constexpr SplitPool<T>& ResourceManager::getPool() const
+constexpr SplitPool<T>& ResourceManager::getPool()
 {
-    SplitPool<T>* pool;
     if constexpr (std::is_same_v<VulkanTexture, T>) {
-        pool = &_vulkanTextureData;
+        return _vulkanTextureData;
     } else if constexpr (std::is_same_v<VulkanBuffer, T>) {
-        pool = &_vulkanBufferData;
+        return _vulkanBufferData;
     }
-
-    return *pool;
 }
 
 template <typename T>
 [[nodiscard]] inline typename T::Hot& ResourceManager::getHotData(Handle<typename T::ResourceType> handle)
 {
-    SplitPool<T> pool = getPool<T>();
+    SplitPool<T>& pool = getPool<T>();
 
     // TODO: customize assertion message using https://github.com/Neargye/nameof
     NH3D_ASSERT(handle.index < pool.size(), "Attempting to fetch a resource with an invalid handle");
 
-    return pool.getHot(handle);
+    return pool.getHotData(handle);
 }
 
 template <typename T>
 [[nodiscard]] inline typename T::Cold& ResourceManager::getColdData(Handle<typename T::ResourceType> handle)
 {
-    SplitPool<T> pool = getPool<T>();
+    SplitPool<T>& pool = getPool<T>();
 
     // TODO: customize assertion message using https://github.com/Neargye/nameof
     NH3D_ASSERT(handle.index < pool.size(), "Attempting to fetch a resource with an invalid handle");
 
-    return pool.getCold(handle);
+    return pool.getColdData(handle);
 }
 
 template <typename T>
-inline Handle<typename T::ResourceType> store(typename T::Hot&& hotData, typename T::Cold&& coldData)
+[[nodiscard]] inline Handle<typename T::ResourceType> ResourceManager::store(typename T::Hot&& hotData, typename T::Cold&& coldData)
 {
-    SplitPool<T> pool = getPool<T>();
+    SplitPool<T>& pool = getPool<T>();
 
     return pool.store(std::forward<typename T::Hot>(hotData), std::forward<typename T::Cold>(coldData));
 }
@@ -100,7 +96,7 @@ inline Handle<typename T::ResourceType> store(typename T::Hot&& hotData, typenam
 template <typename T>
 inline void ResourceManager::release(const IRHI& rhi, Handle<typename T::ResourceType> handle)
 {
-    SplitPool<T> pool = getPool<T>();
+    SplitPool<T>& pool = getPool<T>();
 
     // TODO: customize assertion message using https://github.com/Neargye/nameof
     NH3D_ASSERT(handle.index < pool.size(), "Attempting to release a resource with an invalid handle");

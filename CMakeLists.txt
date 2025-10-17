@@ -62,6 +62,7 @@ link_libraries(GPUOpen::VulkanMemoryAllocator)
 add_subdirectory(${external}/json)
 target_include_directories(${binary} PRIVATE ${external}/json/include)
 
+set(TINYGLTF_BUILD_LOADER_EXAMPLE OFF CACHE INTERNAL "Disable TinyGLTF sample loader build" FORCE)
 set(TINYGLTF_INSTALL OFF CACHE INTERNAL "Disable TinyGLTF install" FORCE)
 set(TINYGLTF_INSTALL_VENDOR OFF CACHE INTERNAL "Disable TinyGLTF dependency install" FORCE)
 add_subdirectory(${external}/tinygltf)

@@ -1,7 +1,6 @@
 #include "vulkan_rhi.hpp"
-#include "rendering/core/buffer.hpp"
-#include "rendering/core/enums.hpp"
-#include "rendering/vulkan/vulkan_enums.hpp"
+#include "rendering/vulkan/vulkan_buffer.hpp" // Must be included before the resource manager
+#include "rendering/vulkan/vulkan_texture.hpp" // Must be included before the resource manager
 #include <cmath>
 #include <cstdint>
 #include <general/window.hpp>
@@ -9,13 +8,14 @@
 #include <memory>
 #include <misc/types.hpp>
 #include <misc/utils.hpp>
+#include <rendering/core/buffer.hpp>
 #include <rendering/core/resource_manager.hpp>
 #include <rendering/render_graph/render_graph.hpp>
-#include <rendering/vulkan/vulkan_buffer.hpp>
 #include <rendering/vulkan/vulkan_compute_pipeline.hpp>
 #include <rendering/vulkan/vulkan_descriptor_set_pool.hpp>
+#include <rendering/vulkan/vulkan_enums.hpp>
 #include <rendering/vulkan/vulkan_graphics_pipeline.hpp>
-#include <rendering/vulkan/vulkan_texture.hpp>
+#include <unordered_set>
 #include <vulkan/vulkan_core.h>
 #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
@@ -68,15 +68,16 @@ VulkanRHI::VulkanRHI(const Window& Window)
         _renderSemaphores[i] = createSemaphore(_device);
     }
 
+    const VkFormat renderTargetsFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
     for (uint32_t i = 0; i < MaxFramesInFlight; ++i) {
         _presentSemaphores[i] = createSemaphore(_device);
         _frameFences[i] = createFence(_device);
 
         _renderTargets[i] = createTexture(
-            VK_FORMAT_R16G16B16_SFLOAT,
+            renderTargetsFormat,
             { Window.getWidth(), Window.getHeight(), 1 },
             static_cast<VkImageUsageFlags>(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT),
-            VK_IMAGE_ASPECT_COLOR_BIT, 
+            VK_IMAGE_ASPECT_COLOR_BIT,
             true);
     }
 
@@ -95,7 +96,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
         VulkanGraphicsPipeline::ShaderData {
             .vertexShaderPath = PROJECT_DIR "src/rendering/shaders/.cache/triangle.vert.spv",
             .fragmentShaderPath = PROJECT_DIR "src/rendering/shaders/.cache/triangle.frag.spv",
-            .colorAttachmentFormats { _renderTargets[0]->getFormat() } });
+            .colorAttachmentFormats { renderTargetsFormat } });
 }
 
 VulkanRHI::~VulkanRHI()
@@ -140,12 +141,12 @@ Handle<Texture> VulkanRHI::createTexture(const Texture::CreateInfo& info)
     return createTexture(MapTextureFormat(info.format), { info.size.x, info.size.y, info.size.z }, MapTextureUsageFlags(info.usage), MapTextureAspectFlags(info.aspect), info.generateMipMaps);
 }
 
-Handle<Texture> VulkanRHI::createTexture( VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, VkImageAspectFlags aspect, bool generateMipMaps) {
+Handle<Texture> VulkanRHI::createTexture(VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, VkImageAspectFlags aspect, bool generateMipMaps)
+{
     auto&& [imageViewData, metadata] = VulkanTexture::create(*this, format, extent, usage, aspect, generateMipMaps);
-    
+
     return _resourceManager.store<VulkanTexture>(std::move(imageViewData), std::move(metadata));
 }
-
 
 void VulkanRHI::destroyTexture(const Handle<Texture> handle)
 {
@@ -182,32 +183,41 @@ void VulkanRHI::render(const RenderGraph& graph) const
 
     beginCommandBuffer(commandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
-    _renderTargets[frameInFlightId]->changeLayoutBarrier(commandBuffer, VK_IMAGE_LAYOUT_GENERAL);
+    const auto& rtImageViewData = _resourceManager.getHotData<VulkanTexture>(_renderTargets[frameInFlightId]);
+    auto& rtMetadata = _resourceManager.getColdData<VulkanTexture>(_renderTargets[frameInFlightId]);
+    VulkanTexture::changeLayoutBarrier(commandBuffer, rtImageViewData.image, rtMetadata.layout, VK_IMAGE_LAYOUT_GENERAL);
 
     VkDescriptorSet descriptorSet = _descriptorSetPoolCompute->getDescriptorSet(_device, frameInFlightId);
 
     // update DS, bind pipeline, bind DS, dispatch
     VkDescriptorImageInfo imageInfo {
-        .imageView = _renderTargets[frameInFlightId]->getView(),
+        .imageView = rtImageViewData.view,
         .imageLayout = VK_IMAGE_LAYOUT_GENERAL
     };
     _descriptorSetPoolCompute->updateDescriptorSet(_device, commandBuffer, descriptorSet, _computePipeline->getLayout(), imageInfo);
     _descriptorSetPoolCompute->bind(commandBuffer, descriptorSet, VK_PIPELINE_BIND_POINT_COMPUTE, _computePipeline->getLayout());
-    _computePipeline->dispatch(commandBuffer, { std::ceil(_renderTargets[frameInFlightId]->getWidth() / 8.f), std::ceil(_renderTargets[0]->getHeight() / 8.f), 1 });
+    _computePipeline->dispatch(commandBuffer, { std::ceil(rtMetadata.extent.width / 8.f), std::ceil(rtMetadata.extent.height / 8.f), 1 });
 
-    _renderTargets[frameInFlightId]->changeLayoutBarrier(commandBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    VulkanTexture::changeLayoutBarrier(commandBuffer, rtImageViewData.image, rtMetadata.layout, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
     // TODO: watch for tiny vector allocations
     _graphicsPipeline->draw(commandBuffer,
-        { _renderTargets[frameInFlightId]->getWidth(), _renderTargets[frameInFlightId]->getHeight() },
-        { _renderTargets[frameInFlightId]->getAttachmentInfo() });
+        { rtMetadata.extent.width, rtMetadata.extent.height },
+        { VkRenderingAttachmentInfo {
+            .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+            .imageView = rtImageViewData.view,
+            .imageLayout = rtMetadata.layout } });
 
-    _renderTargets[frameInFlightId]->changeLayoutBarrier(commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    VulkanTexture::changeLayoutBarrier(commandBuffer, rtImageViewData.image, rtMetadata.layout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
-    _swapchainTextures[swapchainImageId]->changeLayoutBarrier(commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    _renderTargets[frameInFlightId]->blit(commandBuffer, *_swapchainTextures[swapchainImageId]);
+    const auto& scImageViewData = _resourceManager.getHotData<VulkanTexture>(_swapchainTextures[swapchainImageId]);
+    auto& scMetadata = _resourceManager.getColdData<VulkanTexture>(_swapchainTextures[swapchainImageId]);
 
-    _swapchainTextures[swapchainImageId]->changeLayoutBarrier(commandBuffer, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+    VulkanTexture::changeLayoutBarrier(commandBuffer, scImageViewData.image, scMetadata.layout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    VulkanTexture::blit(commandBuffer, rtImageViewData.image, rtMetadata.extent, scImageViewData.image, scMetadata.extent);
+
+    VulkanTexture::changeLayoutBarrier(commandBuffer, scImageViewData.image, scMetadata.layout, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
     vkEndCommandBuffer(commandBuffer);
     submitCommandBuffer(_graphicsQueue,

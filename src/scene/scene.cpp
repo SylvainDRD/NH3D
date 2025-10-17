@@ -1,7 +1,7 @@
 #include "scene.hpp"
-#include "ecs/components/mesh_component.hpp"
 #include <filesystem>
 #include <nlohmann/json.hpp>
+#include <scene/ecs/components/mesh_component.hpp>
 #define TINYGLTF_NO_INCLUDE_JSON
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
