@@ -101,7 +101,7 @@ inline void ResourceManager::release(const IRHI& rhi, Handle<typename T::Resourc
     // TODO: customize assertion message using https://github.com/Neargye/nameof
     NH3D_ASSERT(handle.index < pool.size(), "Attempting to release a resource with an invalid handle");
 
-    T::release(rhi, pool.getHotData(handle), pool.getColdData(handle));
+    pool.release(rhi, handle);
 }
 
 inline void ResourceManager::clear(const IRHI& rhi)

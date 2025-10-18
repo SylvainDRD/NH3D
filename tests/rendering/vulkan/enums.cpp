@@ -1,13 +1,13 @@
-#include "vk_mem_alloc.h"
-#include "vulkan/vulkan_core.h"
 #include <cstdint>
 #include <gtest/gtest.h>
 #include <rendering/core/enums.hpp>
 #include <rendering/vulkan/vulkan_enums.hpp>
+#include <vk_mem_alloc.h>
+#include <vulkan/vulkan_core.h>
 
 namespace NH3D::Test {
 
-TEST(VulkanEnumTest, TextureFormatMapping)
+TEST(VulkanEnumTests, TextureFormatMappingTest)
 {
     // LLM generated, at least they can do that
     constexpr VkFormat Expected[] = {
@@ -67,7 +67,7 @@ TEST(VulkanEnumTest, TextureFormatMapping)
     }
 }
 
-TEST(VulkanEnumTest, TextureAspectFlagsMapping)
+TEST(VulkanEnumTests, TextureAspectFlagsMappingTest)
 {
     constexpr VkImageAspectFlags Expected[] = {
         VK_IMAGE_ASPECT_COLOR_BIT,
@@ -83,7 +83,7 @@ TEST(VulkanEnumTest, TextureAspectFlagsMapping)
     }
 }
 
-TEST(VulkanEnumTest, CombinedTextureAspectFlagsMapping)
+TEST(VulkanEnumTests, CombinedTextureAspectFlagsMappingTest)
 {
     constexpr VkBufferUsageFlags Expected[] = {
         VK_IMAGE_ASPECT_COLOR_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
@@ -103,7 +103,7 @@ TEST(VulkanEnumTest, CombinedTextureAspectFlagsMapping)
         EXPECT_EQ(MapTextureAspectFlags(Flags[i]), Expected[i]);
     }
 }
-TEST(VulkanEnumTest, TextureUsageFlagsMapping)
+TEST(VulkanEnumTests, TextureUsageFlagsMappingTest)
 {
     constexpr VkImageUsageFlags Expected[] = {
         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
@@ -121,7 +121,7 @@ TEST(VulkanEnumTest, TextureUsageFlagsMapping)
     }
 }
 
-TEST(VulkanEnumTest, CombinedTextureUsageFlagsMapping)
+TEST(VulkanEnumTests, CombinedTextureUsageFlagsMappingTest)
 {
     constexpr VkImageUsageFlags Expected[] = {
         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
@@ -144,7 +144,7 @@ TEST(VulkanEnumTest, CombinedTextureUsageFlagsMapping)
     }
 }
 
-TEST(VulkanEnumTest, BufferUsageFlagsMapping)
+TEST(VulkanEnumTests, BufferUsageFlagsMappingTest)
 {
     constexpr VkBufferUsageFlags Expected[] = {
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
@@ -160,7 +160,7 @@ TEST(VulkanEnumTest, BufferUsageFlagsMapping)
     }
 }
 
-TEST(VulkanEnumTest, CombinedBufferUsageFlagsMapping)
+TEST(VulkanEnumTests, CombinedBufferUsageFlagsMappingTest)
 {
     constexpr VkBufferUsageFlags Expected[] = {
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -181,7 +181,7 @@ TEST(VulkanEnumTest, CombinedBufferUsageFlagsMapping)
     }
 }
 
-TEST(VulkanEnumTest, BufferMemoryUsageMapping)
+TEST(VulkanEnumTests, BufferMemoryUsageMappingTest)
 {
     constexpr VmaMemoryUsage Expected[] = {
         VMA_MEMORY_USAGE_GPU_ONLY,

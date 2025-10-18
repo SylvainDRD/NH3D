@@ -2,18 +2,23 @@ set(gtest_force_shared_crt ON CACHE BOOL "For Windows: Prevent overriding the pa
 
 set(INSTALL_GTEST OFF CACHE INTERNAL "Disable gtest install" FORCE)
 set(BUILD_GMOCK OFF CACHE INTERNAL "Disable gmock build" FORCE)
-add_subdirectory(${external}/googletest ${CMAKE_BINARY_DIR}/gtest)
+add_subdirectory(${DEPENDENCIES_PATH}/googletest ${CMAKE_BINARY_DIR}/gtest)
 
 include(GoogleTest)
 
-# TODO: foreach, see GLM tests
+function (declare_test path) 
+    get_filename_component(TEST_NAME ${path} NAME_WE)
+    add_executable(${TEST_NAME} ${path})
+
+    target_compile_features(${TEST_NAME} PRIVATE ${NH3D_CXX_STANDARD})
+    target_include_directories(${TEST_NAME} PRIVATE ${NH3D_INCLUDES})
+    target_link_libraries(${TEST_NAME} PRIVATE ${NH3D_LIBRARIES} GTest::gtest_main)
+    add_dependencies(${TEST_NAME} ${NH3D_DEPENDENCIES})
+    gtest_discover_tests(${TEST_NAME})
+endfunction()
+
 if(${Vulkan_FOUND})
-    set(VK_TEST enums)
-
-    add_executable(${VK_TEST} rendering/vulkan/${VK_TEST}.cpp)
-
-    target_include_directories(${VK_TEST} PRIVATE ${CMAKE_SOURCE_DIR}/src)
-    target_include_directories(${VK_TEST} PRIVATE ${Vulkan_INCLUDE_DIRS} ${external}/VulkanMemoryAllocator/include)
-    target_link_libraries(${VK_TEST} PRIVATE GTest::gtest_main)
-    gtest_discover_tests(${VK_TEST})
+    declare_test(rendering/vulkan/enums.cpp)
+    declare_test(rendering/core/resource_manager.cpp)
+    declare_test(rendering/core/split_pool.cpp)
 endif()
