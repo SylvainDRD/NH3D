@@ -113,7 +113,7 @@ void VulkanTexture::changeLayoutBarrier(VkCommandBuffer commandBuffer, VkImage i
         .newLayout = newLayout,
         .image = image,
         .subresourceRange = {
-            .aspectMask = (newLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT,
+            .aspectMask = static_cast<VkImageAspectFlags>((newLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT),
             .levelCount = VK_REMAINING_MIP_LEVELS,
             .layerCount = VK_REMAINING_ARRAY_LAYERS,
         }

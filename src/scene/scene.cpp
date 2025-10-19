@@ -29,7 +29,7 @@ namespace _private {
         std::string error;
         std::string warning;
 
-        bool result = loader.LoadASCIIFromFile(&model, &error, &warning, glbPath);
+        bool result = loader.LoadASCIIFromFile(&model, &error, &warning, glbPath.string());
 
         if (!warning.empty()) {
             NH3D_WARN("tinyGLTF import warning: " << warning);

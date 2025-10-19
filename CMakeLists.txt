@@ -36,7 +36,7 @@ endif()
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 	target_compile_options(${BINARY} PRIVATE -Wswitch)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-	target_compile_options(${BINARY} PRIVATE /We4062)
+	target_compile_options(${BINARY} PRIVATE /we4062)
 endif()
 
 # External dependencies
