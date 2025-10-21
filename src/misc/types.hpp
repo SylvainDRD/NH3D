@@ -20,6 +20,7 @@ using vec4i = glm::ivec4;
 using vec2u = glm::uvec2;
 using vec3u = glm::uvec3;
 using vec4u = glm::uvec4;
+using quat = glm::quat;
 
 using uint8 = uint8_t;
 using byte = uint8_t;

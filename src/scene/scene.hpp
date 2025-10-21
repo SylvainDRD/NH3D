@@ -10,6 +10,7 @@ class Scene {
 public:
     Scene(const std::filesystem::path& filePath);
 
+private:
 };
 
 }

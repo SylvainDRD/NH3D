@@ -18,7 +18,7 @@ struct VertexData {
 struct MeshComponent {
     NH3D_NO_COPY(MeshComponent)
 public:
-    MeshComponent(const std::vector<VertexData>& vertexData, const std::vector<uint32_t>& indices);
+    MeshComponent(const IRHI& rhi, const std::vector<VertexData>& vertexData, const std::vector<uint32_t>& indices);
 
 private:
     Handle<Buffer> _vertexData;

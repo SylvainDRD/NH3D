@@ -1,13 +1,13 @@
 #pragma once
 
+#include <misc/types.hpp>
+#include <misc/utils.hpp>
+
 namespace NH3D {
 
-class Entity {
-public:
+using entity = uint32;
+static constexpr entity InvalidEntity = NH3D_MAX_T(entity);
 
-private:
-
-
-};
+using component_mask = uint32;
 
 }
