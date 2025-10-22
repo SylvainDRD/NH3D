@@ -5,9 +5,9 @@
 
 namespace NH3D {
 
-using entity = uint32;
-static constexpr entity InvalidEntity = NH3D_MAX_T(entity);
+using Entity = uint32;
+static constexpr Entity InvalidEntity = NH3D_MAX_T(Entity);
 
-using component_mask = uint32;
+using ComponentMask = uint32;
 
 }

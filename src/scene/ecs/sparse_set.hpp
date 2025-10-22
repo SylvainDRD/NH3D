@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstring>
 #include <memory>
 #include <misc/types.hpp>
@@ -14,7 +15,7 @@ public:
 
     // This seals the deal as removal being a garbage operation
     // Perhapse if removal becomes performance critical, there is an argument for forward declaring all SparseSet types
-    virtual void remove(entity e) = 0;
+    virtual void remove(Entity e) = 0;
 };
 
 template <typename T>
@@ -27,11 +28,17 @@ public:
 
     ~SparseSet() = default;
 
-    void add(entity e, T&& component);
+    void add(Entity e, T&& component);
 
-    void remove(entity e) override;
+    void remove(Entity e) override;
 
-    T& get(entity e);
+    [[nodiscard]] T& get(Entity e);
+
+    [[nodiscard]] const std::vector<Entity>& entities() const;
+
+    [[nodiscard]] size_t size() const; 
+
+    [[nodiscard]] T& getRaw(uint32 id);
 
 private:
     constexpr static uint8 BufferBitSize = 10;
@@ -41,7 +48,7 @@ private:
     using indices = Uptr<uint32[]>;
     std::vector<indices> _entityLUT;
     std::vector<T> _data;
-    std::vector<entity> _entities; // required for deletion
+    std::vector<Entity> _entities; // required for deletion
 };
 
 template <typename T>
@@ -54,7 +61,7 @@ SparseSet<T>::SparseSet()
 }
 
 template <typename T>
-void SparseSet<T>::add(entity e, T&& component)
+void SparseSet<T>::add(Entity e, T&& component)
 {
     const uint32 bufferId = e >> BufferBitSize;
     const uint32 indexId = e & (BufferSize - 1);
@@ -65,7 +72,7 @@ void SparseSet<T>::add(entity e, T&& component)
 
     if (_entityLUT[bufferId] == nullptr) {
         _entityLUT[bufferId] = std::make_unique_for_overwrite<uint32[]>(BufferSize);
-        std::memset(_entityLUT[BufferSize].get(), InvalidIndex, BufferSize * sizeof(uint32));
+        std::memset(_entityLUT[bufferId].get(), InvalidIndex, BufferSize * sizeof(uint32));
     }
 
     uint32& index = _entityLUT[bufferId][indexId];
@@ -77,7 +84,7 @@ void SparseSet<T>::add(entity e, T&& component)
 }
 
 template <typename T>
-void SparseSet<T>::remove(entity e)
+void SparseSet<T>::remove(Entity e)
 {
     const uint32 bufferId = e >> BufferBitSize;
     const uint32 indexId = e & (BufferSize - 1);
@@ -97,7 +104,7 @@ void SparseSet<T>::remove(entity e)
 }
 
 template <typename T>
-T& SparseSet<T>::get(entity e)
+[[nodiscard]] T& SparseSet<T>::get(Entity e)
 {
     const uint32 bufferId = e >> BufferBitSize;
     const uint32 indexId = e & (BufferSize - 1);
@@ -108,6 +115,22 @@ T& SparseSet<T>::get(entity e)
     NH3D_ASSERT(id != InvalidIndex, "Requested a non-existing component: Samir you're thrashing the cache");
 
     return _data[id];
+}
+
+template <typename T>
+[[nodiscard]] T& SparseSet<T>::getRaw(uint32 id) {
+    NH3D_ASSERT(id < _data.size(), "Out of bound raw data SparseSet access");
+    return _data[id];
+}
+
+template <typename T>
+[[nodiscard]] const std::vector<Entity>& SparseSet<T>::entities() const {
+    return _entities;
+}
+
+template <typename T>
+[[nodiscard]] size_t SparseSet<T>::size() const {
+    return _entities.size();
 }
 
 }

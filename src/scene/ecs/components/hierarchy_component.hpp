@@ -5,7 +5,7 @@
 namespace NH3D {
    
     struct HierarchyComponent {
-        entity parent;
+        Entity parent;
     };
 
 }

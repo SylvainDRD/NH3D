@@ -1,5 +1,6 @@
 #pragma once
 
+#include "scene/ecs/component_view.hpp"
 #include <memory>
 #include <misc/types.hpp>
 #include <misc/utils.hpp>
@@ -15,38 +16,38 @@ public:
     SparseSetMap() = default;
 
     template <typename... Ts>
-    inline component_mask mask() const;
+    [[nodiscard]] inline ComponentMask mask() const;
 
     template <typename T>
-    inline T& get(entity e);
-
-    template <typename T>
-    inline bool has(entity e) const;
+    [[nodiscard]] inline T& get(Entity e);
 
     template <typename... Ts>
-    inline void add(entity e, Ts&&... components);
+    [[nodiscard]] inline ComponentView<Ts...> get();
+
+    template <typename... Ts>
+    inline void add(Entity e, Ts&&... components);
 
     template <typename T>
-    inline void remove(entity e);
+    inline void remove(Entity e);
 
-    inline void remove(entity e, component_mask mask);
+    inline void remove(Entity e, ComponentMask mask);
 
 private:
     template <typename T>
-    inline uint32 getId();
+    [[nodiscard]] inline uint32 getId() const;
 
     template <typename T>
-    inline SparseSet<T>& get();
+    [[nodiscard]] inline SparseSet<T>& getSet();
 
 private:
-    constexpr static uint8 MaxComponent = sizeof(component_mask) * 8;
+    constexpr static uint8 MaxComponent = sizeof(ComponentMask) * 8;
     mutable Uptr<ISparseSet> _sets[MaxComponent] = {};
 
     mutable uint32 _nextPoolIndex = 0;
 };
 
 template <typename T>
-inline uint32 SparseSetMap::getId()
+[[nodiscard]] inline uint32 SparseSetMap::getId() const
 {
     static const uint32 Index = _nextPoolIndex++;
 
@@ -56,7 +57,7 @@ inline uint32 SparseSetMap::getId()
 }
 
 template <typename T>
-inline SparseSet<T>& SparseSetMap::get()
+[[nodiscard]] inline SparseSet<T>& SparseSetMap::getSet()
 {
     const uint32 index = getId<T>();
 
@@ -70,42 +71,40 @@ inline SparseSet<T>& SparseSetMap::get()
 };
 
 template <typename... Ts>
-inline component_mask SparseSetMap::mask() const
+[[nodiscard]] inline ComponentMask SparseSetMap::mask() const
 {
     return ((1 << getId<Ts>()) | ...);
 }
 
 template <typename T>
-inline T& SparseSetMap::get(entity e)
+[[nodiscard]] inline T& SparseSetMap::get(Entity e)
 {
-    const SparseSet<T>& set = get<T>();
-
-    return set.get(e);
+    return getSet<T>().get(e);
 }
 
 template <typename... Ts>
-inline void SparseSetMap::add(entity e, Ts&&... components)
+[[nodiscard]] inline ComponentView<Ts...> SparseSetMap::get()
 {
-    for (auto&& component : { components... }) {
-        const SparseSet<decltype(component)>& set = get<decltype(component)>();
+    return ComponentView<Ts...> { std::make_tuple(getSet<Ts>()...) };
+}
 
-        set.add(e, std::forward<decltype(component)>(component));
-    }
+template <typename... Ts>
+inline void SparseSetMap::add(Entity e, Ts&&... component)
+{
+    (getSet<Ts>().add(e, std::forward<Ts>(component)), ...);
 }
 
 template <typename T>
-inline void SparseSetMap::remove(entity e)
+inline void SparseSetMap::remove(Entity e)
 {
-    const SparseSet<T>& set = get<T>();
-
-    set.remove(e);
+    getSet<T>().remove(e);
 }
 
-inline void SparseSetMap::remove(entity e, component_mask mask)
+inline void SparseSetMap::remove(Entity e, ComponentMask mask)
 {
     for (uint32 id = 0; mask != 0; mask >>= 1, ++id) {
         if (mask & 1) {
-            NH3D_ASSERT(_sets[id] != nullptr, "Component")
+            NH3D_ASSERT(_sets[id] != nullptr, "Unexpected null sparse set");
             _sets[id]->remove(e);
         }
     }

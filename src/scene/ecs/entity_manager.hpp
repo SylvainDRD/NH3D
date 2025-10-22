@@ -1,10 +1,13 @@
 #pragma once
 
+#include <algorithm>
 #include <misc/types.hpp>
 #include <misc/utils.hpp>
+#include <scene/ecs/component_view.hpp>
 #include <scene/ecs/entity.hpp>
 #include <scene/ecs/sparse_set.hpp>
 #include <scene/ecs/sparse_set_map.hpp>
+#include <tuple>
 #include <utility>
 
 namespace NH3D {
@@ -15,23 +18,27 @@ public:
     static void prealloc();
 
     template <typename T>
-    static inline T& get(entity e);
+    [[nodiscard]] static inline T& get(Entity e);
 
     template <typename... Ts>
-    static inline entity create(Ts&&... components);
+    [[nodiscard]] static inline Entity create(Ts&&... components);
 
     template <typename... Ts>
-    static inline void add(entity e, Ts&&... components);
+    static inline void add(Entity e, Ts&&... components);
 
-    template <typename T>
-    static inline bool has(entity e);
+    template <typename ...Ts>
+    [[nodiscard]] static inline bool has(Entity e);
 
-    template <typename T>
-    static inline void clearComponent(entity e);
+    template <typename ...Ts>
+    static inline void clearComponent(Entity e);
 
-    static inline void remove(entity e);
+    static inline void remove(Entity e);
 
-    // TODO: get component view
+    // TODO: make a tuple, iterate over sets to use the one with the least number of entities
+    // Caveat: might not lead to the most memory efficient scenario if the component order for the selected type is dumb
+    // TODO: figure out type "safety"
+    template <typename T, typename... Ts>
+    [[nodiscard]] static inline ComponentView<T, Ts...> get();
 
 private:
     inline EntityManager();
@@ -39,34 +46,34 @@ private:
 private:
     static SparseSetMap g_setMap;
 
-    static std::vector<component_mask> g_entityMasks;
+    static std::vector<ComponentMask> g_entityMasks;
 
-    static std::vector<uint32> _availableEntities;
+    static std::vector<uint32> g_availableEntities;
 };
 
 inline SparseSetMap EntityManager::g_setMap;
-inline std::vector<component_mask> EntityManager::g_entityMasks;
-inline std::vector<uint32> EntityManager::_availableEntities;
+inline std::vector<ComponentMask> EntityManager::g_entityMasks;
+inline std::vector<uint32> EntityManager::g_availableEntities;
 
 inline void EntityManager::prealloc()
 {
     g_entityMasks.reserve(400'000);
-    _availableEntities.reserve(2'000);
+    g_availableEntities.reserve(2'000);
 }
 
 template <typename T>
-inline T& EntityManager::get(entity e)
+[[nodiscard]] inline T& EntityManager::get(Entity e)
 {
-    return g_setMap.get<T>(e);
+    return g_setMap.getSet<T>(e);
 }
 
 template <typename... Ts>
-inline entity EntityManager::create(Ts&&... components)
+[[nodiscard]] inline Entity EntityManager::create(Ts&&... components)
 {
-    entity e;
-    if (!_availableEntities.empty()) {
-        e = _availableEntities.back();
-        _availableEntities.pop_back();
+    Entity e;
+    if (!g_availableEntities.empty()) {
+        e = g_availableEntities.back();
+        g_availableEntities.pop_back();
     } else {
         e = g_entityMasks.size();
         g_entityMasks.emplace_back(0);
@@ -76,30 +83,41 @@ inline entity EntityManager::create(Ts&&... components)
 }
 
 template <typename... Ts>
-inline void EntityManager::add(entity e, Ts&&... components)
+inline void EntityManager::add(Entity e, Ts&&... components)
 {
-    const component_mask mask = g_setMap.mask<Ts...>();
+    const ComponentMask mask = g_setMap.mask<Ts...>();
 
     g_setMap.add(e, std::forward<Ts>(components)...);
 
     g_entityMasks[e] |= mask;
 }
 
-template <typename T>
-inline bool EntityManager::has(entity e)
+template <typename ...Ts>
+[[nodiscard]] inline bool EntityManager::has(Entity e)
 {
-    return g_entityMasks[e] & g_setMap.mask<T>();
+    return (g_entityMasks[e] & g_setMap.mask<Ts...>()) == g_setMap.mask<Ts...>();
 }
 
-template <typename T>
-inline void EntityManager::clearComponent(entity e)
+template <typename ...Ts>
+inline void EntityManager::clearComponent(Entity e)
 {
-    g_setMap.remove<T>(e);
+    NH3D_ASSERT(has<Ts...>(e), "Entity mask is missing components to delete");
+    
+    (g_setMap.remove<Ts>(e), ...);
+
+    g_entityMasks[e] ^= mask<Ts...>();
 }
 
-inline void EntityManager::remove(entity e)
+inline void EntityManager::remove(Entity e)
 {
     g_setMap.remove(e, g_entityMasks[e]);
+    g_entityMasks[e] = 0;
+}
+
+template <typename T, typename... Ts>
+[[nodiscard]] inline ComponentView<T, Ts...> EntityManager::get()
+{
+    return g_setMap.getSet<T, Ts...>();
 }
 
 }

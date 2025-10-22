@@ -1,3 +1,4 @@
+#include "gtest/gtest.h"
 #include <gtest/gtest.h>
 #include <rendering/core/buffer.hpp>
 #include <rendering/core/rhi.hpp>
