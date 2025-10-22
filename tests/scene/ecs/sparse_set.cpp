@@ -1,3 +1,4 @@
+#include "gtest/gtest.h"
 #include <gtest/gtest.h>
 #include <scene/ecs/sparse_set.hpp>
 
@@ -29,6 +30,9 @@ TEST(SparseSetTests, AddInternalTest)
         EXPECT_EQ(set.get(i), i + 10);
     }
 
+    EXPECT_DEATH((void)set.get(220'000), ".*FATAL.*Requested a component for an entity without storage");
+    EXPECT_DEATH((void)set.get(2000), ".*FATAL.*Requested a non-existing component: Samir you're thrashing the cache");
+
     set.add(220'000, 1337);
     EXPECT_EQ(set.get(220'000), 1337);
 }
@@ -47,6 +51,8 @@ TEST(SparseSetTests, GetRawTest)
 
     set.add(220'000, 1337);
     EXPECT_EQ(set.getRaw(1025), 1337);
+
+    EXPECT_DEATH((void)set.getRaw(2000), ".*FATAL.*Out of bound raw data SparseSet access");
 }
 
 TEST(SparseSetTests, EntitiesTest)
@@ -74,10 +80,13 @@ TEST(SparseSetTests, RemoveTest)
 {
     SparseSet<int> set;
 
+    EXPECT_DEATH(set.remove(2000), ".*FATAL.*Trying to clear a component for an entity without storage");
+
     for (int i = 1024; i >= 0; --i) {
         set.add(i, 0);
         EXPECT_EQ(set.size(), 1024 - i + 1);
     }
+    EXPECT_DEATH(set.remove(2000), ".*FATAL.*Trying to clear a non-existing component");
 
     set.add(220'000, 1337);
     EXPECT_EQ(set.size(), 1026);
