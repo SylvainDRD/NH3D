@@ -8,7 +8,7 @@
 
 namespace NH3D {
 
-inline VkFormat MapTextureFormat(TextureFormat format)
+[[nodiscard]] inline VkFormat MapTextureFormat(TextureFormat format)
 {
     switch (format) {
     case TextureFormat::R8_UINT:
@@ -108,9 +108,11 @@ inline VkFormat MapTextureFormat(TextureFormat format)
     }
 }
 
-inline VkImageUsageFlags MapTextureUsageFlags(TextureUsageFlags flag)
+[[nodiscard]] inline VkImageUsageFlags MapTextureUsageFlags(TextureUsageFlags flag)
 {
     VkImageUsageFlags vkFlag = 0;
+
+    NH3D_ASSERT((static_cast<uint32_t>(flag) & TextureUsageFlagBits::NH3D_TEXTURE_USAGE_MAX) == 0, "Invalid TextureUsageFlagBits set");
 
     for (uint32_t i = 1; i < static_cast<uint32_t>(TextureUsageFlagBits::NH3D_TEXTURE_USAGE_MAX); i <<= 1) {
         switch (static_cast<TextureUsageFlagBits>(static_cast<uint32_t>(flag) & i)) {
@@ -137,9 +139,11 @@ inline VkImageUsageFlags MapTextureUsageFlags(TextureUsageFlags flag)
     return vkFlag;
 }
 
-inline VkImageAspectFlags MapTextureAspectFlags(TextureAspectFlags flag)
+[[nodiscard]] inline VkImageAspectFlags MapTextureAspectFlags(TextureAspectFlags flag)
 {
     VkImageAspectFlags vkFlag = 0;
+
+    NH3D_ASSERT((static_cast<uint32_t>(flag) & TextureAspectFlagBits::NH3D_TEXTURE_ASPECT_MAX) == 0, "Invalid TextureAspectFlagBits set");
 
     for (uint32_t i = 1; i < static_cast<uint32_t>(TextureAspectFlagBits::NH3D_TEXTURE_ASPECT_MAX); i <<= 1) {
         switch (static_cast<TextureAspectFlagBits>(static_cast<uint32_t>(flag) & i)) {
@@ -160,9 +164,11 @@ inline VkImageAspectFlags MapTextureAspectFlags(TextureAspectFlags flag)
     return vkFlag;
 }
 
-inline VkBufferUsageFlags MapBufferUsageFlags(BufferUsageFlags flag)
+[[nodiscard]] inline VkBufferUsageFlags MapBufferUsageFlags(BufferUsageFlags flag)
 {
     VkBufferUsageFlags vkFlag = 0;
+
+    NH3D_ASSERT((static_cast<uint32_t>(flag) & BufferUsageFlagBits::NH3D_BUFFER_USAGE_MAX) == 0, "Invalid BufferUsageFlagBits set");
 
     for (uint32_t i = 1; i < static_cast<uint32_t>(BufferUsageFlagBits::NH3D_BUFFER_USAGE_MAX); i <<= 1) {
         switch (static_cast<BufferUsageFlagBits>(static_cast<uint32_t>(flag) & i)) {
@@ -183,7 +189,7 @@ inline VkBufferUsageFlags MapBufferUsageFlags(BufferUsageFlags flag)
     return vkFlag;
 }
 
-inline VmaMemoryUsage MapBufferMemoryUsage(BufferMemoryUsage flag)
+[[nodiscard]] inline VmaMemoryUsage MapBufferMemoryUsage(BufferMemoryUsage flag)
 {
     switch (flag) {
     case BufferMemoryUsage::GPU_ONLY:
