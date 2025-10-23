@@ -40,7 +40,15 @@ namespace NH3D {
 #ifdef NH3D_DEBUG
 #define NH3D_DEBUGLOG(msg) std::cout << "\033[96m[DEBUG]: " << msg << _NH3D_ENDLOG
 #define NH3D_DEBUGLOG_VK(msg) std::cout << "\033[96m[VK DEBUG]: " << msg << _NH3D_ENDLOG
+#else
+#define _NH3D_NOP \
+    if (false) { \
+    }
+#define NH3D_DEBUGLOG(msg) _NH3D_NOP
+#define NH3D_DEBUGLOG_VK(msg) _NH3D_NOP
+#endif
 
+#if defined(NH3D_DEBUG) || defined(NH3D_FORCE_ASSERTS)
 #define NH3D_ASSERT(condition, msg) \
     if (!(condition)) {            \
         NH3D_ABORT(msg);                \
@@ -50,12 +58,6 @@ namespace NH3D {
         NH3D_ABORT_VK(msg);                \
     }
 #else
-#define _NH3D_NOP \
-    if (false) { \
-    }
-#define NH3D_DEBUGLOG(msg) _NH3D_NOP
-#define NH3D_DEBUGLOG_VK(msg) _NH3D_NOP
-
 #define NH3D_ASSERT(condition, msg) _NH3D_NOP
 #define NH3D_ASSERT_VK(condition, msg) _NH3D_NOP
 #endif
