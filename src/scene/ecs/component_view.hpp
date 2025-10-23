@@ -6,24 +6,24 @@
 #include <scene/ecs/entity.hpp>
 #include <scene/ecs/sparse_set.hpp>
 #include <tuple>
+#include <type_traits>
 
 namespace NH3D {
 
 template <typename... Ts>
 class ComponentView {
-    NH3D_NO_COPY_MOVE(ComponentView)
 public:
     ComponentView() = delete;
 
-    ComponentView(SparseSet<Ts>&... sets);
+    ComponentView(std::tuple<SparseSet<std::remove_cvref_t<Ts>>&...> sets);
 
     class Iterator {
     public:
         Iterator() = delete;
 
-        Iterator(const std::tuple<SparseSet<Ts>&...>& sets)
+        Iterator(std::tuple<SparseSet<std::remove_cvref_t<Ts>>&...>& sets)
             : _sets { sets }
-            , _entities { selectEntityArray(sets) }
+            , _entities { selectEntityArray() }
         {
         }
 
@@ -38,34 +38,56 @@ public:
             return _id == it._id;
         }
 
-        const std::tuple<Ts...>& operator*()
+        bool operator!=(const Iterator& it)
+        {
+            return !(_id == it._id);
+        }
+
+        std::tuple<Entity, Ts...> operator*()
         {
             const Entity e = _entities[_id];
 
-            return std::make_tuple(std::get<Ts>(_sets).get(e)...);
+            // TODO: getRaw on main set
+            return std::tie(e, std::get<SparseSet<std::remove_cvref_t<Ts>>&>(_sets).get(e)...);
         }
 
     private:
-        const std::vector<Entity>& selectEntityArray(const std::tuple<SparseSet<Ts>&...>& sets)
+        template <typename F, int i = 0>
+        constexpr void foreachSet(const F& f)
+        {
+            if constexpr (i < sizeof...(Ts)) {
+                f(std::get<i>(_sets));
+                foreachSet<F, i + 1>(f);
+            }
+        }
+
+        const std::vector<Entity>& selectEntityArray()
         {
             const std::vector<Entity>* entities;
-
             size_t size = NH3D_MAX_T(size_t);
-            for (const auto& set : sets) {
+
+            const auto f = [&size, &entities]<typename T>(const SparseSet<T>& set) {
                 if (set.size() < size) {
                     size = set.size();
                     entities = &set.entities();
                 }
-            }
+            };
+
+            foreachSet(f);
+
+            NH3D_ASSERT(entities != nullptr, "Failed to select an entities array");
+
             return *entities;
         }
 
     private:
-        const std::tuple<SparseSet<Ts>&...>& _sets;
+        std::tuple<SparseSet<std::remove_cvref_t<Ts>>&...>& _sets;
 
         const std::vector<Entity>& _entities;
 
         uint32 _id = 0;
+
+        friend ComponentView<Ts...>;
     };
 
     Iterator begin();
@@ -73,8 +95,15 @@ public:
     Iterator end();
 
 private:
-    std::tuple<SparseSet<Ts>...> _sets;
+    std::tuple<SparseSet<std::remove_cvref_t<Ts>>&...> _sets;
 };
+
+template <typename... Ts>
+
+ComponentView<Ts...>::ComponentView(std::tuple<SparseSet<std::remove_cvref_t<Ts>>&...> sets)
+    : _sets { sets }
+{
+}
 
 template <typename... Ts>
 ComponentView<Ts...>::Iterator ComponentView<Ts...>::begin()
@@ -87,7 +116,7 @@ ComponentView<Ts...>::Iterator ComponentView<Ts...>::end()
 {
     auto it = ComponentView<Ts...>::Iterator { _sets };
     it._id = it._entities.size();
-    NH3D_DEBUGLOG("ComponentView::end called");
+    
     return it;
 }
 

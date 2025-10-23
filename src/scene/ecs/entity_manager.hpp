@@ -19,7 +19,7 @@ public:
     [[nodiscard]] static inline T& get(Entity e);
 
     template <typename... Ts>
-    [[nodiscard]] static inline Entity create(Ts&&... components);
+    static inline Entity create(Ts&&... components);
 
     template <typename... Ts>
     static inline void add(Entity e, Ts&&... components);
@@ -32,8 +32,8 @@ public:
 
     static inline void remove(Entity e);
 
-    template <typename T, typename... Ts>
-    [[nodiscard]] static inline ComponentView<T, Ts...> get();
+    template <typename... Ts>
+    [[nodiscard]] static inline ComponentView<Ts...> makeView();
 
 private:
     inline EntityManager();
@@ -63,7 +63,7 @@ template <typename T>
 }
 
 template <typename... Ts>
-[[nodiscard]] inline Entity EntityManager::create(Ts&&... components)
+inline Entity EntityManager::create(Ts&&... components)
 {
     Entity e;
     if (!g_availableEntities.empty()) {
@@ -115,10 +115,10 @@ inline void EntityManager::remove(Entity e)
     g_availableEntities.emplace_back(e);
 }
 
-template <typename T, typename... Ts>
-[[nodiscard]] inline ComponentView<T, Ts...> EntityManager::get()
+template <typename... Ts>
+[[nodiscard]] inline ComponentView<Ts...> EntityManager::makeView()
 {
-    return g_setMap.getSet<T, Ts...>();
+    return g_setMap.makeView<Ts...>();
 }
 
 }

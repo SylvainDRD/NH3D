@@ -6,6 +6,7 @@
 #include <scene/ecs/component_view.hpp>
 #include <scene/ecs/entity.hpp>
 #include <scene/ecs/sparse_set.hpp>
+#include <type_traits>
 
 namespace NH3D {
 
@@ -26,7 +27,7 @@ public:
     [[nodiscard]] inline T& get(Entity e);
 
     template <typename... Ts>
-    [[nodiscard]] inline ComponentView<Ts...> get();
+    [[nodiscard]] inline ComponentView<Ts...> makeView();
 
     template <typename... Ts>
     inline void add(Entity e, Ts&&... components);
@@ -86,9 +87,10 @@ template <typename T>
 }
 
 template <typename... Ts>
-[[nodiscard]] inline ComponentView<Ts...> SparseSetMap::get()
+[[nodiscard]] inline ComponentView<Ts...> SparseSetMap::makeView()
 {
-    return ComponentView<Ts...> { std::make_tuple(getSet<Ts>()...) };
+    // TODO: decay const/ref qualifiers
+    return ComponentView<Ts...> { std::tie(getSet<std::remove_cvref_t<Ts>>()...) };
 }
 
 template <typename... Ts>
