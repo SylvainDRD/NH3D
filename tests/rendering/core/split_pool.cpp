@@ -46,7 +46,7 @@ TEST(SplitPoolTests, StorageTest)
     EXPECT_EQ(pool.getColdData(handle).coldValue, "Hello there!");
 }
 
-TEST(SplitPoolTests, RidRecyclingTest)
+TEST(SplitPoolTests, HandleRecyclingTest)
 {
     SplitPool<A> pool { 10, 10 };
 

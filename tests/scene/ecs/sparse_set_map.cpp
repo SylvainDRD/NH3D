@@ -1,6 +1,6 @@
-#include "misc/utils.hpp"
 #include "gtest/gtest.h"
 #include <gtest/gtest.h>
+#include <misc/utils.hpp>
 #include <scene/ecs/entity.hpp>
 #include <scene/ecs/sparse_set_map.hpp>
 #include <string>
@@ -55,7 +55,7 @@ TEST(SparseSetMapTests, RemoveMaskTest)
     SparseSetMap map;
 
     const Entity e1 = 0;
-    EXPECT_DEATH(map.remove(e1, NH3D_MAX_T(ComponentMask)), ".*FATAL.*Unexpected null sparse set");
+    EXPECT_DEATH(map.remove(e1, NH3D_MAX_T(ComponentMask) ^ SparseSetMap::InvalidEntityMask), ".*FATAL.*Unexpected null sparse set");
 
     map.add(e1, 42, true, 'a', A { 1337, true });
     EXPECT_DEATH(map.add(e1, 42, true, 'a', A { 1337, true }), ".*FATAL.*Trying to overwrite an existing component");
@@ -68,6 +68,8 @@ TEST(SparseSetMapTests, RemoveMaskTest)
     EXPECT_NO_FATAL_FAILURE(map.add(e1));
 
     EXPECT_DEATH(map.remove<int>(e1), ".*FATAL.*Trying to clear a non-existing component");
+
+    EXPECT_DEATH(map.remove(e1, SparseSetMap::InvalidEntityMask), ".*FATAL.*Invalid entity bit set for entity removal");
 }
 
 }

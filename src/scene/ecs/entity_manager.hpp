@@ -1,13 +1,11 @@
 #pragma once
 
-#include <algorithm>
 #include <misc/types.hpp>
 #include <misc/utils.hpp>
 #include <scene/ecs/component_view.hpp>
 #include <scene/ecs/entity.hpp>
 #include <scene/ecs/sparse_set.hpp>
 #include <scene/ecs/sparse_set_map.hpp>
-#include <tuple>
 #include <utility>
 
 namespace NH3D {
@@ -26,17 +24,14 @@ public:
     template <typename... Ts>
     static inline void add(Entity e, Ts&&... components);
 
-    template <typename ...Ts>
+    template <typename... Ts>
     [[nodiscard]] static inline bool has(Entity e);
 
-    template <typename ...Ts>
+    template <typename... Ts>
     static inline void clearComponent(Entity e);
 
     static inline void remove(Entity e);
 
-    // TODO: make a tuple, iterate over sets to use the one with the least number of entities
-    // Caveat: might not lead to the most memory efficient scenario if the component order for the selected type is dumb
-    // TODO: figure out type "safety"
     template <typename T, typename... Ts>
     [[nodiscard]] static inline ComponentView<T, Ts...> get();
 
@@ -64,7 +59,7 @@ inline void EntityManager::prealloc()
 template <typename T>
 [[nodiscard]] inline T& EntityManager::get(Entity e)
 {
-    return g_setMap.getSet<T>(e);
+    return g_setMap.get<T>(e);
 }
 
 template <typename... Ts>
@@ -80,6 +75,7 @@ template <typename... Ts>
     }
 
     add(e, std::forward<Ts>(components)...);
+    return e;
 }
 
 template <typename... Ts>
@@ -92,26 +88,31 @@ inline void EntityManager::add(Entity e, Ts&&... components)
     g_entityMasks[e] |= mask;
 }
 
-template <typename ...Ts>
+template <typename... Ts>
 [[nodiscard]] inline bool EntityManager::has(Entity e)
 {
+    NH3D_ASSERT(e < g_entityMasks.size(), "Trying to check ComponentMask for a non-existing entity");
     return (g_entityMasks[e] & g_setMap.mask<Ts...>()) == g_setMap.mask<Ts...>();
 }
 
-template <typename ...Ts>
+template <typename... Ts>
 inline void EntityManager::clearComponent(Entity e)
 {
     NH3D_ASSERT(has<Ts...>(e), "Entity mask is missing components to delete");
-    
+
     (g_setMap.remove<Ts>(e), ...);
 
-    g_entityMasks[e] ^= mask<Ts...>();
+    g_entityMasks[e] ^= g_setMap.mask<Ts...>();
 }
 
 inline void EntityManager::remove(Entity e)
 {
+    NH3D_ASSERT(e < g_entityMasks.size(), "Attempting to delete a non-existant entity");
+    NH3D_ASSERT(g_entityMasks[e] != SparseSetMap::InvalidEntityMask, "Attempting to delete an invalid entity");
+
     g_setMap.remove(e, g_entityMasks[e]);
-    g_entityMasks[e] = 0;
+    g_entityMasks[e] = SparseSetMap::InvalidEntityMask;
+    g_availableEntities.emplace_back(e);
 }
 
 template <typename T, typename... Ts>
