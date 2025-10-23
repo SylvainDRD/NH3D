@@ -30,7 +30,8 @@ set(NH3D_CXX_STANDARD cxx_std_20)
 target_compile_features(${BINARY} PRIVATE ${NH3D_CXX_STANDARD})
 
 if(NOT CMAKE_BUILD_TYPE MATCHES ".*Release.*")
-	add_definitions(-DNH3D_DEBUG)
+	# Add custom debug defines for RelWithDebInfo mode which enables asserts
+	target_compile_definitions(${BINARY} PRIVATE NH3D_DEBUG)
 endif()
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")

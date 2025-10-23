@@ -53,8 +53,8 @@ namespace NH3D {
 #define _NH3D_NOP \
     if (false) { \
     }
-#define NH3D_DEBUG(msg) _NH3D_NOP
-#define NH3D_DEBUG_VK(msg) _NH3D_NOP
+#define NH3D_DEBUGLOG(msg) _NH3D_NOP
+#define NH3D_DEBUGLOG_VK(msg) _NH3D_NOP
 
 #define NH3D_ASSERT(condition, msg) _NH3D_NOP
 #define NH3D_ASSERT_VK(condition, msg) _NH3D_NOP

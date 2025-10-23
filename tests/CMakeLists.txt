@@ -13,6 +13,8 @@ function (declare_test path)
     target_compile_features(${TEST_NAME} PRIVATE ${NH3D_CXX_STANDARD})
     target_include_directories(${TEST_NAME} PRIVATE ${NH3D_INCLUDES})
     target_link_libraries(${TEST_NAME} PRIVATE ${NH3D_LIBRARIES} GTest::gtest_main)
+    # Force assertions enabled even in release mode
+	target_compile_definitions(${TEST_NAME} PRIVATE NH3D_DEBUG) 
     add_dependencies(${TEST_NAME} ${NH3D_DEPENDENCIES})
     gtest_discover_tests(${TEST_NAME})
 endfunction()
