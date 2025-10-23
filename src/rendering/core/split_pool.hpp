@@ -47,15 +47,10 @@ template <typename T>
 }
 
 template <typename T>
-[[nodiscard]] inline size_t SplitPool<T>::size() const
-{
-    NH3D_ASSERT(_hot.size() == _cold.size(), "Hot and cold data size mismatch");
-    return _hot.size() - _availableHandles.size();
-}
-
-template <typename T>
 [[nodiscard]] inline SplitPool<T>::Hot& SplitPool<T>::getHotData(HandleType handle)
 {
+    // Cannot reasonnably check that the resource is valid without trashing the cache with cold data, which would destroy the performance
+    // This will be checked in a test
     NH3D_ASSERT(handle.index < _hot.size(), "Invalid handle index");
     return _hot[handle.index];
 }
@@ -64,6 +59,7 @@ template <typename T>
 [[nodiscard]] inline SplitPool<T>::Cold& SplitPool<T>::getColdData(HandleType handle)
 {
     NH3D_ASSERT(handle.index < _cold.size(), "Invalid handle index");
+    NH3D_ASSERT(T::valid(getHotData(handle), _cold[handle.index]), "Attempting to access cold data of an invalid handle");
     return _cold[handle.index];
 }
 
@@ -83,7 +79,6 @@ template <typename T>
         _cold.emplace_back(std::forward<Cold>(coldData));
     }
 
-
     return handle;
 }
 
@@ -96,7 +91,7 @@ inline void SplitPool<T>::release(const IRHI& rhi, HandleType handle)
     Cold& cold = getColdData(handle);
 
     NH3D_ASSERT(T::valid(hot, cold), "Trying to release an invalid handle");
-    T::release(rhi, getHotData(handle), getColdData(handle));
+    T::release(rhi, hot, cold);
     NH3D_ASSERT(!T::valid(hot, cold), "Released handle should not be valid: resource is not cleaned up properly");
 
     _availableHandles.emplace_back(handle.index);

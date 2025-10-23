@@ -68,9 +68,6 @@ template <typename T>
 {
     SplitPool<T>& pool = getPool<T>();
 
-    // TODO: customize assertion message using https://github.com/Neargye/nameof
-    NH3D_ASSERT(handle.index < pool.size(), "Attempting to fetch a resource with an invalid handle");
-
     return pool.getHotData(handle);
 }
 
@@ -78,9 +75,6 @@ template <typename T>
 [[nodiscard]] inline typename T::Cold& ResourceManager::getColdData(Handle<typename T::ResourceType> handle)
 {
     SplitPool<T>& pool = getPool<T>();
-
-    // TODO: customize assertion message using https://github.com/Neargye/nameof
-    NH3D_ASSERT(handle.index < pool.size(), "Attempting to fetch a resource with an invalid handle");
 
     return pool.getColdData(handle);
 }
@@ -97,9 +91,6 @@ template <typename T>
 inline void ResourceManager::release(const IRHI& rhi, Handle<typename T::ResourceType> handle)
 {
     SplitPool<T>& pool = getPool<T>();
-
-    // TODO: customize assertion message using https://github.com/Neargye/nameof
-    NH3D_ASSERT(handle.index < pool.size(), "Attempting to release a resource with an invalid handle");
 
     pool.release(rhi, handle);
 }

@@ -1,4 +1,4 @@
-#include "gtest/gtest.h"
+#include "mock_rhi.hpp"
 #include <gtest/gtest.h>
 #include <rendering/core/buffer.hpp>
 #include <rendering/core/rhi.hpp>
@@ -28,15 +28,16 @@ struct VulkanBuffer {
 
     struct Hot {
         std::string hotValue;
+        bool valid = true;
     };
 
     struct Cold {
         uint8_t coldValue;
     };
 
-    [[nodiscard]] static inline bool valid(const Hot& hot, const Cold& cold) { return true; }
+    [[nodiscard]] static inline bool valid(const Hot& hot, const Cold& cold) { return hot.valid; }
 
-    static void release(const IRHI& rhi, Hot& hot, Cold& cold) { }
+    static void release(const IRHI& rhi, Hot& hot, Cold& cold) { hot.valid = false; }
 };
 
 }
@@ -45,18 +46,53 @@ struct VulkanBuffer {
 
 namespace NH3D::Test {
 
-TEST(ResourceManagerTests, StorageTest)
+TEST(ResourceManagerTests, GeneralTest)
 {
     ResourceManager resourceManager;
 
     Handle<Texture> textureHandle = resourceManager.store<VulkanTexture>({ 1337 }, { "Hello there!" });
-    Handle<Buffer> bufferHandle = resourceManager.store<VulkanBuffer>({ "Hello there too!" }, { 42 });
+    Handle<Buffer> bufferHandle = resourceManager.store<VulkanBuffer>({ "Hello there too!", true }, { 42 });
 
     EXPECT_EQ(resourceManager.getHotData<VulkanTexture>(textureHandle).hotValue, 1337);
     EXPECT_EQ(resourceManager.getColdData<VulkanTexture>(textureHandle).coldValue, "Hello there!");
 
     EXPECT_EQ(resourceManager.getHotData<VulkanBuffer>(bufferHandle).hotValue, "Hello there too!");
     EXPECT_EQ(resourceManager.getColdData<VulkanBuffer>(bufferHandle).coldValue, 42);
+
+    EXPECT_DEATH((void)resourceManager.getHotData<VulkanTexture>({ 4 }), ".*FATAL.*Invalid handle index");
+    EXPECT_DEATH((void)resourceManager.getColdData<VulkanTexture>({ 4 }), ".*FATAL.*Invalid handle index");
+}
+
+TEST(ResourceManagerTests, ReleaseTest)
+{
+    ResourceManager resourceManager;
+
+    Handle<Texture> textureHandle = resourceManager.store<VulkanTexture>({ 1337 }, { "Hello there!" });
+    Handle<Buffer> bufferHandle = resourceManager.store<VulkanBuffer>({ "Hello there too!", true }, { 42 });
+
+    MockRHI rhi;
+    resourceManager.release<VulkanBuffer>(rhi, bufferHandle);
+    // Assertion only present on cold getter for debug performance
+    EXPECT_FALSE(VulkanBuffer::valid(resourceManager.getHotData<VulkanBuffer>(bufferHandle), { 42 }));
+    EXPECT_DEATH((void)resourceManager.getColdData<VulkanBuffer>(bufferHandle), ".*FATAL.*Attempting to access cold data of an invalid handle");
+
+    EXPECT_DEATH(resourceManager.release<VulkanTexture>(rhi, { 10 }), ".*FATAL.*Invalid handle index");
+}
+
+TEST(ResourceManagerTests, ClearTest)
+{
+    ResourceManager resourceManager;
+
+    Handle<Texture> textureHandle = resourceManager.store<VulkanTexture>({ 1337 }, { "Hello there!" });
+    Handle<Buffer> bufferHandle = resourceManager.store<VulkanBuffer>({ "Hello there too!", true }, { 42 });
+
+    MockRHI rhi;
+    resourceManager.clear(rhi);
+
+    EXPECT_DEATH((void)resourceManager.getHotData<VulkanBuffer>(bufferHandle), ".*FATAL.*Invalid handle index");
+    EXPECT_DEATH((void)resourceManager.getColdData<VulkanBuffer>(bufferHandle), ".*FATAL.*Invalid handle index");
+    // gtest is fucking weird sometimes
+    EXPECT_DEATH(resourceManager.release<VulkanTexture>(rhi, { bufferHandle.index }), ".*FATAL.*Invalid handle index");
 }
 
 }
