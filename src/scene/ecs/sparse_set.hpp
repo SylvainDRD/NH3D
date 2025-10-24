@@ -20,7 +20,7 @@ public:
 
 template <typename T>
 class SparseSet : public ISparseSet {
-    NH3D_NO_COPY(SparseSet<T>)
+    NH3D_NO_COPY(SparseSet)
 public:
     SparseSet();
 

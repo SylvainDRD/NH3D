@@ -15,6 +15,7 @@ class ComponentView {
 public:
     ComponentView() = delete;
 
+    // Look at that degenerate syntax
     ComponentView(std::tuple<SparseSet<std::remove_cvref_t<Ts>>&...> sets);
 
     class Iterator {
@@ -47,7 +48,7 @@ public:
         {
             const Entity e = _entities[_id];
 
-            // TODO: getRaw on main set
+            // TODO: getRaw on main set, its some kind of constexpr foreach again
             return std::tie(e, std::get<SparseSet<std::remove_cvref_t<Ts>>&>(_sets).get(e)...);
         }
 
