@@ -1,17 +1,11 @@
 cmake_minimum_required(VERSION 3.25 FATAL_ERROR)
 cmake_policy(SET CMP0043 NEW)
 
-set(BINARY NH3D)
+set(NH3D_LIB NH3D)
 set(PROJECT_VERSION_MAJOR 0)
 set(PROJECT_VERSION_MINOR 0)
 set(PROJECT_VERSION_PATCH 1)
-project(${BINARY} VERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH} DESCRIPTION "")
-
-add_definitions(-DPROJECT_NAME="${BINARY}" 
-				-DPROJECT_VERSION_MAJOR=${PROJECT_VERSION_MAJOR} 
-				-DPROJECT_VERSION_MINOR=${PROJECT_VERSION_MINOR}
-				-DPROJECT_VERSION_PATCH=${PROJECT_VERSION_PATCH}
-				-DPROJECT_DIR="${CMAKE_SOURCE_DIR}/")
+project(${NH3D_LIB} VERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH} DESCRIPTION "")
 
 file(GLOB SRC 	${CMAKE_SOURCE_DIR}/src/scene/*.cpp
 				${CMAKE_SOURCE_DIR}/src/scene/ecs/*.cpp
@@ -23,20 +17,27 @@ file(GLOB SRC 	${CMAKE_SOURCE_DIR}/src/scene/*.cpp
 				${CMAKE_SOURCE_DIR}/src/rendering/vulkan/*.cpp
 			)
 
-add_executable(${BINARY} src/main.cpp ${SRC})
+add_library(${NH3D_LIB} STATIC ${SRC})
+
+target_compile_definitions(${NH3D_LIB} PRIVATE  -DPROJECT_NAME="${NH3D_LIB}" 
+												-DPROJECT_VERSION_MAJOR=${PROJECT_VERSION_MAJOR} 
+												-DPROJECT_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+												-DPROJECT_VERSION_PATCH=${PROJECT_VERSION_PATCH}
+												-DPROJECT_DIR="${CMAKE_SOURCE_DIR}/")
+
 
 set(NH3D_CXX_STANDARD cxx_std_20)
-target_compile_features(${BINARY} PRIVATE ${NH3D_CXX_STANDARD})
+target_compile_features(${NH3D_LIB} PRIVATE ${NH3D_CXX_STANDARD})
 
 if(NOT CMAKE_BUILD_TYPE MATCHES ".*Release.*")
 	# Add custom debug defines for RelWithDebInfo mode which enables asserts
-	target_compile_definitions(${BINARY} PRIVATE NH3D_DEBUG)
+	target_compile_definitions(${NH3D_LIB} PRIVATE NH3D_DEBUG)
 endif()
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-	target_compile_options(${BINARY} PRIVATE -Wswitch)
+	target_compile_options(${NH3D_LIB} PRIVATE -Wswitch)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-	target_compile_options(${BINARY} PRIVATE /we4062)
+	target_compile_options(${NH3D_LIB} PRIVATE /we4062)
 endif()
 
 # External dependencies
@@ -61,7 +62,7 @@ set(NH3D_INCLUDES 	${CMAKE_SOURCE_DIR}/src
 					${DEPENDENCIES_PATH}/json/include
 					${DEPENDENCIES_PATH}/tinygltf
 )
-target_include_directories(${BINARY} PRIVATE ${NH3D_INCLUDES})
+target_include_directories(${NH3D_LIB} PRIVATE ${NH3D_INCLUDES})
 
 set(NH3D_LIBRARIES  ${Vulkan_LIBRARIES}
 					glm
@@ -69,12 +70,28 @@ set(NH3D_LIBRARIES  ${Vulkan_LIBRARIES}
 					GPUOpen::VulkanMemoryAllocator
 
 )
-target_link_libraries(${BINARY} PRIVATE ${NH3D_LIBRARIES})
+target_link_libraries(${NH3D_LIB} PRIVATE ${NH3D_LIBRARIES})
 
 set(NH3D_DEPENDENCIES glfw)
-add_dependencies(${BINARY} ${NH3D_DEPENDENCIES})
+add_dependencies(${NH3D_LIB} ${NH3D_DEPENDENCIES})
 
 if(TRUE) 
 	enable_testing() # Needs to be in at the top level so ctest doesn't shit itself
 	add_subdirectory(${CMAKE_SOURCE_DIR}/tests)
 endif()
+
+## Editor
+set(NH3D_EDITOR_BIN NH3D-Editor)
+add_executable(${NH3D_EDITOR_BIN} src/editor/main.cpp)
+
+target_compile_features(${NH3D_EDITOR_BIN} PRIVATE ${NH3D_CXX_STANDARD})
+
+target_compile_definitions(${NH3D_EDITOR_BIN} PRIVATE   -DPROJECT_NAME="${NH3D_LIB}" 
+														-DPROJECT_VERSION_MAJOR=${PROJECT_VERSION_MAJOR} 
+														-DPROJECT_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+														-DPROJECT_VERSION_PATCH=${PROJECT_VERSION_PATCH}
+														-DPROJECT_DIR="${CMAKE_SOURCE_DIR}/")
+
+target_link_libraries(${NH3D_EDITOR_BIN} PRIVATE ${NH3D_LIB})
+
+target_include_directories(${NH3D_EDITOR_BIN} PRIVATE ${NH3D_INCLUDES})

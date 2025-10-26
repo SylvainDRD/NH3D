@@ -8,11 +8,11 @@ include(GoogleTest)
 
 function (declare_test path) 
     get_filename_component(TEST_NAME ${path} NAME_WE)
-    add_executable(${TEST_NAME} ${path} ${SRC})
+    add_executable(${TEST_NAME} ${path})
 
     target_compile_features(${TEST_NAME} PRIVATE ${NH3D_CXX_STANDARD})
     target_include_directories(${TEST_NAME} PRIVATE ${NH3D_INCLUDES})
-    target_link_libraries(${TEST_NAME} PRIVATE ${NH3D_LIBRARIES} GTest::gtest_main)
+    target_link_libraries(${TEST_NAME} PRIVATE ${NH3D_LIB} ${NH3D_LIBRARIES} GTest::gtest_main)
     # Force assertions enabled even in release mode
 	target_compile_definitions(${TEST_NAME} PRIVATE NH3D_FORCE_ASSERTS) 
     add_dependencies(${TEST_NAME} ${NH3D_DEPENDENCIES})
