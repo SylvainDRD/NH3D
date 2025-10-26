@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstddef>
 #include <misc/types.hpp>
 #include <misc/utils.hpp>
 #include <scene/ecs/entity.hpp>
@@ -10,27 +9,29 @@
 
 namespace NH3D {
 
-template <typename... Ts>
+class Scene;
+
+template <typename T, typename... Ts>
 class ComponentView {
+    using TupleType = std::tuple<SparseSet<std::remove_cvref_t<T>>&, SparseSet<std::remove_cvref_t<Ts>>&...>;
+
 public:
     ComponentView() = delete;
 
-    // Look at that degenerate syntax
-    ComponentView(std::tuple<SparseSet<std::remove_cvref_t<Ts>>&...> sets);
+    ComponentView(const std::vector<ComponentMask>& entityMasks, TupleType setsconst, const ComponentMask mask);
 
     class Iterator {
     public:
         Iterator() = delete;
 
-        Iterator(std::tuple<SparseSet<std::remove_cvref_t<Ts>>&...>& sets)
-            : _sets { sets }
-            , _entities { selectEntityArray() }
-        {
-        }
-
         Iterator& operator++()
         {
-            ++_id;
+            const auto& entities = std::get<SparseSet<std::remove_cvref_t<T>>&>(_sets).entities();
+
+            do {
+                ++_id;
+            } while (_id != entities.size() && !ComponentMaskUtils::checkComponents(_entityMasks[entities[_id]], _mask));
+
             return *this;
         }
 
@@ -44,51 +45,35 @@ public:
             return !(_id == it._id);
         }
 
-        std::tuple<Entity, Ts...> operator*()
+        std::tuple<Entity, T, Ts...> operator*()
         {
-            const Entity e = _entities[_id];
+            auto& leadSet = std::get<SparseSet<std::remove_cvref_t<T>>&>(_sets);
+            const Entity e = leadSet.entities()[_id];
 
-            // TODO: getRaw on main set, its some kind of constexpr foreach again
-            return std::tie(e, std::get<SparseSet<std::remove_cvref_t<Ts>>&>(_sets).get(e)...);
+            return std::tie(e, leadSet.getRaw(_id), std::get<SparseSet<std::remove_cvref_t<Ts>>&>(_sets).get(e)...);
         }
 
     private:
-        template <typename F, int i = 0>
-        constexpr void foreachSet(const F& f)
+        Iterator(const std::vector<ComponentMask>& entityMasks, TupleType& sets, const ComponentMask mask)
+            : _entityMasks { entityMasks }
+            , _sets { sets }
+            , _mask { mask }
         {
-            if constexpr (i < sizeof...(Ts)) {
-                f(std::get<i>(_sets));
-                foreachSet<F, i + 1>(f);
+            const auto& entities = std::get<SparseSet<std::remove_cvref_t<T>>&>(_sets).entities();
+
+            while (_id != entities.size() && !ComponentMaskUtils::checkComponents(_entityMasks[entities[_id]], _mask)) {
+                ++_id;
             }
         }
 
-        const std::vector<Entity>& selectEntityArray()
-        {
-            const std::vector<Entity>* entities;
-            size_t size = NH3D_MAX_T(size_t);
-
-            const auto f = [&size, &entities]<typename T>(const SparseSet<T>& set) {
-                if (set.size() < size) {
-                    size = set.size();
-                    entities = &set.entities();
-                }
-            };
-
-            foreachSet(f);
-
-            NH3D_ASSERT(entities != nullptr, "Failed to select an entities array");
-
-            return *entities;
-        }
-
     private:
-        std::tuple<SparseSet<std::remove_cvref_t<Ts>>&...>& _sets;
-
-        const std::vector<Entity>& _entities;
+        const std::vector<ComponentMask>& _entityMasks;
+        TupleType& _sets;
+        const ComponentMask _mask;
 
         uint32 _id = 0;
 
-        friend ComponentView<Ts...>;
+        friend ComponentView<T, Ts...>;
     };
 
     Iterator begin();
@@ -96,28 +81,31 @@ public:
     Iterator end();
 
 private:
-    std::tuple<SparseSet<std::remove_cvref_t<Ts>>&...> _sets;
+    const std::vector<ComponentMask>& _entityMasks;
+    TupleType _sets;
+    const ComponentMask _mask;
 };
 
-template <typename... Ts>
-
-ComponentView<Ts...>::ComponentView(std::tuple<SparseSet<std::remove_cvref_t<Ts>>&...> sets)
-    : _sets { sets }
+template <typename T, typename... Ts>
+ComponentView<T, Ts...>::ComponentView(const std::vector<ComponentMask>& entityMasks, TupleType sets, const ComponentMask mask)
+    : _entityMasks { entityMasks }
+    , _sets { sets }
+    , _mask { mask }
 {
 }
 
-template <typename... Ts>
-ComponentView<Ts...>::Iterator ComponentView<Ts...>::begin()
+template <typename T, typename... Ts>
+ComponentView<T, Ts...>::Iterator ComponentView<T, Ts...>::begin()
 {
-    return ComponentView<Ts...>::Iterator { _sets };
+    return ComponentView<T, Ts...>::Iterator { _entityMasks, _sets, _mask };
 }
 
-template <typename... Ts>
-ComponentView<Ts...>::Iterator ComponentView<Ts...>::end()
+template <typename T, typename... Ts>
+ComponentView<T, Ts...>::Iterator ComponentView<T, Ts...>::end()
 {
-    auto it = ComponentView<Ts...>::Iterator { _sets };
-    it._id = it._entities.size();
-    
+    auto it = ComponentView<T, Ts...>::Iterator { _entityMasks, _sets, _mask };
+    it._id = std::get<SparseSet<std::remove_cvref_t<T>>&>(_sets).size();
+
     return it;
 }
 

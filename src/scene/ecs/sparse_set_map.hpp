@@ -7,8 +7,11 @@
 #include <scene/ecs/entity.hpp>
 #include <scene/ecs/sparse_set.hpp>
 #include <type_traits>
+#include <vector>
 
 namespace NH3D {
+
+class Scene;
 
 // Maps a type to a container
 class SparseSetMap {
@@ -16,7 +19,7 @@ class SparseSetMap {
 public:
     SparseSetMap() = default;
 
-    // Most significant bit means invalid entity
+    // Most significant bit reserved for invalid entity
     constexpr static uint8 MaxComponent = sizeof(ComponentMask) * 8 - 1;
     static constexpr ComponentMask InvalidEntityMask = 1 << MaxComponent;
 
@@ -26,8 +29,8 @@ public:
     template <typename T>
     [[nodiscard]] inline T& get(Entity e);
 
-    template <typename... Ts>
-    [[nodiscard]] inline ComponentView<Ts...> makeView();
+    template <typename T, typename... Ts>
+    [[nodiscard]] inline ComponentView<T, Ts...> makeView(const std::vector<ComponentMask>& entityMasks);
 
     template <typename... Ts>
     inline void add(Entity e, Ts&&... components);
@@ -77,7 +80,7 @@ template <typename T>
 template <typename... Ts>
 [[nodiscard]] inline ComponentMask SparseSetMap::mask() const
 {
-    return ((1 << getId<Ts>()) | ...);
+    return ((1 << getId<std::remove_cvref_t<Ts>>()) | ...);
 }
 
 template <typename T>
@@ -86,11 +89,14 @@ template <typename T>
     return getSet<T>().get(e);
 }
 
-template <typename... Ts>
-[[nodiscard]] inline ComponentView<Ts...> SparseSetMap::makeView()
+template <typename T, typename... Ts>
+[[nodiscard]] inline ComponentView<T, Ts...> SparseSetMap::makeView(const std::vector<ComponentMask>& entityMasks)
 {
-    // TODO: decay const/ref qualifiers
-    return ComponentView<Ts...> { std::tie(getSet<std::remove_cvref_t<Ts>>()...) };
+    return ComponentView<T, Ts...> {
+        entityMasks,
+        std::tie(getSet<std::remove_cvref_t<T>>(), getSet<std::remove_cvref_t<Ts>>()...),
+        mask<T, Ts...>()
+    };
 }
 
 template <typename... Ts>

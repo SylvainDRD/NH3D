@@ -10,8 +10,17 @@
 
 namespace NH3D {
 
+Scene::Scene()
+{
+    _entityMasks.reserve(400'000);
+    _availableEntities.reserve(2'000);
+}
+
 Scene::Scene(const std::filesystem::path& filePath)
 {
+    _entityMasks.reserve(400'000);
+    _availableEntities.reserve(2'000);
+
     // TODO: pre-allocate a loading struct with strings for errors & warnings/tinygltf::Model/vectors for mesh data pre-allocated
 }
 

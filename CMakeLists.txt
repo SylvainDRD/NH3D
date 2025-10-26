@@ -13,18 +13,17 @@ add_definitions(-DPROJECT_NAME="${BINARY}"
 				-DPROJECT_VERSION_PATCH=${PROJECT_VERSION_PATCH}
 				-DPROJECT_DIR="${CMAKE_SOURCE_DIR}/")
 
-file(GLOB_RECURSE SRC 	${CMAKE_SOURCE_DIR}/src/*.cpp
-						${CMAKE_SOURCE_DIR}/src/scene/*.cpp
-						${CMAKE_SOURCE_DIR}/src/scene/ecs/*.cpp
-						${CMAKE_SOURCE_DIR}/src/scene/ecs/components/*.cpp
-						${CMAKE_SOURCE_DIR}/src/general/*.cpp
-						${CMAKE_SOURCE_DIR}/src/utils/*.cpp
-						${CMAKE_SOURCE_DIR}/src/rendering/*.cpp
-						${CMAKE_SOURCE_DIR}/src/rendering/render_graph/*.cpp
-						${CMAKE_SOURCE_DIR}/src/rendering/vulkan/*.cpp
-					)
+file(GLOB SRC 	${CMAKE_SOURCE_DIR}/src/scene/*.cpp
+				${CMAKE_SOURCE_DIR}/src/scene/ecs/*.cpp
+				${CMAKE_SOURCE_DIR}/src/scene/ecs/components/*.cpp
+				${CMAKE_SOURCE_DIR}/src/general/*.cpp
+				${CMAKE_SOURCE_DIR}/src/utils/*.cpp
+				${CMAKE_SOURCE_DIR}/src/rendering/*.cpp
+				${CMAKE_SOURCE_DIR}/src/rendering/render_graph/*.cpp
+				${CMAKE_SOURCE_DIR}/src/rendering/vulkan/*.cpp
+			)
 
-add_executable(${BINARY} ${SRC})
+add_executable(${BINARY} src/main.cpp ${SRC})
 
 set(NH3D_CXX_STANDARD cxx_std_20)
 target_compile_features(${BINARY} PRIVATE ${NH3D_CXX_STANDARD})

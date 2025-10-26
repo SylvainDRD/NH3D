@@ -10,4 +10,13 @@ static constexpr Entity InvalidEntity = NH3D_MAX_T(Entity);
 
 using ComponentMask = uint32;
 
+namespace ComponentMaskUtils {
+
+    [[nodiscard]] inline static bool checkComponents(const ComponentMask entityMask, const ComponentMask componentMask)
+    {
+        return (entityMask & componentMask) == componentMask;
+    }
+
+}
+
 }
