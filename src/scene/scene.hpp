@@ -20,21 +20,21 @@ public:
     Scene(const std::filesystem::path& filePath);
 
     template <typename T>
-    [[nodiscard]] inline T& get(const Entity e);
+    [[nodiscard]] inline T& get(const Entity entity);
 
     template <typename... Ts>
     inline Entity create(Ts&&... components);
 
     template <typename... Ts>
-    inline void add(const Entity e, Ts&&... components);
+    inline void add(const Entity entity, Ts&&... components);
 
     template <typename... Ts>
-    [[nodiscard]] inline bool checkComponents(const Entity e) const;
+    [[nodiscard]] inline bool checkComponents(const Entity entity) const;
 
     template <typename... Ts>
-    inline void clearComponents(const Entity e);
+    inline void clearComponents(const Entity entity);
 
-    inline void remove(const Entity e);
+    inline void remove(const Entity entity);
 
     template <typename T, typename... Ts>
     [[nodiscard]] inline ComponentView<T, Ts...> makeView();
@@ -46,9 +46,9 @@ private:
 };
 
 template <typename T>
-[[nodiscard]] inline T& Scene::get(const Entity e)
+[[nodiscard]] inline T& Scene::get(const Entity entity)
 {
-    return _setMap.get<T>(e);
+    return _setMap.get<T>(entity);
 }
 
 template <typename... Ts>
@@ -68,40 +68,40 @@ inline Entity Scene::create(Ts&&... components)
 }
 
 template <typename... Ts>
-inline void Scene::add(const Entity e, Ts&&... components)
+inline void Scene::add(const Entity entity, Ts&&... components)
 {
     const ComponentMask mask = _setMap.mask<Ts...>();
 
-    _setMap.add(e, std::forward<Ts>(components)...);
+    _setMap.add(entity, std::forward<Ts>(components)...);
 
-    _entityMasks[e] |= mask;
+    _entityMasks[entity] |= mask;
 }
 
 template <typename... Ts>
-[[nodiscard]] inline bool Scene::checkComponents(const Entity e) const
+[[nodiscard]] inline bool Scene::checkComponents(const Entity entity) const
 {
-    NH3D_ASSERT(e < _entityMasks.size(), "Attempting to check components of a non-existing entity");
-    return ComponentMaskUtils::checkComponents(_entityMasks[e], _setMap.mask<Ts...>());
+    NH3D_ASSERT(entity < _entityMasks.size(), "Attempting to check components of a non-existing entity");
+    return ComponentMaskUtils::checkComponents(_entityMasks[entity], _setMap.mask<Ts...>());
 }
 
 template <typename... Ts>
-inline void Scene::clearComponents(const Entity e)
+inline void Scene::clearComponents(const Entity entity)
 {
-    NH3D_ASSERT(checkComponents<Ts...>(e), "Entity mask is missing components to delete");
+    NH3D_ASSERT(checkComponents<Ts...>(entity), "Entity mask is missing components to delete");
 
-    (_setMap.remove<Ts>(e), ...);
+    (_setMap.remove<Ts>(entity), ...);
 
-    _entityMasks[e] ^= _setMap.mask<Ts...>();
+    _entityMasks[entity] ^= _setMap.mask<Ts...>();
 }
 
-inline void Scene::remove(const Entity e)
+inline void Scene::remove(const Entity entity)
 {
-    NH3D_ASSERT(e < _entityMasks.size(), "Attempting to delete a non-existant entity");
-    NH3D_ASSERT(_entityMasks[e] != SparseSetMap::InvalidEntityMask, "Attempting to delete an invalid entity");
+    NH3D_ASSERT(entity < _entityMasks.size(), "Attempting to delete a non-existant entity");
+    NH3D_ASSERT(_entityMasks[entity] != SparseSetMap::InvalidEntityMask, "Attempting to delete an invalid entity");
 
-    _setMap.remove(e, _entityMasks[e]);
-    _entityMasks[e] = SparseSetMap::InvalidEntityMask;
-    _availableEntities.emplace_back(e);
+    _setMap.remove(entity, _entityMasks[entity]);
+    _entityMasks[entity] = SparseSetMap::InvalidEntityMask;
+    _availableEntities.emplace_back(entity);
 }
 
 template <typename T, typename... Ts>

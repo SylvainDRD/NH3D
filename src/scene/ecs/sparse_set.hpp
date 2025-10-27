@@ -15,7 +15,7 @@ public:
 
     // This seals the deal as removal being a garbage operation
     // Perhapse if removal becomes performance critical, there is an argument for forward declaring all SparseSet types
-    virtual void remove(Entity e) = 0;
+    virtual void remove(const Entity entity) = 0;
 };
 
 template <typename T>
@@ -28,11 +28,11 @@ public:
 
     ~SparseSet() = default;
 
-    void add(Entity e, T&& component);
+    void add(const Entity entity, T&& component);
 
-    void remove(Entity e) override;
+    void remove(const Entity entity) override;
 
-    [[nodiscard]] T& get(Entity e);
+    [[nodiscard]] T& get(const Entity entity);
 
     [[nodiscard]] const std::vector<Entity>& entities() const;
 
@@ -61,10 +61,10 @@ SparseSet<T>::SparseSet()
 }
 
 template <typename T>
-void SparseSet<T>::add(Entity e, T&& component)
+void SparseSet<T>::add(const Entity entity, T&& component)
 {
-    const uint32 bufferId = e >> BufferBitSize;
-    const uint32 indexId = e & (BufferSize - 1);
+    const uint32 bufferId = entity >> BufferBitSize;
+    const uint32 indexId = entity & (BufferSize - 1);
 
     if (bufferId >= _entityLUT.size()) {
         _entityLUT.resize(bufferId + 1);
@@ -80,14 +80,14 @@ void SparseSet<T>::add(Entity e, T&& component)
     index = _data.size();
 
     _data.emplace_back(std::forward<T>(component));
-    _entities.emplace_back(e);
+    _entities.emplace_back(entity);
 }
 
 template <typename T>
-void SparseSet<T>::remove(Entity e)
+void SparseSet<T>::remove(const Entity entity)
 {
-    const uint32 bufferId = e >> BufferBitSize;
-    const uint32 indexId = e & (BufferSize - 1);
+    const uint32 bufferId = entity >> BufferBitSize;
+    const uint32 indexId = entity & (BufferSize - 1);
     NH3D_ASSERT(bufferId < _entityLUT.size(), "Trying to clear a component for an entity without storage");
 
     const auto& indices = _entityLUT[bufferId];
@@ -104,10 +104,10 @@ void SparseSet<T>::remove(Entity e)
 }
 
 template <typename T>
-[[nodiscard]] T& SparseSet<T>::get(Entity e)
+[[nodiscard]] T& SparseSet<T>::get(const Entity entity)
 {
-    const uint32 bufferId = e >> BufferBitSize;
-    const uint32 indexId = e & (BufferSize - 1);
+    const uint32 bufferId = entity >> BufferBitSize;
+    const uint32 indexId = entity & (BufferSize - 1);
     NH3D_ASSERT(bufferId < _entityLUT.size(), "Requested a component for an entity without storage");
 
     const auto& indices = _entityLUT[bufferId];

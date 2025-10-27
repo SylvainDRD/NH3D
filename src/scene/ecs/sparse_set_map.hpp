@@ -27,18 +27,18 @@ public:
     [[nodiscard]] inline ComponentMask mask() const;
 
     template <typename T>
-    [[nodiscard]] inline T& get(Entity e);
+    [[nodiscard]] inline T& get(const Entity entity);
 
     template <typename T, typename... Ts>
     [[nodiscard]] inline ComponentView<T, Ts...> makeView(const std::vector<ComponentMask>& entityMasks);
 
     template <typename... Ts>
-    inline void add(Entity e, Ts&&... components);
+    inline void add(const Entity entity, Ts&&... components);
 
     template <typename T>
-    inline void remove(Entity e);
+    inline void remove(const Entity entity);
 
-    inline void remove(Entity e, ComponentMask mask);
+    inline void remove(const Entity entity, ComponentMask mask);
 
 private:
     template <typename T>
@@ -88,9 +88,9 @@ template <typename... Ts>
 }
 
 template <typename T>
-[[nodiscard]] inline T& SparseSetMap::get(Entity e)
+[[nodiscard]] inline T& SparseSetMap::get(const Entity entity)
 {
-    return getSet<T>().get(e);
+    return getSet<T>().get(entity);
 }
 
 template <typename T, typename... Ts>
@@ -104,25 +104,25 @@ template <typename T, typename... Ts>
 }
 
 template <typename... Ts>
-inline void SparseSetMap::add(Entity e, Ts&&... component)
+inline void SparseSetMap::add(const Entity entity, Ts&&... component)
 {
-    (getSet<Ts>().add(e, std::forward<Ts>(component)), ...);
+    (getSet<Ts>().add(entity, std::forward<Ts>(component)), ...);
 }
 
 template <typename T>
-inline void SparseSetMap::remove(Entity e)
+inline void SparseSetMap::remove(const Entity entity)
 {
-    getSet<T>().remove(e);
+    getSet<T>().remove(entity);
 }
 
-inline void SparseSetMap::remove(Entity e, ComponentMask mask)
+inline void SparseSetMap::remove(const Entity entity, ComponentMask mask)
 {
     NH3D_ASSERT((mask & SparseSetMap::InvalidEntityMask) == 0, "Invalid entity bit set for entity removal");
 
     for (uint32 id = 0; mask != 0; mask >>= 1, ++id) {
         if (mask & 1) {
             NH3D_ASSERT(_sets[id] != nullptr, "Unexpected null sparse set");
-            _sets[id]->remove(e);
+            _sets[id]->remove(entity);
         }
     }
 }
