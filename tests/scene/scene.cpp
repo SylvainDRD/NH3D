@@ -39,7 +39,7 @@ TEST(SceneTests, HasTest)
     const Entity e1 = scene.create('a', 2);
     const Entity e2 = scene.create('b', true);
 
-    EXPECT_DEATH((void)scene.checkComponents<int>(3), ".*FATAL.*Trying to check ComponentMask for a non-existing entity");
+    EXPECT_DEATH((void)scene.checkComponents<int>(3), ".*FATAL.*Attempting to check components of a non-existing entity");
 
     EXPECT_TRUE(scene.checkComponents<int>(e1));
     EXPECT_TRUE(scene.checkComponents<char>(e1));
