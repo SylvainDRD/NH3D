@@ -35,14 +35,14 @@ public:
             return *this;
         }
 
-        bool operator==(const Iterator& it)
+        bool operator==(const Iterator& other)
         {
-            return _id == it._id;
+            return _id == other._id;
         }
 
-        bool operator!=(const Iterator& it)
+        bool operator!=(const Iterator& other)
         {
-            return !(_id == it._id);
+            return !(_id == other._id);
         }
 
         std::tuple<Entity, T, Ts...> operator*()

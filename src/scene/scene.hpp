@@ -1,5 +1,6 @@
 #pragma once
 
+#include <scene/ecs/subtree_view.hpp>
 #include <filesystem>
 #include <misc/types.hpp>
 #include <misc/utils.hpp>
@@ -21,6 +22,8 @@ public:
 
     template <typename T>
     [[nodiscard]] inline T& get(const Entity entity);
+
+    [[nodiscard]] inline SubtreeView getSubtree(const Entity entity);
 
     template <typename... Ts>
     inline Entity create(Ts&&... components);
@@ -49,6 +52,11 @@ template <typename T>
 [[nodiscard]] inline T& Scene::get(const Entity entity)
 {
     return _setMap.get<T>(entity);
+}
+
+
+[[nodiscard]] inline SubtreeView Scene::getSubtree(const Entity entity) {
+    return _setMap.getSubtree(entity);
 }
 
 template <typename... Ts>

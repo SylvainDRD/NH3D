@@ -1,11 +1,14 @@
 #pragma once
 
+#include <concepts>
 #include <cstddef>
 #include <cstring>
 #include <memory>
 #include <misc/types.hpp>
 #include <misc/utils.hpp>
+#include <scene/ecs/components/hierarchy_component.hpp>
 #include <scene/ecs/entity.hpp>
+#include <scene/ecs/subtree_view.hpp>
 
 namespace NH3D {
 
@@ -34,11 +37,14 @@ public:
 
     [[nodiscard]] T& get(const Entity entity);
 
+    [[nodiscard]] T& getRaw(uint32 id);
+
+    [[nodiscard]] inline SubtreeView getSubtree(const Entity entity) const
+        requires std::same_as<HierarchyComponent, T>;
+
     [[nodiscard]] const std::vector<Entity>& entities() const;
 
-    [[nodiscard]] size_t size() const; 
-
-    [[nodiscard]] T& getRaw(uint32 id);
+    [[nodiscard]] size_t size() const;
 
 private:
     constexpr static uint8 BufferBitSize = 10;
@@ -118,18 +124,36 @@ template <typename T>
 }
 
 template <typename T>
-[[nodiscard]] T& SparseSet<T>::getRaw(uint32 id) {
+[[nodiscard]] T& SparseSet<T>::getRaw(uint32 id)
+{
     NH3D_ASSERT(id < _data.size(), "Out of bound raw data SparseSet access");
     return _data[id];
 }
 
 template <typename T>
-[[nodiscard]] const std::vector<Entity>& SparseSet<T>::entities() const {
+[[nodiscard]] inline SubtreeView SparseSet<T>::getSubtree(const Entity entity) const
+    requires std::same_as<HierarchyComponent, T>
+{
+    const uint32 bufferId = entity >> BufferBitSize;
+    const uint32 indexId = entity & (BufferSize - 1);
+    NH3D_ASSERT(bufferId < _entityLUT.size(), "Requested a component for an entity without storage");
+
+    const auto& indices = _entityLUT[bufferId];
+    const uint32 id = indices[indexId];
+    NH3D_ASSERT(indices[indexId] != InvalidIndex, "Requested a non-existing component: Samir you're thrashing the cache");
+
+    return SubtreeView { &_entities[id], &_data[id], static_cast<uint32>(_data.size()) - id };
+}
+
+template <typename T>
+[[nodiscard]] const std::vector<Entity>& SparseSet<T>::entities() const
+{
     return _entities;
 }
 
 template <typename T>
-[[nodiscard]] size_t SparseSet<T>::size() const {
+[[nodiscard]] size_t SparseSet<T>::size() const
+{
     return _entities.size();
 }
 

@@ -4,8 +4,10 @@
 #include <misc/types.hpp>
 #include <misc/utils.hpp>
 #include <scene/ecs/component_view.hpp>
+#include <scene/ecs/components/hierarchy_component.hpp>
 #include <scene/ecs/entity.hpp>
 #include <scene/ecs/sparse_set.hpp>
+#include <scene/ecs/subtree_view.hpp>
 #include <type_traits>
 #include <vector>
 
@@ -28,6 +30,8 @@ public:
 
     template <typename T>
     [[nodiscard]] inline T& get(const Entity entity);
+
+    [[nodiscard]] inline SubtreeView getSubtree(const Entity entity);
 
     template <typename T, typename... Ts>
     [[nodiscard]] inline ComponentView<T, Ts...> makeView(const std::vector<ComponentMask>& entityMasks);
@@ -93,6 +97,11 @@ template <typename T>
     return getSet<T>().get(entity);
 }
 
+[[nodiscard]] inline SubtreeView SparseSetMap::getSubtree(const Entity entity)
+{
+    return getSet<HierarchyComponent>().getSubtree(entity);
+}
+
 template <typename T, typename... Ts>
 [[nodiscard]] inline ComponentView<T, Ts...> SparseSetMap::makeView(const std::vector<ComponentMask>& entityMasks)
 {
@@ -119,6 +128,7 @@ inline void SparseSetMap::remove(const Entity entity, ComponentMask mask)
 {
     NH3D_ASSERT((mask & SparseSetMap::InvalidEntityMask) == 0, "Invalid entity bit set for entity removal");
 
+    // TODO: investigate perf vs __builtin_ctz
     for (uint32 id = 0; mask != 0; mask >>= 1, ++id) {
         if (mask & 1) {
             NH3D_ASSERT(_sets[id] != nullptr, "Unexpected null sparse set");
