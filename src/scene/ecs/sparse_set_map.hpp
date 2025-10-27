@@ -50,13 +50,17 @@ private:
 private:
     mutable Uptr<ISparseSet> _sets[MaxComponent] = {};
 
-    mutable uint32 _nextPoolIndex = 0;
+    // Implies not thread safe and different scene are still limited to MaxComponent total
+    // Components would just be on different buffers
+    static uint32 g_nextPoolIndex;
 };
+
+inline uint32 SparseSetMap::g_nextPoolIndex = 0;
 
 template <typename T>
 [[nodiscard]] inline uint32 SparseSetMap::getId() const
 {
-    static const uint32 Index = _nextPoolIndex++;
+    static const uint32 Index = g_nextPoolIndex++;
 
     NH3D_ASSERT(Index <= MaxComponent, "Maximum amount of component types exceeded, kaboom");
 

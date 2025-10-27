@@ -7,6 +7,7 @@ set(PROJECT_VERSION_MINOR 0)
 set(PROJECT_VERSION_PATCH 1)
 project(${NH3D_LIB} VERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH} DESCRIPTION "")
 
+## Library
 file(GLOB SRC 	${CMAKE_SOURCE_DIR}/src/scene/*.cpp
 				${CMAKE_SOURCE_DIR}/src/scene/ecs/*.cpp
 				${CMAKE_SOURCE_DIR}/src/scene/ecs/components/*.cpp
@@ -75,6 +76,7 @@ target_link_libraries(${NH3D_LIB} PRIVATE ${NH3D_LIBRARIES})
 set(NH3D_DEPENDENCIES glfw)
 add_dependencies(${NH3D_LIB} ${NH3D_DEPENDENCIES})
 
+## Test suite
 if(TRUE) 
 	enable_testing() # Needs to be in at the top level so ctest doesn't shit itself
 	add_subdirectory(${CMAKE_SOURCE_DIR}/tests)

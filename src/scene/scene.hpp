@@ -11,6 +11,7 @@
 
 namespace NH3D {
 
+    // TODO: scene cloning for in editor play mode
 class Scene {
     NH3D_NO_COPY_MOVE(Scene)
 public:
