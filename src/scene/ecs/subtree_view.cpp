@@ -13,7 +13,7 @@ SubtreeView::SubtreeView(const Entity* const entities, const HierarchyComponent*
     , _size { size }
 {
     g_subtreeParentStack.reserve(128);
-    g_subtreeParentStack.clear();
+    g_subtreeParentStack.clear(); // Iterating should never stops until this is empty, but just to be safe
     g_subtreeParentStack.emplace_back(entities[0]);
 
     NH3D_ASSERT(entities != nullptr, "Null entities array provided to SubtreeView");
@@ -30,7 +30,7 @@ SubtreeView::Iterator& SubtreeView::Iterator::operator++()
     }
 
     // Find the parent entity in the previously visited "nodes"
-    while(_view._hierarchy[_id].parent != g_subtreeParentStack.back() && !g_subtreeParentStack.empty()) {
+    while(_view._hierarchy[_id].parent() != g_subtreeParentStack.back() && !g_subtreeParentStack.empty()) {
         g_subtreeParentStack.pop_back();
     }
 

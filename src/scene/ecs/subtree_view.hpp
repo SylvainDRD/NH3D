@@ -43,6 +43,7 @@ private:
     const HierarchyComponent* const _hierarchy;
     const uint32 _size;
 
+    // Preallocated buffer used as a stack for subtree iteration
     static std::vector<Entity> g_subtreeParentStack;
 };
 

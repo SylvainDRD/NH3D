@@ -25,26 +25,32 @@ template <typename T>
 class SparseSet : public ISparseSet {
     NH3D_NO_COPY(SparseSet)
 public:
-    SparseSet();
+    inline SparseSet();
 
     SparseSet(SparseSet<T>&&) = default;
 
     ~SparseSet() = default;
 
-    void add(const Entity entity, T&& component);
+    inline void add(const Entity entity, T&& component);
 
-    void remove(const Entity entity) override;
+    inline void remove(const Entity entity) override;
 
-    [[nodiscard]] T& get(const Entity entity);
+    [[nodiscard]] inline T& get(const Entity entity);
 
-    [[nodiscard]] T& getRaw(uint32 id);
+    [[nodiscard]] inline T& getRaw(const uint32 id);
+
+    [[nodiscard]] inline const std::vector<Entity>& entities() const;
+
+    [[nodiscard]] inline size_t size() const;
 
     [[nodiscard]] inline SubtreeView getSubtree(const Entity entity) const
         requires std::same_as<HierarchyComponent, T>;
 
-    [[nodiscard]] const std::vector<Entity>& entities() const;
+    inline void setParent(const Entity entity, const Entity parent)
+        requires std::same_as<HierarchyComponent, T>;
 
-    [[nodiscard]] size_t size() const;
+private:
+    [[nodiscard]] inline uint32& getId(const Entity entity) const;
 
 private:
     constexpr static uint8 BufferBitSize = 10;
@@ -58,7 +64,7 @@ private:
 };
 
 template <typename T>
-SparseSet<T>::SparseSet()
+inline SparseSet<T>::SparseSet()
 {
     _entityLUT.reserve(1'000); // allow for up to 1'024'000 entities without reallocation
     _data.reserve(40'000);
@@ -67,7 +73,19 @@ SparseSet<T>::SparseSet()
 }
 
 template <typename T>
-void SparseSet<T>::add(const Entity entity, T&& component)
+[[nodiscard]] inline uint32& SparseSet<T>::getId(const Entity entity) const
+{
+    const uint32 bufferId = entity >> BufferBitSize;
+    const uint32 indexId = entity & (BufferSize - 1);
+    NH3D_ASSERT(bufferId < _entityLUT.size(), "Requested a component for an entity without storage");
+
+    const auto& indices = _entityLUT[bufferId];
+
+    return indices[indexId];
+}
+
+template <typename T>
+inline void SparseSet<T>::add(const Entity entity, T&& component)
 {
     const uint32 bufferId = entity >> BufferBitSize;
     const uint32 indexId = entity & (BufferSize - 1);
@@ -90,17 +108,12 @@ void SparseSet<T>::add(const Entity entity, T&& component)
 }
 
 template <typename T>
-void SparseSet<T>::remove(const Entity entity)
+inline void SparseSet<T>::remove(const Entity entity)
 {
-    const uint32 bufferId = entity >> BufferBitSize;
-    const uint32 indexId = entity & (BufferSize - 1);
-    NH3D_ASSERT(bufferId < _entityLUT.size(), "Trying to clear a component for an entity without storage");
+    uint32& id = getId(entity);
+    const uint32 deletedId = id;
 
-    const auto& indices = _entityLUT[bufferId];
-    const uint32 deletedId = indices[indexId];
-    NH3D_ASSERT(deletedId != InvalidIndex, "Trying to clear a non-existing component");
-
-    indices[indexId] = InvalidIndex;
+    id = InvalidIndex;
 
     const uint32 lastEntity = _entities.back();
     _entities.pop_back();
@@ -110,41 +123,19 @@ void SparseSet<T>::remove(const Entity entity)
 }
 
 template <typename T>
-[[nodiscard]] T& SparseSet<T>::get(const Entity entity)
+[[nodiscard]] inline T& SparseSet<T>::get(const Entity entity)
 {
-    const uint32 bufferId = entity >> BufferBitSize;
-    const uint32 indexId = entity & (BufferSize - 1);
-    NH3D_ASSERT(bufferId < _entityLUT.size(), "Requested a component for an entity without storage");
-
-    const auto& indices = _entityLUT[bufferId];
-    const uint32 id = indices[indexId];
+    const uint32 id = getId(entity);
     NH3D_ASSERT(id != InvalidIndex, "Requested a non-existing component: Samir you're thrashing the cache");
-
     return _data[id];
 }
 
 template <typename T>
-[[nodiscard]] T& SparseSet<T>::getRaw(uint32 id)
+[[nodiscard]] inline T& SparseSet<T>::getRaw(const uint32 id)
 {
     NH3D_ASSERT(id < _data.size(), "Out of bound raw data SparseSet access");
     return _data[id];
 }
-
-template <typename T>
-[[nodiscard]] inline SubtreeView SparseSet<T>::getSubtree(const Entity entity) const
-    requires std::same_as<HierarchyComponent, T>
-{
-    const uint32 bufferId = entity >> BufferBitSize;
-    const uint32 indexId = entity & (BufferSize - 1);
-    NH3D_ASSERT(bufferId < _entityLUT.size(), "Requested a component for an entity without storage");
-
-    const auto& indices = _entityLUT[bufferId];
-    const uint32 id = indices[indexId];
-    NH3D_ASSERT(indices[indexId] != InvalidIndex, "Requested a non-existing component: Samir you're thrashing the cache");
-
-    return SubtreeView { &_entities[id], &_data[id], static_cast<uint32>(_data.size()) - id };
-}
-
 template <typename T>
 [[nodiscard]] const std::vector<Entity>& SparseSet<T>::entities() const
 {
@@ -152,9 +143,142 @@ template <typename T>
 }
 
 template <typename T>
-[[nodiscard]] size_t SparseSet<T>::size() const
+[[nodiscard]] inline size_t SparseSet<T>::size() const
 {
     return _entities.size();
+}
+
+template <typename T>
+[[nodiscard]] inline SubtreeView SparseSet<T>::getSubtree(const Entity entity) const
+    requires std::same_as<HierarchyComponent, T>
+{
+    const uint32 id = getId(entity);
+    NH3D_ASSERT(id != InvalidIndex, "Requested a non-existing component: Samir you're thrashing the cache");
+
+    return SubtreeView { &_entities[id], &_data[id], static_cast<uint32>(_data.size()) - id };
+}
+
+template <typename T>
+inline void SparseSet<T>::setParent(const Entity entity, const Entity newParent)
+    requires std::same_as<HierarchyComponent, T>
+{
+    static std::vector<Entity> buffer;
+    buffer.reserve(2048);
+
+    const uint32 entityId = getId(entity);
+    NH3D_ASSERT(entityId != InvalidIndex, "Requested a non-existing component: Samir you're thrashing the cache");
+    const uint32 newParentId = getId(newParent);
+    NH3D_ASSERT(newParentId != InvalidIndex, "Requested a non-existing component: Samir you're thrashing the cache");
+
+    NH3D_ASSERT(entity == _entities[entityId], "SparseSets are broken");
+    NH3D_ASSERT(newParent == _entities[newParentId], "SparseSets are broken");
+    _data[entityId]._parent = newParent;
+
+    // Find the end of the subtree to move
+    // One-past the end index
+    uint32 entitySubtreeEndId = entityId;
+    do {
+        buffer.emplace_back(_entities[entitySubtreeEndId]);
+        ++entitySubtreeEndId;
+
+        if (entitySubtreeEndId >= _entities.size()) {
+            break;
+        }
+
+        const Entity parent = static_cast<HierarchyComponent>(_data[entitySubtreeEndId]).parent();
+        while (!buffer.empty() && buffer.back() != parent) {
+            buffer.pop_back();
+        }
+    } while (!buffer.empty());
+
+    // Defines two consecutive subarrays, where begin2 is the beginning of the second subarray
+    uint32 begin1, begin2, end;
+    if (newParentId < entityId) {
+        begin1 = newParentId + 1;
+        begin2 = entityId;
+        end = entitySubtreeEndId;
+    } else {
+        begin1 = entityId;
+        begin2 = entitySubtreeEndId;
+        end = newParentId + 1; // One-past the end index
+    }
+
+    // Swap both subarrays in the entities vector
+    // To do so, copy everything into the previously allocated buffer
+    // The alternative is to perform a full permutation of the entities, and a permutation for each subarray
+    // I expect this version to be faster, even more so since we can do the same thing for the data
+    const uint32 size = end - begin1;
+    if (buffer.capacity() < size) {
+        buffer.reserve(2 * size);
+    }
+    buffer.resize(size);
+    const uint32 firstSubSize = begin2 - begin1;
+    const uint32 secondSubSize = end - begin2;
+    std::memcpy(buffer.data(), &_entities[begin1], size * sizeof(Entity));
+    std::memcpy(&_entities[begin1], &buffer[firstSubSize], secondSubSize * sizeof(Entity));
+    std::memcpy(&_entities[begin1 + secondSubSize], &buffer[0], firstSubSize * sizeof(Entity));
+
+    // Update the LUT
+    for (uint32 i = begin1; i < end; ++i) {
+        uint32& id = getId(newParent);
+        NH3D_ASSERT(id != InvalidIndex, "Unexpected invalid index");
+        id = i;
+    }
+
+    // Swap the data around, exploits the fact that the HierarchyComponent is just a parent Entity
+    // If this assumption ever changes, allocate another buffer (or use the existing one as a byte array? nasty) or swap to a loop
+    NH3D_STATIC_ASSERT(sizeof(Entity) == sizeof(HierarchyComponent));
+    std::memcpy(buffer.data(), &_data[begin1], size * sizeof(Entity));
+    std::memcpy(&_data[begin1], &buffer[firstSubSize], secondSubSize * sizeof(Entity));
+    std::memcpy(&_data[begin1 + secondSubSize], &buffer[0], firstSubSize * sizeof(Entity));
+
+    buffer.clear();
+}
+
+template <>
+inline void SparseSet<HierarchyComponent>::add(const Entity entity, HierarchyComponent&& component)
+{
+    const uint32 bufferId = entity >> BufferBitSize;
+    const uint32 indexId = entity & (BufferSize - 1);
+
+    if (bufferId >= _entityLUT.size()) {
+        _entityLUT.resize(bufferId + 1);
+    }
+
+    if (_entityLUT[bufferId] == nullptr) {
+        _entityLUT[bufferId] = std::make_unique_for_overwrite<uint32[]>(BufferSize);
+        std::memset(_entityLUT[bufferId].get(), InvalidIndex, BufferSize * sizeof(uint32));
+    }
+
+    uint32& index = _entityLUT[bufferId][indexId];
+    NH3D_ASSERT(index == InvalidIndex, "Trying to overwrite an existing component");
+    index = getId(component.parent()) + 1;
+
+    _entities.emplace(_entities.begin() + index, entity);
+    _data.emplace(_data.begin() + index, std::forward<HierarchyComponent>(component));
+
+    for (uint32 i = index + 2; i < _entities.size(); ++i) {
+        uint32& id = getId(_entities[i]);
+        NH3D_ASSERT(id != InvalidIndex, "Unexpected invalid index");
+        ++id;
+    }
+}
+
+template <>
+inline void SparseSet<HierarchyComponent>::remove(const Entity entity)
+{
+    uint32& id = getId(entity);
+    const uint32 deletedId = id;
+    id = InvalidIndex;
+
+    _entities.erase(_entities.begin() + id);
+    _data.erase(_data.begin() + id);
+
+    for (uint32 i = id; i < _entities.size(); ++i) {
+        uint32& id = getId(_entities[i]);
+        NH3D_ASSERT(id != InvalidIndex, "Unexpected invalid index");
+        --id;
+    }
 }
 
 }

@@ -9,9 +9,11 @@ class Scene;
 // Beware of updates of two nodes in the same subtree by two different threads, race condition
 // TODO: force RigidBodyComponents only on root HierarchyComponent, disallow otherwise
 struct HierarchyComponent {
-    Entity parent;
+    static void create(Scene& scene, const Entity entity, const Entity parent);
 
-    // TODO: add reparenting functions
+    [[nodiscard]] Entity parent() const;
+
+    void setParent(const Scene& scene, const Entity parent);
 
     // World space, not unconditionally thread safe
     void translate(Scene& scene, const Entity self, const vec3& translation);
@@ -21,6 +23,12 @@ struct HierarchyComponent {
 
     // World space, not unconditionally thread safe
     void scale(Scene& scene, const Entity self, const vec3& scale);
+
+private:
+    Entity _parent;
+
+    template <typename T>
+    friend class SparseSet;
 };
 
 }
