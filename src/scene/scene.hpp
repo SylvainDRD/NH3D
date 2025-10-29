@@ -71,10 +71,10 @@ inline Entity Scene::create(Ts&&... components)
     if (!_availableEntities.empty()) {
         e = _availableEntities.back();
         _availableEntities.pop_back();
-        _entityMasks[e] = ComponentMask {};
+        _entityMasks[e] = _setMap.mask<HierarchyComponent>();
     } else {
         e = _entityMasks.size();
-        _entityMasks.emplace_back(0);
+        _entityMasks.emplace_back(_setMap.mask<HierarchyComponent>());
     }
 
     add(e, std::forward<Ts>(components)...);

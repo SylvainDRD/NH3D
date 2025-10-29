@@ -23,7 +23,6 @@ struct HierarchyComponent {
 private:
     Entity _parent;
 
-    friend class Scene;
     template <typename T>
     friend class SparseSet;
 };

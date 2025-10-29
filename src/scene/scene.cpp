@@ -54,7 +54,7 @@ namespace _private {
             NH3D_ERROR("Failed to import GLB/GLTF file from " << glbPath);
         }
 
-        // TODO: move that into scene loading
+        // TODO
 
         return {};
     }
@@ -75,31 +75,7 @@ void Scene::remove(const Entity entity)
 void Scene::setParent(const Entity entity, const Entity parent)
 {
     NH3D_ASSERT(entity != InvalidEntity, "Unexpected invalid entity");
-
-    // Possible optimization: make an add function for HierarchyComponents that creates both the parent and child component if necessary
-    const ComponentMask hierarchyMask = _setMap.mask<HierarchyComponent>();
-    if (parent != InvalidEntity && !checkComponents<HierarchyComponent>(parent)) {
-        HierarchyComponent comp;
-        comp._parent = InvalidEntity;
-
-        _setMap.add(parent, std::move(comp));
-        _entityMasks[parent] |= hierarchyMask;
-    }
-
-    if (checkComponents<HierarchyComponent>(entity)) {
-        // Parent can be invalid entity, which means we're actually removing the component
-        if (parent == InvalidEntity) {
-            _entityMasks[entity] ^= hierarchyMask;
-        }
-        _setMap.setParent(entity, parent);
-    } else {
-        NH3D_ASSERT(parent != InvalidEntity, "Unexpected invalid entity");
-        HierarchyComponent comp;
-        comp._parent = parent;
-
-        _setMap.add(entity, std::move(comp));
-        _entityMasks[entity] |= hierarchyMask;
-    }
+    _setMap.setParent(entity, parent);
 }
 
 }

@@ -6,6 +6,8 @@ void SparseSetMap::remove(const Entity entity, ComponentMask mask)
 {
     NH3D_ASSERT((mask & SparseSetMap::InvalidEntityMask) == 0, "Invalid entity bit set for entity removal");
 
+    // TODO: fix, brakes the hierarchy
+
     // TODO: investigate perf vs __builtin_ctz
     for (uint32 id = 0; mask != 0; mask >>= 1, ++id) {
         if (mask & 1) {

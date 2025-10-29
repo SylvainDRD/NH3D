@@ -258,7 +258,8 @@ template <typename T>
 }
 
 template <typename T>
-inline void SparseSet<T>::swapConsecutiveSubarrays(const uint32 begin1, const uint32 begin2, const uint32 end, std::vector<uint32>& buffer) {
+inline void SparseSet<T>::swapConsecutiveSubarrays(const uint32 begin1, const uint32 begin2, const uint32 end, std::vector<uint32>& buffer)
+{
     // Swap both subarrays in the entities vector
     // To do so, copy everything into the previously allocated buffer
     // The alternative is to perform a full permutation of the entities, and a permutation for each subarray
@@ -291,6 +292,7 @@ inline void SparseSet<T>::swapConsecutiveSubarrays(const uint32 begin1, const ui
     buffer.clear();
 }
 
+// TODO: remove the extra array shift induced by the removal of orphaned components
 template <typename T>
 inline void SparseSet<T>::setParent(const Entity entity, const Entity newParent)
     requires std::same_as<HierarchyComponent, T>
@@ -300,48 +302,47 @@ inline void SparseSet<T>::setParent(const Entity entity, const Entity newParent)
     static std::vector<uint32> buffer;
     buffer.reserve(2048);
 
-    // In this case, we're deleting this component if it is a leaf, and moving it to the back if it is not
-    if (newParent == InvalidEntity) {
-        if (isLeaf(entity)) {
-            remove(entity);
-            return;
-        }
+    // Defines two consecutive subarrays, where begin2 is the beginning of the second subarray
+    uint32 begin1, begin2, end;
 
-        const uint32 entityId = getId(entity);
-        NH3D_ASSERT(entityId != InvalidIndex, "Unexpected invalid index");
-        _data[entityId]._parent = InvalidEntity;
-
-        const uint32 entitySubtreeEndId = getSubtreeEndId(entityId, buffer);
-        swapConsecutiveSubarrays(entityId, entitySubtreeEndId, _entities.size(), buffer);
+    // In this case, we're deleting the component if it is a leaf
+    if (newParent == InvalidEntity && isLeaf(entity)) {
+        remove(entity);
         return;
     }
 
     const uint32 entityId = getId(entity);
-    NH3D_ASSERT(entityId != InvalidIndex, "Requested a non-existing component: Samir you're thrashing the cache");
-    const uint32 newParentId = getId(newParent);
-    NH3D_ASSERT(newParentId != InvalidIndex, "Requested a non-existing component: Samir you're thrashing the cache");
-
-    NH3D_ASSERT(entity == _entities[entityId], "SparseSets are broken");
-    NH3D_ASSERT(newParent == _entities[newParentId], "SparseSets are broken");
-    _data[entityId]._parent = newParent;
-
-    // Find the end of the subtree to move
-    // One-past the end index
-    const uint32 entitySubtreeEndId = getSubtreeEndId(entityId, buffer);
-
-    // Defines two consecutive subarrays, where begin2 is the beginning of the second subarray
-    uint32 begin1, begin2, end;
-    if (newParentId < entityId) {
-        begin1 = newParentId + 1;
-        begin2 = entityId;
-        end = entitySubtreeEndId;
-    } else {
+    NH3D_ASSERT(entityId != InvalidIndex, "Unexpected invalid index");
+    const Entity previousParent = _data[entityId].parent();
+    // In this case, we're shifting the subtree to the end
+    if (newParent == InvalidEntity) {
+        _data[entityId]._parent = InvalidEntity;
         begin1 = entityId;
-        begin2 = entitySubtreeEndId;
-        end = newParentId + 1; // One-past the end index
+        begin2 = getSubtreeEndId(entityId, buffer);
+        end = _entities.size(); // One-past the end index
+    } else {
+        _data[entityId]._parent = newParent;
+        const uint32 newParentId = getId(newParent);
+        NH3D_ASSERT(newParentId != InvalidIndex, "Unexpected invalid index");
+
+        const uint32 entitySubtreeEndId = getSubtreeEndId(entityId, buffer);
+        if (newParentId < entityId) {
+            begin1 = newParentId + 1;
+            begin2 = entityId;
+            end = entitySubtreeEndId;
+        } else {
+            begin1 = entityId;
+            begin2 = entitySubtreeEndId;
+            end = newParentId + 1; // One-past the end index
+        }
     }
 
     swapConsecutiveSubarrays(begin1, begin2, end, buffer);
+
+    // Delete old parent if it is orphaned (i.e. at root level without children)
+    if (isLeaf(previousParent) && _data[getId(previousParent)].parent() == InvalidEntity) {
+        remove(previousParent);
+    }
 }
 
 template <typename T>
