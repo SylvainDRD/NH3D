@@ -25,35 +25,35 @@ public:
 
     void setParent(const Entity entity, const Entity parent);
 
-    template <typename T>
+    template <NotHierarchyComponent T>
     [[nodiscard]] inline T& get(const Entity entity);
 
     [[nodiscard]] inline SubtreeView getSubtree(const Entity entity);
 
-    template <typename... Ts>
+    template <NotHierarchyComponent... Ts>
     inline Entity create(Ts&&... components);
 
-    template <typename... Ts>
-    inline void add(const Entity entity, Ts&&... components)
-        requires(!(std::same_as<std::remove_cvref_t<Ts>, HierarchyComponent>) && ...);
+    template <NotHierarchyComponent... Ts>
+    inline void add(const Entity entity, Ts&&... components);
 
-    template <typename... Ts>
+    template <NotHierarchyComponent... Ts>
     [[nodiscard]] inline bool checkComponents(const Entity entity) const;
 
-    template <typename... Ts>
-    inline void clearComponents(const Entity entity)
-        requires(!(std::same_as<std::remove_cvref_t<Ts>, HierarchyComponent>) && ...);
+    template <NotHierarchyComponent... Ts>
+    inline void clearComponents(const Entity entity);
 
-    template <typename T, typename... Ts>
+    template <NotHierarchyComponent T, NotHierarchyComponent... Ts>
     [[nodiscard]] inline ComponentView<T, Ts...> makeView();
 
 private:
     SparseSetMap _setMap;
     std::vector<ComponentMask> _entityMasks;
     std::vector<uint32> _availableEntities;
+
+    SparseSet<HierarchyComponent> _hierarchy;
 };
 
-template <typename T>
+template <NotHierarchyComponent T>
 [[nodiscard]] inline T& Scene::get(const Entity entity)
 {
     return _setMap.get<T>(entity);
@@ -61,29 +61,28 @@ template <typename T>
 
 [[nodiscard]] inline SubtreeView Scene::getSubtree(const Entity entity)
 {
-    return _setMap.getSubtree(entity);
+    return _hierarchy.getSubtree(entity);
 }
 
-template <typename... Ts>
+template <NotHierarchyComponent... Ts>
 inline Entity Scene::create(Ts&&... components)
 {
-    Entity e;
+    Entity entity;
     if (!_availableEntities.empty()) {
-        e = _availableEntities.back();
+        entity = _availableEntities.back();
         _availableEntities.pop_back();
-        _entityMasks[e] = _setMap.mask<HierarchyComponent>();
+        _entityMasks[entity] = 0;
     } else {
-        e = _entityMasks.size();
-        _entityMasks.emplace_back(_setMap.mask<HierarchyComponent>());
+        entity = _entityMasks.size();
+        _entityMasks.emplace_back(0);
     }
 
-    add(e, std::forward<Ts>(components)...);
-    return e;
+    add(entity, std::forward<Ts>(components)...);
+    return entity;
 }
 
-template <typename... Ts>
+template <NotHierarchyComponent... Ts>
 inline void Scene::add(const Entity entity, Ts&&... components)
-    requires(!(std::same_as<std::remove_cvref_t<Ts>, HierarchyComponent>) && ...)
 {
     const ComponentMask mask = _setMap.mask<Ts...>();
 
@@ -92,16 +91,15 @@ inline void Scene::add(const Entity entity, Ts&&... components)
     _entityMasks[entity] |= mask;
 }
 
-template <typename... Ts>
+template <NotHierarchyComponent... Ts>
 [[nodiscard]] inline bool Scene::checkComponents(const Entity entity) const
 {
     NH3D_ASSERT(entity < _entityMasks.size(), "Attempting to check components of a non-existing entity");
     return ComponentMaskUtils::checkComponents(_entityMasks[entity], _setMap.mask<Ts...>());
 }
 
-template <typename... Ts>
+template <NotHierarchyComponent... Ts>
 inline void Scene::clearComponents(const Entity entity)
-    requires(!(std::same_as<std::remove_cvref_t<Ts>, HierarchyComponent>) && ...)
 {
     NH3D_ASSERT(checkComponents<Ts...>(entity), "Entity mask is missing components to delete");
 
@@ -110,7 +108,7 @@ inline void Scene::clearComponents(const Entity entity)
     _entityMasks[entity] ^= _setMap.mask<Ts...>();
 }
 
-template <typename T, typename... Ts>
+template <NotHierarchyComponent T, NotHierarchyComponent... Ts>
 [[nodiscard]] inline ComponentView<T, Ts...> Scene::makeView()
 {
     return _setMap.makeView<T, Ts...>(_entityMasks);

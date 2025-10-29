@@ -29,28 +29,26 @@ public:
     constexpr static uint8 MaxComponent = sizeof(ComponentMask) * 8 - 1;
     static constexpr ComponentMask InvalidEntityMask = 1 << MaxComponent;
 
-    template <typename... Ts>
+    template <NotHierarchyComponent... Ts>
     [[nodiscard]] inline ComponentMask mask() const;
 
-    template <typename T>
+    template <NotHierarchyComponent T>
     [[nodiscard]] inline T& get(const Entity entity);
 
-    [[nodiscard]] inline SubtreeView getSubtree(const Entity entity);
-
-    template <typename T, typename... Ts>
+    template <NotHierarchyComponent T, NotHierarchyComponent... Ts>
     [[nodiscard]] inline ComponentView<T, Ts...> makeView(const std::vector<ComponentMask>& entityMasks);
 
-    template <typename... Ts>
+    template <NotHierarchyComponent... Ts>
     inline void add(const Entity entity, Ts&&... components);
 
-    template <typename T>
+    template <NotHierarchyComponent T>
     inline void remove(const Entity entity);
 
 private:
-    template <typename T>
+    template <NotHierarchyComponent T>
     [[nodiscard]] inline uint32 getId() const;
 
-    template <typename T>
+    template <NotHierarchyComponent T>
     [[nodiscard]] inline SparseSet<T>& getSet();
 
 private:
@@ -63,7 +61,7 @@ private:
 
 inline uint32 SparseSetMap::g_nextPoolIndex = 0;
 
-template <typename T>
+template <NotHierarchyComponent T>
 [[nodiscard]] inline uint32 SparseSetMap::getId() const
 {
     static const uint32 Index = g_nextPoolIndex++;
@@ -73,7 +71,7 @@ template <typename T>
     return Index;
 }
 
-template <typename T>
+template <NotHierarchyComponent T>
 [[nodiscard]] inline SparseSet<T>& SparseSetMap::getSet()
 {
     const uint32 index = getId<T>();
@@ -87,24 +85,19 @@ template <typename T>
     return *static_cast<SparseSet<T>*>(_sets[index].get());
 };
 
-template <typename... Ts>
+template <NotHierarchyComponent... Ts>
 [[nodiscard]] inline ComponentMask SparseSetMap::mask() const
 {
     return ((1 << getId<std::remove_cvref_t<Ts>>()) | ...);
 }
 
-template <typename T>
+template <NotHierarchyComponent T>
 [[nodiscard]] inline T& SparseSetMap::get(const Entity entity)
 {
     return getSet<T>().get(entity);
 }
 
-[[nodiscard]] inline SubtreeView SparseSetMap::getSubtree(const Entity entity)
-{
-    return getSet<HierarchyComponent>().getSubtree(entity);
-}
-
-template <typename T, typename... Ts>
+template <NotHierarchyComponent T, NotHierarchyComponent... Ts>
 [[nodiscard]] inline ComponentView<T, Ts...> SparseSetMap::makeView(const std::vector<ComponentMask>& entityMasks)
 {
     return ComponentView<T, Ts...> {
@@ -114,13 +107,13 @@ template <typename T, typename... Ts>
     };
 }
 
-template <typename... Ts>
+template <NotHierarchyComponent... Ts>
 inline void SparseSetMap::add(const Entity entity, Ts&&... component)
 {
     (getSet<Ts>().add(entity, std::forward<Ts>(component)), ...);
 }
 
-template <typename T>
+template <NotHierarchyComponent T>
 inline void SparseSetMap::remove(const Entity entity)
 {
     getSet<T>().remove(entity);

@@ -75,7 +75,7 @@ void Scene::remove(const Entity entity)
 void Scene::setParent(const Entity entity, const Entity parent)
 {
     NH3D_ASSERT(entity != InvalidEntity, "Unexpected invalid entity");
-    _setMap.setParent(entity, parent);
+    _hierarchy.setParent(entity, parent);
 }
 
 }
