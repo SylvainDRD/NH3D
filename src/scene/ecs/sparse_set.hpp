@@ -60,6 +60,9 @@ private:
 
     inline void swapConsecutiveSubarrays(const uint32 begin1, const uint32 begin2, const uint32 end, std::vector<uint32>& buffer);
 
+    inline void ensureExists(const uint32 entity)
+        requires std::same_as<HierarchyComponent, T>;
+
 private:
     constexpr static uint8 BufferBitSize = 10;
     constexpr static uint32 BufferSize = 1 << BufferBitSize;
@@ -292,7 +295,24 @@ inline void SparseSet<T>::swapConsecutiveSubarrays(const uint32 begin1, const ui
     buffer.clear();
 }
 
-// TODO: remove the extra array shift induced by the removal of orphaned components
+template <typename T>
+inline void SparseSet<T>::ensureExists(const uint32 entity)
+    requires std::same_as<HierarchyComponent, T>
+{
+    NH3D_ASSERT(entity != InvalidEntity, "Unexpected invalid entity");
+    const uint32 bufferId = entity >> BufferBitSize;
+    const uint32 indexId = entity & (BufferSize - 1);
+    NH3D_ASSERT(bufferId < _entityLUT.size(), "Requested a component for an entity without storage");
+
+    if (entity == InvalidEntity || bufferId == _entityLUT.size()) {
+        HierarchyComponent comp;
+        comp._parent = InvalidEntity;
+
+        add(entity, std::move(comp));
+    }
+}
+
+// TODO: remove the extra array shift induced by the removal of orphaned components and last minute insertions
 template <typename T>
 inline void SparseSet<T>::setParent(const Entity entity, const Entity newParent)
     requires std::same_as<HierarchyComponent, T>
@@ -302,11 +322,14 @@ inline void SparseSet<T>::setParent(const Entity entity, const Entity newParent)
     static std::vector<uint32> buffer;
     buffer.reserve(2048);
 
+    ensureExists(entity);
+
     // Defines two consecutive subarrays, where begin2 is the beginning of the second subarray
     uint32 begin1, begin2, end;
 
     // In this case, we're deleting the component if it is a leaf
     if (newParent == InvalidEntity && isLeaf(entity)) {
+        // Note that if the entity was just created by calling ensureExists, this function is just a costly no-op
         remove(entity);
         return;
     }
@@ -322,14 +345,10 @@ inline void SparseSet<T>::setParent(const Entity entity, const Entity newParent)
         end = _entities.size(); // One-past the end index
     } else {
         _data[entityId]._parent = newParent;
-        const uint32 &newParentId = getId(newParent);
-        if(newParentId == InvalidIndex) {
-            // Ensures the parent component is present
-            HierarchyComponent component;
-            component._parent = InvalidEntity;
-            add(newParent, std::move(component));
-        }
 
+        ensureExists(newParent);
+
+        const uint32 newParentId = getId(newParent);
         const uint32 entitySubtreeEndId = getSubtreeEndId(entityId, buffer);
         if (newParentId < entityId) {
             begin1 = newParentId + 1;
