@@ -322,8 +322,13 @@ inline void SparseSet<T>::setParent(const Entity entity, const Entity newParent)
         end = _entities.size(); // One-past the end index
     } else {
         _data[entityId]._parent = newParent;
-        const uint32 newParentId = getId(newParent);
-        NH3D_ASSERT(newParentId != InvalidIndex, "Unexpected invalid index");
+        const uint32 &newParentId = getId(newParent);
+        if(newParentId == InvalidIndex) {
+            // Ensures the parent component is present
+            HierarchyComponent component;
+            component._parent = InvalidEntity;
+            add(newParent, std::move(component));
+        }
 
         const uint32 entitySubtreeEndId = getSubtreeEndId(entityId, buffer);
         if (newParentId < entityId) {
