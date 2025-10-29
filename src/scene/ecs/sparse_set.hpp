@@ -46,7 +46,7 @@ protected:
     using indices = Uptr<uint32[]>;
     std::vector<indices> _entityLUT;
     std::vector<T> _data;
-    std::vector<Entity> _entities; 
+    std::vector<Entity> _entities;
 };
 
 template <typename T>
@@ -67,6 +67,7 @@ template <typename T>
     NH3D_ASSERT(g_bufferId < _entityLUT.size(), "Requested a component for an entity without storage");
 
     const auto& indices = _entityLUT[g_bufferId];
+    NH3D_ASSERT(indices[indexId] != InvalidIndex, "Unexpected invalid index");
 
     return indices[indexId];
 }

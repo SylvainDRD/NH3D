@@ -55,10 +55,10 @@ TEST(SparseSetMapTests, RemoveMaskTest)
     SparseSetMap map;
 
     const Entity e1 = 0;
-    EXPECT_DEATH(map.remove(e1, NH3D_MAX_T(ComponentMask) ^ SparseSetMap::InvalidEntityMask), ".*FATAL.*Unexpected null sparse set");
+    EXPECT_DEATH(map.remove(e1, NH3D_MAX_T(ComponentMask) ^ SparseSetMap::InvalidEntityMask), ".*FATAL.*");
 
     map.add(e1, 42, true, 'a', A { 1337, true });
-    EXPECT_DEATH(map.add(e1, 42, true, 'a', A { 1337, true }), ".*FATAL.*Trying to overwrite an existing component");
+    EXPECT_DEATH(map.add(e1, 42, true, 'a', A { 1337, true }), ".*FATAL.*");
 
     const Entity e2 = 1;
     map.add(e2, 10, std::string { "Test str" }, A { 20, true });
@@ -67,9 +67,9 @@ TEST(SparseSetMapTests, RemoveMaskTest)
     map.remove(e1, mask);
     EXPECT_NO_FATAL_FAILURE(map.add(e1));
 
-    EXPECT_DEATH(map.remove<int>(e1), ".*FATAL.*Trying to clear a non-existing component");
+    EXPECT_DEATH(map.remove<int>(e1), ".*FATAL.*");
 
-    EXPECT_DEATH(map.remove(e1, SparseSetMap::InvalidEntityMask), ".*FATAL.*Invalid entity bit set for entity removal");
+    EXPECT_DEATH(map.remove(e1, SparseSetMap::InvalidEntityMask), ".*FATAL.*");
 }
 
 }

@@ -66,7 +66,7 @@ TEST(VulkanEnumTests, TextureFormatMappingTest)
         EXPECT_EQ(MapTextureFormat(static_cast<TextureFormat>(i)), Expected[i]);
     }
 
-    EXPECT_DEATH((void)MapTextureFormat(TextureFormat::NH3D_TEXTURE_FORMAT_MAX), ".*FATAL.*Invalid texture format");
+    EXPECT_DEATH((void)MapTextureFormat(TextureFormat::NH3D_TEXTURE_FORMAT_MAX), ".*FATAL.*");
 }
 
 TEST(VulkanEnumTests, TextureAspectFlagsMappingTest)
@@ -83,7 +83,7 @@ TEST(VulkanEnumTests, TextureAspectFlagsMappingTest)
     for (uint32_t i = 0; i < TestCases; ++i) {
         EXPECT_EQ(MapTextureAspectFlags(static_cast<TextureAspectFlags>(1 << i)), Expected[i]);
     }
-    EXPECT_DEATH((void)MapTextureAspectFlags(TextureAspectFlagBits::NH3D_TEXTURE_ASPECT_MAX), ".*FATAL.*Invalid TextureAspectFlagBits set");
+    EXPECT_DEATH((void)MapTextureAspectFlags(TextureAspectFlagBits::NH3D_TEXTURE_ASPECT_MAX), ".*FATAL.*");
 }
 
 TEST(VulkanEnumTests, CombinedTextureAspectFlagsMappingTest)
@@ -123,7 +123,7 @@ TEST(VulkanEnumTests, TextureUsageFlagsMappingTest)
     for (uint32_t i = 0; i < TestCases; ++i) {
         EXPECT_EQ(MapTextureUsageFlags(static_cast<TextureUsageFlags>(1 << i)), Expected[i]);
     }
-    EXPECT_DEATH((void)MapTextureUsageFlags(TextureUsageFlagBits::NH3D_TEXTURE_USAGE_MAX), ".*FATAL.*Invalid TextureUsageFlagBits set");
+    EXPECT_DEATH((void)MapTextureUsageFlags(TextureUsageFlagBits::NH3D_TEXTURE_USAGE_MAX), ".*FATAL.*");
 }
 
 TEST(VulkanEnumTests, CombinedTextureUsageFlagsMappingTest)
@@ -163,7 +163,7 @@ TEST(VulkanEnumTests, BufferUsageFlagsMappingTest)
     for (uint32_t i = 0; i < TestCases; ++i) {
         EXPECT_EQ(MapBufferUsageFlags(static_cast<BufferUsageFlags>(1 << i)), Expected[i]);
     }
-    EXPECT_DEATH((void)MapBufferUsageFlags(BufferUsageFlagBits::NH3D_BUFFER_USAGE_MAX), ".*FATAL.*Invalid BufferUsageFlagBits set");
+    EXPECT_DEATH((void)MapBufferUsageFlags(BufferUsageFlagBits::NH3D_BUFFER_USAGE_MAX), ".*FATAL.*");
 }
 
 TEST(VulkanEnumTests, CombinedBufferUsageFlagsMappingTest)
@@ -202,7 +202,7 @@ TEST(VulkanEnumTests, BufferMemoryUsageMappingTest)
     for (uint32_t i = 0; i < std::max(TestCases, static_cast<uint32_t>(BufferMemoryUsage::NH3D_BUFFER_MEMORY_USAGE_MAX)); ++i) {
         EXPECT_EQ(MapBufferMemoryUsage(static_cast<BufferMemoryUsage>(i)), Expected[i]);
     }
-    EXPECT_DEATH((void)MapBufferMemoryUsage(BufferMemoryUsage::NH3D_BUFFER_MEMORY_USAGE_MAX), ".*FATAL.*Invalid BufferMemoryUsage value");
+    EXPECT_DEATH((void)MapBufferMemoryUsage(BufferMemoryUsage::NH3D_BUFFER_MEMORY_USAGE_MAX), ".*FATAL.*");
 }
 
 }

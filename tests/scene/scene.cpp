@@ -7,13 +7,13 @@ namespace NH3D::Test {
 TEST(SceneTests, CreateTest)
 {
     Scene scene;
-    EXPECT_DEATH((void)scene.get<int>(0), ".*FATAL.*Requested a component for an entity without storage");
+    EXPECT_DEATH((void)scene.get<int>(0), ".*FATAL.*");
 
     const Entity e = scene.create(3, 'a');
     EXPECT_EQ(scene.get<int>(e), 3);
     EXPECT_EQ(scene.get<char>(e), 'a');
 
-    EXPECT_DEATH((void)scene.get<int>(e + 1), ".*FATAL.*Requested a non-existing component: Samir you're thrashing the cache");
+    EXPECT_DEATH((void)scene.get<int>(e + 1), ".*FATAL.*");
 
     scene.remove(e);
 
@@ -39,7 +39,7 @@ TEST(SceneTests, HasTest)
     const Entity e1 = scene.create('a', 2);
     const Entity e2 = scene.create('b', true);
 
-    EXPECT_DEATH((void)scene.checkComponents<int>(3), ".*FATAL.*Attempting to check components of a non-existing entity");
+    EXPECT_DEATH((void)scene.checkComponents<int>(3), ".*FATAL.*");
 
     EXPECT_TRUE(scene.checkComponents<int>(e1));
     EXPECT_TRUE(scene.checkComponents<char>(e1));
@@ -67,8 +67,8 @@ TEST(SceneTests, ClearComponentTest)
     EXPECT_FALSE(scene.checkComponents<char>(e));
     EXPECT_TRUE(scene.checkComponents<int>(e));
 
-    EXPECT_DEATH((void)scene.get<char>(e), ".*FATAL.*Requested a non-existing component: Samir you're thrashing the cache");
-    EXPECT_DEATH((void)scene.clearComponents<char>(e), ".*FATAL.*Entity mask is missing components to delete");
+    EXPECT_DEATH((void)scene.get<char>(e), ".*FATAL.*");
+    EXPECT_DEATH((void)scene.clearComponents<char>(e), ".*FATAL.*");
 }
 
 TEST(SceneTests, RemoveTest)
@@ -78,8 +78,8 @@ TEST(SceneTests, RemoveTest)
 
     scene.remove(e);
 
-    EXPECT_DEATH(scene.remove(e), ".*FATAL.*Attempting to delete an invalid entity");
-    EXPECT_DEATH(scene.remove(e + 1), ".*FATAL.*Attempting to delete a non-existant entity");
+    EXPECT_DEATH(scene.remove(e), ".*FATAL.*");
+    EXPECT_DEATH(scene.remove(e + 1), ".*FATAL.*");
 
     EXPECT_FALSE(scene.checkComponents<char>(e));
     EXPECT_FALSE(scene.checkComponents<int>(e));

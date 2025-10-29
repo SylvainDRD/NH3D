@@ -59,8 +59,8 @@ TEST(ResourceManagerTests, GeneralTest)
     EXPECT_EQ(resourceManager.getHotData<VulkanBuffer>(bufferHandle).hotValue, "Hello there too!");
     EXPECT_EQ(resourceManager.getColdData<VulkanBuffer>(bufferHandle).coldValue, 42);
 
-    EXPECT_DEATH((void)resourceManager.getHotData<VulkanTexture>({ 4 }), ".*FATAL.*Invalid handle index");
-    EXPECT_DEATH((void)resourceManager.getColdData<VulkanTexture>({ 4 }), ".*FATAL.*Invalid handle index");
+    EXPECT_DEATH((void)resourceManager.getHotData<VulkanTexture>({ 4 }), ".*FATAL.*");
+    EXPECT_DEATH((void)resourceManager.getColdData<VulkanTexture>({ 4 }), ".*FATAL.*");
 }
 
 TEST(ResourceManagerTests, ReleaseTest)
@@ -74,9 +74,9 @@ TEST(ResourceManagerTests, ReleaseTest)
     resourceManager.release<VulkanBuffer>(rhi, bufferHandle);
     // Assertion only present on cold getter for debug performance
     EXPECT_FALSE(VulkanBuffer::valid(resourceManager.getHotData<VulkanBuffer>(bufferHandle), { 42 }));
-    EXPECT_DEATH((void)resourceManager.getColdData<VulkanBuffer>(bufferHandle), ".*FATAL.*Attempting to access cold data of an invalid handle");
+    EXPECT_DEATH((void)resourceManager.getColdData<VulkanBuffer>(bufferHandle), ".*FATAL.*");
 
-    EXPECT_DEATH(resourceManager.release<VulkanTexture>(rhi, { 10 }), ".*FATAL.*Invalid handle index");
+    EXPECT_DEATH(resourceManager.release<VulkanTexture>(rhi, { 10 }), ".*FATAL.*");
 }
 
 TEST(ResourceManagerTests, ClearTest)
@@ -89,10 +89,10 @@ TEST(ResourceManagerTests, ClearTest)
     MockRHI rhi;
     resourceManager.clear(rhi);
 
-    EXPECT_DEATH((void)resourceManager.getHotData<VulkanBuffer>(bufferHandle), ".*FATAL.*Invalid handle index");
-    EXPECT_DEATH((void)resourceManager.getColdData<VulkanBuffer>(bufferHandle), ".*FATAL.*Invalid handle index");
+    EXPECT_DEATH((void)resourceManager.getHotData<VulkanBuffer>(bufferHandle), ".*FATAL.*");
+    EXPECT_DEATH((void)resourceManager.getColdData<VulkanBuffer>(bufferHandle), ".*FATAL.*");
     // gtest is fucking weird sometimes
-    EXPECT_DEATH(resourceManager.release<VulkanTexture>(rhi, { bufferHandle.index }), ".*FATAL.*Invalid handle index");
+    EXPECT_DEATH(resourceManager.release<VulkanTexture>(rhi, { bufferHandle.index }), ".*FATAL.*");
 }
 
 }

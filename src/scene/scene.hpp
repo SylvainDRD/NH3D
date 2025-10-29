@@ -1,10 +1,10 @@
 #pragma once
 
-#include "scene/ecs/components/hierarchy_component.hpp"
 #include <filesystem>
 #include <misc/types.hpp>
 #include <misc/utils.hpp>
 #include <scene/ecs/component_view.hpp>
+#include <scene/ecs/components/hierarchy_component.hpp>
 #include <scene/ecs/entity.hpp>
 #include <scene/ecs/hierarchy_sparse_set.hpp>
 #include <scene/ecs/sparse_set.hpp>

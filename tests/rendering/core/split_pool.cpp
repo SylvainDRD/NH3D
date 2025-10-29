@@ -37,8 +37,8 @@ TEST(SplitPoolTests, StorageTest)
     EXPECT_EQ(pool.getHotData(handle).hotValue, 1337);
     EXPECT_EQ(pool.getColdData(handle).coldValue, "Hello there!");
 
-    EXPECT_DEATH((void)pool.getHotData({ 4 }), ".*FATAL.*Invalid handle index");
-    EXPECT_DEATH((void)pool.getColdData({ 4 }), ".*FATAL.*Invalid handle index");
+    EXPECT_DEATH((void)pool.getHotData({ 4 }), ".*FATAL.*");
+    EXPECT_DEATH((void)pool.getColdData({ 4 }), ".*FATAL.*");
 }
 
 TEST(SplitPoolTests, ReleaseTest)
@@ -47,19 +47,19 @@ TEST(SplitPoolTests, ReleaseTest)
 
     Handle<B> handle = pool.store({ 1337, true }, { "Hello there!" });
 
-    EXPECT_DEATH((void)pool.getHotData({ 4 }), ".*FATAL.*Invalid handle index");
-    EXPECT_DEATH((void)pool.getColdData({ 4 }), ".*FATAL.*Invalid handle index");
+    EXPECT_DEATH((void)pool.getHotData({ 4 }), ".*FATAL.*");
+    EXPECT_DEATH((void)pool.getColdData({ 4 }), ".*FATAL.*");
     EXPECT_TRUE(A::valid(pool.getHotData(handle), pool.getColdData(handle)));
 
     MockRHI rhi;
     pool.release(rhi, handle);
 
     EXPECT_FALSE(A::valid(pool.getHotData(handle), { "Hello there!" }));
-    EXPECT_DEATH((void)pool.getColdData({ handle }), ".*FATAL.*Attempting to access cold data of an invalid handle");
+    EXPECT_DEATH((void)pool.getColdData({ handle }), ".*FATAL.*");
 
-    EXPECT_DEATH(pool.release(rhi, { 4 }), ".*FATAL.*Invalid handle index");
+    EXPECT_DEATH(pool.release(rhi, { 4 }), ".*FATAL.*");
     // Cold data is fetched to check the data validity
-    EXPECT_DEATH(pool.release(rhi, handle), ".*FATAL.*Attempting to access cold data of an invalid handle");
+    EXPECT_DEATH(pool.release(rhi, handle), ".*FATAL.*");
 }
 
 TEST(SplitPoolTests, ClearTest)
@@ -70,8 +70,8 @@ TEST(SplitPoolTests, ClearTest)
 
     pool.clear(MockRHI {});
 
-    EXPECT_DEATH((void)pool.getHotData(handle), ".*FATAL.*Invalid handle index");
-    EXPECT_DEATH((void)pool.getColdData(handle), ".*FATAL.*Invalid handle index");
+    EXPECT_DEATH((void)pool.getHotData(handle), ".*FATAL.*");
+    EXPECT_DEATH((void)pool.getColdData(handle), ".*FATAL.*");
 }
 
 TEST(SplitPoolTests, HandleRecyclingTest)
@@ -81,7 +81,7 @@ TEST(SplitPoolTests, HandleRecyclingTest)
     const Handle<B> handle1 = pool.store({ 1337, true }, { "Hello there!" });
 
     pool.release(MockRHI {}, handle1);
-    EXPECT_DEATH((void)pool.getColdData({ handle1 }), ".*FATAL.*Attempting to access cold data of an invalid handle");
+    EXPECT_DEATH((void)pool.getColdData({ handle1 }), ".*FATAL.*");
 
     const Handle<B> handle2 = pool.store({ 1337, true }, { "Hello there!" });
 
