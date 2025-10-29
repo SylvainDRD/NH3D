@@ -21,6 +21,10 @@ class SparseSetMap {
 public:
     SparseSetMap() = default;
 
+    void remove(const Entity entity, ComponentMask mask);
+
+    void setParent(const Entity entity, const Entity parent);
+
     // Most significant bit reserved for invalid entity
     constexpr static uint8 MaxComponent = sizeof(ComponentMask) * 8 - 1;
     static constexpr ComponentMask InvalidEntityMask = 1 << MaxComponent;
@@ -41,8 +45,6 @@ public:
 
     template <typename T>
     inline void remove(const Entity entity);
-
-    inline void remove(const Entity entity, ComponentMask mask);
 
 private:
     template <typename T>
@@ -122,19 +124,6 @@ template <typename T>
 inline void SparseSetMap::remove(const Entity entity)
 {
     getSet<T>().remove(entity);
-}
-
-inline void SparseSetMap::remove(const Entity entity, ComponentMask mask)
-{
-    NH3D_ASSERT((mask & SparseSetMap::InvalidEntityMask) == 0, "Invalid entity bit set for entity removal");
-
-    // TODO: investigate perf vs __builtin_ctz
-    for (uint32 id = 0; mask != 0; mask >>= 1, ++id) {
-        if (mask & 1) {
-            NH3D_ASSERT(_sets[id] != nullptr, "Unexpected null sparse set");
-            _sets[id]->remove(entity);
-        }
-    }
 }
 
 }

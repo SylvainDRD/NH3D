@@ -4,19 +4,9 @@
 
 namespace NH3D {
 
-[[nodiscard]] void HierarchyComponent::create(Scene& scene, const Entity entity, const Entity parent)
-{
-    scene.add(entity, HierarchyComponent { parent });
-}
-
 [[nodiscard]] Entity HierarchyComponent::parent() const
 {
     return _parent;
-}
-
-void HierarchyComponent::setParent(const Scene& scene, const Entity parent)
-{
-    scene.set
 }
 
 void HierarchyComponent::translate(Scene& scene, const Entity self, const vec3& translation)
