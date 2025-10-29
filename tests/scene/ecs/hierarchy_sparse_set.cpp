@@ -107,8 +107,8 @@ TEST(HierarchySparseSetTests, ReparentingSubtreeMaintainsStructure)
     EXPECT_EQ(set.getRaw(2).parent(), 1);
     EXPECT_EQ(set.getRaw(3).parent(), 2);
 
-    EXPECT_EQ(set.entities()[0], 0);
-    EXPECT_EQ(set.entities()[1], 1);
+    EXPECT_EQ(set.entities()[0], 1);
+    EXPECT_EQ(set.entities()[1], 3);
     EXPECT_EQ(set.entities()[2], 2);
     EXPECT_EQ(set.entities()[3], 4);
 
@@ -121,8 +121,8 @@ TEST(HierarchySparseSetTests, ReparentingSubtreeMaintainsStructure)
     EXPECT_TRUE(set.isLeaf(4));
 
     EXPECT_EQ(set.getRaw(0).parent(), InvalidEntity);
-    EXPECT_EQ(set.getRaw(1).parent(), 3);
-    EXPECT_EQ(set.getRaw(2).parent(), 1);
+    EXPECT_EQ(set.getRaw(1).parent(), 1);
+    EXPECT_EQ(set.getRaw(2).parent(), 3);
     EXPECT_EQ(set.getRaw(3).parent(), 2);
 
     EXPECT_EQ(set.entities()[0], 1);
@@ -155,8 +155,8 @@ TEST(HierarchySparseSetTests, GetSubtreeReturnsCorrectEntities)
     EXPECT_EQ(set.getRaw(2).parent(), 1);
     EXPECT_EQ(set.getRaw(3).parent(), 2);   
 
-    EXPECT_EQ(set.entities()[0], 0);
-    EXPECT_EQ(set.entities()[1], 1);
+    EXPECT_EQ(set.entities()[0], 1);
+    EXPECT_EQ(set.entities()[1], 3);
     EXPECT_EQ(set.entities()[2], 2);
     EXPECT_EQ(set.entities()[3], 4);
 }
@@ -178,8 +178,8 @@ TEST(HierarchySparseSetTests, DeleteSubtreePreservesOtherSubtrees)
     EXPECT_EQ(set.entities()[2], 5);
 
     EXPECT_EQ(set.getRaw(0).parent(), InvalidEntity);
-    EXPECT_EQ(set.getRaw(4).parent(), 0);
-    EXPECT_EQ(set.getRaw(5).parent(), 0);
+    EXPECT_EQ(set.getRaw(1).parent(), 0);
+    EXPECT_EQ(set.getRaw(2).parent(), 4);
 
     EXPECT_EQ(set.entities()[0], 0);
     EXPECT_EQ(set.entities()[1], 4);

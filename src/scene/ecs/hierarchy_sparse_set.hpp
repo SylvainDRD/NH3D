@@ -45,29 +45,28 @@ inline void HierarchySparseSet::add(const Entity entity, HierarchyComponent&& co
 {
     NH3D_ASSERT(entity != InvalidEntity, "Unexpected invalid entity");
 
-    const uint32 g_bufferId = entity >> BufferBitSize;
+    const uint32 _bufferId = entity >> BufferBitSize;
     const uint32 indexId = entity & (BufferSize - 1);
 
-    if (g_bufferId >= _entityLUT.size()) {
-        _entityLUT.resize(g_bufferId + 1);
+    if (_bufferId >= _entityLUT.size()) {
+        _entityLUT.resize(_bufferId + 1);
     }
 
-    if (_entityLUT[g_bufferId] == nullptr) {
-        _entityLUT[g_bufferId] = std::make_unique_for_overwrite<uint32[]>(BufferSize);
-        std::memset(_entityLUT[g_bufferId].get(), InvalidIndex, BufferSize * sizeof(uint32));
+    if (_entityLUT[_bufferId] == nullptr) {
+        _entityLUT[_bufferId] = std::make_unique_for_overwrite<uint32[]>(BufferSize);
+        std::memset(_entityLUT[_bufferId].get(), InvalidIndex, BufferSize * sizeof(uint32));
     }
 
-    uint32& index = _entityLUT[g_bufferId][indexId];
+    uint32& index = _entityLUT[_bufferId][indexId];
     NH3D_ASSERT(index == InvalidIndex, "Trying to overwrite an existing component");
 
-    const uint32 parentId = getId(component.parent());
-
-    if (parentId != InvalidEntity) {
-        index = parentId + 1;
-    } else {
-        // Edge case: we're likely to call that function again with entity as component.parent(), i.e. we're creating a new subtree from a root & leaf entity
-        // It would be more performant & cleaner to have a separate function doing both, since this leaves the set in a weird state
+    if (component.parent() == InvalidEntity) {
         index = _entities.size();
+    } else {
+        const uint32 parentId = getId(component.parent());
+
+        NH3D_ASSERT(parentId != InvalidIndex, "Unexpected invalid index");
+        index = parentId + 1;
     }
 
     _entities.emplace(_entities.begin() + index, entity);
@@ -86,9 +85,9 @@ inline void HierarchySparseSet::remove(const Entity entity)
 
     uint32& id = getId(entity);
     const uint32 deletedId = id;
-    id = InvalidIndex;
 
-    NH3D_ASSERT(deletedId + 1 < _entities.size() ? _data[deletedId + 1].parent() != entity : true, "Can only delete leaves from the HierarchyComponent SparseSet");
+    NH3D_ASSERT(isLeaf(entity), "Can only delete leaves from the Hierarchy");
+    id = InvalidIndex;
 
     _entities.erase(_entities.begin() + id);
     _data.erase(_data.begin() + id);
@@ -111,9 +110,15 @@ inline void HierarchySparseSet::remove(const Entity entity)
 
 [[nodiscard]] inline bool HierarchySparseSet::isLeaf(const Entity entity) const
 {
-    const uint32 id = getId(entity);
-    NH3D_ASSERT(id != InvalidIndex, "Unexpected invalid index");
-    return id + 1 == _entities.size() || _data[id + 1].parent() != entity;
+    if (entity == InvalidEntity) {
+        return false;
+    }
+    if (entity >> BufferBitSize >= _entityLUT.size() || _entityLUT[entity >> BufferBitSize] == nullptr) {
+        return true;
+    }
+
+    const uint32 id = _entityLUT[entity >> BufferBitSize][entity & (BufferSize - 1)];
+    return id == InvalidIndex || id + 1 == _entities.size() || _data[id + 1].parent() != entity;
 }
 
 inline void HierarchySparseSet::deleteSubtree(const Entity root)
@@ -122,7 +127,7 @@ inline void HierarchySparseSet::deleteSubtree(const Entity root)
     const uint32 rootId = getId(root);
     NH3D_ASSERT(rootId != InvalidIndex, "Unexpected invalid index");
 
-    const uint32 subtreeEndId = getSubtreeEndId(root);
+    const uint32 subtreeEndId = getSubtreeEndId(rootId);
 
     for (uint32 i = rootId; i < subtreeEndId; ++i) {
         uint32& id = getId(_entities[i]);
@@ -244,12 +249,10 @@ inline void HierarchySparseSet::swapConsecutiveSubarrays(const uint32 begin1, co
 
 inline void HierarchySparseSet::ensureExists(const uint32 entity)
 {
-    NH3D_ASSERT(entity != InvalidEntity, "Unexpected invalid entity");
-    const uint32 g_bufferId = entity >> BufferBitSize;
+    const uint32 _bufferId = entity >> BufferBitSize;
     const uint32 indexId = entity & (BufferSize - 1);
-    NH3D_ASSERT(g_bufferId < _entityLUT.size(), "Requested a component for an entity without storage");
 
-    if (entity == InvalidEntity || g_bufferId == _entityLUT.size()) {
+    if (entity == InvalidEntity || _bufferId >= _entityLUT.size() || _entityLUT[_bufferId] == nullptr || _entityLUT[_bufferId][indexId] == InvalidIndex) {
         HierarchyComponent comp;
         comp._parent = InvalidEntity;
 

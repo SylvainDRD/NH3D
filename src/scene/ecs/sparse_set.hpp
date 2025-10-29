@@ -62,12 +62,11 @@ template <typename T>
 [[nodiscard]] inline uint32& SparseSet<T>::getId(const Entity entity) const
 {
     NH3D_ASSERT(entity != InvalidEntity, "Unexpected invalid entity");
-    const uint32 g_bufferId = entity >> BufferBitSize;
+    const uint32 _bufferId = entity >> BufferBitSize;
     const uint32 indexId = entity & (BufferSize - 1);
-    NH3D_ASSERT(g_bufferId < _entityLUT.size(), "Requested a component for an entity without storage");
+    NH3D_ASSERT(_bufferId < _entityLUT.size(), "Requested a component for an entity without storage");
 
-    const auto& indices = _entityLUT[g_bufferId];
-    NH3D_ASSERT(indices[indexId] != InvalidIndex, "Unexpected invalid index");
+    const auto& indices = _entityLUT[_bufferId];
 
     return indices[indexId];
 }
@@ -76,19 +75,19 @@ template <typename T>
 inline void SparseSet<T>::add(const Entity entity, T&& component)
 {
     NH3D_ASSERT(entity != InvalidEntity, "Unexpected invalid entity");
-    const uint32 g_bufferId = entity >> BufferBitSize;
+    const uint32 _bufferId = entity >> BufferBitSize;
     const uint32 indexId = entity & (BufferSize - 1);
 
-    if (g_bufferId >= _entityLUT.size()) {
-        _entityLUT.resize(g_bufferId + 1);
+    if (_bufferId >= _entityLUT.size()) {
+        _entityLUT.resize(_bufferId + 1);
     }
 
-    if (_entityLUT[g_bufferId] == nullptr) {
-        _entityLUT[g_bufferId] = std::make_unique_for_overwrite<uint32[]>(BufferSize);
-        std::memset(_entityLUT[g_bufferId].get(), InvalidIndex, BufferSize * sizeof(uint32));
+    if (_entityLUT[_bufferId] == nullptr) {
+        _entityLUT[_bufferId] = std::make_unique_for_overwrite<uint32[]>(BufferSize);
+        std::memset(_entityLUT[_bufferId].get(), InvalidIndex, BufferSize * sizeof(uint32));
     }
 
-    uint32& index = _entityLUT[g_bufferId][indexId];
+    uint32& index = _entityLUT[_bufferId][indexId];
     NH3D_ASSERT(index == InvalidIndex, "Trying to overwrite an existing component");
     index = _data.size();
 
@@ -101,6 +100,7 @@ inline void SparseSet<T>::remove(const Entity entity)
 {
     NH3D_ASSERT(entity != InvalidEntity, "Unexpected invalid entity");
     uint32& id = getId(entity);
+    NH3D_ASSERT(id != InvalidIndex, "Trying to remove a non-existing component");
     const uint32 deletedId = id;
 
     id = InvalidIndex;

@@ -67,6 +67,13 @@ void Scene::remove(const Entity entity)
     NH3D_ASSERT(entity < _entityMasks.size(), "Attempting to delete a non-existant entity");
     NH3D_ASSERT(_entityMasks[entity] != SparseSetMap::InvalidEntityMask, "Attempting to delete an invalid entity");
 
+    if (_hierarchy.isLeaf(entity)) {
+        _setMap.remove(entity, _entityMasks[entity]);
+        _entityMasks[entity] = SparseSetMap::InvalidEntityMask;
+        _availableEntities.emplace_back(entity);
+        return;
+    }
+
     SubtreeView subtree = getSubtree(entity);
     for (const Entity e : subtree) {
         _setMap.remove(e, _entityMasks[e]);
