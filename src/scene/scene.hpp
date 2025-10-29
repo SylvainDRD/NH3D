@@ -6,6 +6,7 @@
 #include <misc/utils.hpp>
 #include <scene/ecs/component_view.hpp>
 #include <scene/ecs/entity.hpp>
+#include <scene/ecs/hierarchy_sparse_set.hpp>
 #include <scene/ecs/sparse_set.hpp>
 #include <scene/ecs/sparse_set_map.hpp>
 #include <scene/ecs/subtree_view.hpp>
@@ -50,7 +51,7 @@ private:
     std::vector<ComponentMask> _entityMasks;
     std::vector<uint32> _availableEntities;
 
-    SparseSet<HierarchyComponent> _hierarchy;
+    HierarchySparseSet _hierarchy;
 };
 
 template <NotHierarchyComponent T>

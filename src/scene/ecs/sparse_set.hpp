@@ -1,6 +1,5 @@
 #pragma once
 
-#include <concepts>
 #include <cstddef>
 #include <cstring>
 #include <memory>
@@ -8,18 +7,10 @@
 #include <misc/utils.hpp>
 #include <scene/ecs/components/hierarchy_component.hpp>
 #include <scene/ecs/entity.hpp>
+#include <scene/ecs/interface_sparse_set.hpp>
 #include <scene/ecs/subtree_view.hpp>
 
 namespace NH3D {
-
-class ISparseSet {
-public:
-    virtual ~ISparseSet() = default;
-
-    // This seals the deal as removal being a garbage operation
-    // Perhapse if removal becomes performance critical, there is an argument for forward declaring all SparseSet types
-    virtual void remove(const Entity entity) = 0;
-};
 
 // This code became ridiculous when specialized for HierarchyComponents
 template <typename T>
@@ -30,7 +21,7 @@ public:
 
     SparseSet(SparseSet<T>&&) = default;
 
-    ~SparseSet() = default;
+    virtual ~SparseSet() = default;
 
     inline void add(const Entity entity, T&& component);
 
@@ -44,35 +35,10 @@ public:
 
     [[nodiscard]] inline size_t size() const;
 
-public:
-    // HierarchyComponent specific
-    [[nodiscard]] inline SubtreeView getSubtree(const Entity entity) const
-        requires IsHierarchyComponent<T>;
-
-    inline void setParent(const Entity entity, const Entity parent)
-        requires IsHierarchyComponent<T>;
-
-    [[nodiscard]] inline bool isLeaf(const Entity entity) const
-        requires IsHierarchyComponent<T>;
-
-    inline void deleteSubtree(const Entity root)
-        requires IsHierarchyComponent<T>;
-
-private:
+protected:
     [[nodiscard]] inline uint32& getId(const Entity entity) const;
 
-private:
-    // HierarchyComponent specific
-    [[nodiscard]] inline uint32 getSubtreeEndId(const uint32 entityId) const
-        requires IsHierarchyComponent<T>;
-
-    inline void swapConsecutiveSubarrays(const uint32 begin1, const uint32 begin2, const uint32 end)
-        requires IsHierarchyComponent<T>;
-
-    inline void ensureExists(const uint32 entity)
-        requires IsHierarchyComponent<T>;
-
-private:
+protected:
     constexpr static uint8 BufferBitSize = 10;
     constexpr static uint32 BufferSize = 1 << BufferBitSize;
     constexpr static uint32 InvalidIndex = NH3D_MAX_T(uint32);
@@ -80,13 +46,8 @@ private:
     using indices = Uptr<uint32[]>;
     std::vector<indices> _entityLUT;
     std::vector<T> _data;
-    std::vector<Entity> _entities; // required for deletion
-
-    static std::vector<uint32> g_buffer;
+    std::vector<Entity> _entities; 
 };
-
-template <typename T>
-std::vector<uint32> SparseSet<T>::g_buffer;
 
 template <typename T>
 inline SparseSet<T>::SparseSet()
@@ -175,233 +136,6 @@ template <typename T>
 [[nodiscard]] inline size_t SparseSet<T>::size() const
 {
     return _entities.size();
-}
-
-template <>
-inline void SparseSet<HierarchyComponent>::add(const Entity entity, HierarchyComponent&& component)
-{
-    NH3D_ASSERT(entity != InvalidEntity, "Unexpected invalid entity");
-
-    const uint32 g_bufferId = entity >> BufferBitSize;
-    const uint32 indexId = entity & (BufferSize - 1);
-
-    if (g_bufferId >= _entityLUT.size()) {
-        _entityLUT.resize(g_bufferId + 1);
-    }
-
-    if (_entityLUT[g_bufferId] == nullptr) {
-        _entityLUT[g_bufferId] = std::make_unique_for_overwrite<uint32[]>(BufferSize);
-        std::memset(_entityLUT[g_bufferId].get(), InvalidIndex, BufferSize * sizeof(uint32));
-    }
-
-    uint32& index = _entityLUT[g_bufferId][indexId];
-    NH3D_ASSERT(index == InvalidIndex, "Trying to overwrite an existing component");
-
-    const uint32 parentId = getId(component.parent());
-
-    if (parentId != InvalidEntity) {
-        index = parentId + 1;
-    } else {
-        // Edge case: we're likely to call that function again with entity as component.parent(), i.e. we're creating a new subtree from a root & leaf entity
-        // It would be more performant & cleaner to have a separate function doing both, since this leaves the set in a weird state
-        index = _entities.size();
-    }
-
-    _entities.emplace(_entities.begin() + index, entity);
-    _data.emplace(_data.begin() + index, std::forward<HierarchyComponent>(component));
-
-    for (uint32 i = index + 2; i < _entities.size(); ++i) {
-        uint32& id = getId(_entities[i]);
-        NH3D_ASSERT(id != InvalidIndex, "Unexpected invalid index");
-        ++id;
-    }
-}
-
-template <>
-inline void SparseSet<HierarchyComponent>::remove(const Entity entity)
-{
-    NH3D_ASSERT(entity != InvalidEntity, "Unexpected invalid entity");
-
-    uint32& id = getId(entity);
-    const uint32 deletedId = id;
-    id = InvalidIndex;
-
-    NH3D_ASSERT(deletedId + 1 < _entities.size() ? _data[deletedId + 1].parent() != entity : true, "Can only delete leaves from the HierarchyComponent SparseSet");
-
-    _entities.erase(_entities.begin() + id);
-    _data.erase(_data.begin() + id);
-
-    for (uint32 i = id; i < _entities.size(); ++i) {
-        uint32& id = getId(_entities[i]);
-        NH3D_ASSERT(id != InvalidIndex, "Unexpected invalid index");
-        --id;
-    }
-}
-
-template <typename T>
-[[nodiscard]] inline SubtreeView SparseSet<T>::getSubtree(const Entity entity) const
-    requires IsHierarchyComponent<T>
-{
-    NH3D_ASSERT(entity != InvalidEntity, "Unexpected invalid entity");
-    const uint32 id = getId(entity);
-    NH3D_ASSERT(id != InvalidIndex, "Requested a non-existing component: Samir you're thrashing the cache");
-
-    return SubtreeView { &_entities[id], &_data[id], static_cast<uint32>(_data.size()) - id };
-}
-
-template <typename T>
-[[nodiscard]] inline bool SparseSet<T>::isLeaf(const Entity entity) const
-    requires IsHierarchyComponent<T>
-{
-    const uint32 id = getId(entity);
-    NH3D_ASSERT(id != InvalidIndex, "Unexpected invalid index");
-    return id + 1 == _entities.size() || _data[id + 1].parent() != entity;
-}
-
-template <typename T>
-inline void SparseSet<T>::deleteSubtree(const Entity root)
-    requires IsHierarchyComponent<T>
-{
-    NH3D_ASSERT(root != InvalidEntity, "Unexpected invalid entity");
-    const uint32 rootId = getId(root);
-    NH3D_ASSERT(rootId != InvalidIndex, "Unexpected invalid index");
-    g_buffer.reserve(2048);
-
-    const uint32 subtreeEndId = getSubtreeEndId(root);
-}
-
-// TODO: remove the extra array shift induced by the removal of orphaned components and last minute insertions
-template <typename T>
-inline void SparseSet<T>::setParent(const Entity entity, const Entity newParent)
-    requires IsHierarchyComponent<T>
-{
-    NH3D_ASSERT(entity != InvalidEntity, "Unexpected invalid entity");
-
-    g_buffer.reserve(2048);
-
-    ensureExists(entity);
-
-    // Defines two consecutive subarrays, where begin2 is the beginning of the second subarray
-    uint32 begin1, begin2, end;
-
-    // In this case, we're deleting the component if it is a leaf
-    if (newParent == InvalidEntity && isLeaf(entity)) {
-        // Note that if the entity was just created by calling ensureExists, this function is just a costly no-op
-        remove(entity);
-        return;
-    }
-
-    const uint32 entityId = getId(entity);
-    NH3D_ASSERT(entityId != InvalidIndex, "Unexpected invalid index");
-    const Entity previousParent = _data[entityId].parent();
-    // In this case, we're shifting the subtree to the end
-    if (newParent == InvalidEntity) {
-        _data[entityId]._parent = InvalidEntity;
-        begin1 = entityId;
-        begin2 = getSubtreeEndId(entityId);
-        end = _entities.size(); // One-past the end index
-    } else {
-        _data[entityId]._parent = newParent;
-
-        ensureExists(newParent);
-
-        const uint32 newParentId = getId(newParent);
-        const uint32 entitySubtreeEndId = getSubtreeEndId(entityId);
-        if (newParentId < entityId) {
-            begin1 = newParentId + 1;
-            begin2 = entityId;
-            end = entitySubtreeEndId;
-        } else {
-            begin1 = entityId;
-            begin2 = entitySubtreeEndId;
-            end = newParentId + 1; // One-past the end index
-        }
-    }
-
-    swapConsecutiveSubarrays(begin1, begin2, end);
-
-    // Delete old parent if it is orphaned (i.e. at root level without children)
-    if (isLeaf(previousParent) && _data[getId(previousParent)].parent() == InvalidEntity) {
-        remove(previousParent);
-    }
-}
-
-template <typename T>
-[[nodiscard]] inline uint32 SparseSet<T>::getSubtreeEndId(const uint32 entityId) const
-    requires IsHierarchyComponent<T>
-{
-    // Find the end of the subtree to move
-    // One-past the end index
-    uint32 entitySubtreeEndId = entityId;
-    do {
-        g_buffer.emplace_back(_entities[entitySubtreeEndId]);
-        ++entitySubtreeEndId;
-
-        if (entitySubtreeEndId >= _entities.size()) {
-            break;
-        }
-
-        const Entity parent = static_cast<HierarchyComponent>(_data[entitySubtreeEndId]).parent();
-        while (!g_buffer.empty() && g_buffer.back() != parent) {
-            g_buffer.pop_back();
-        }
-    } while (!g_buffer.empty());
-
-    g_buffer.clear();
-    return entitySubtreeEndId;
-}
-
-template <typename T>
-inline void SparseSet<T>::swapConsecutiveSubarrays(const uint32 begin1, const uint32 begin2, const uint32 end)
-    requires IsHierarchyComponent<T>
-{
-    // Swap both subarrays in the entities vector
-    // To do so, copy everything into the previously allocated g_buffer
-    // The alternative is to perform a full permutation of the entities, and a permutation for each subarray
-    // I expect this version to be faster, even more so since we can do the same thing for the data
-    const uint32 size = end - begin1;
-    if (g_buffer.capacity() < size) {
-        g_buffer.reserve(2 * size);
-    }
-    g_buffer.resize(size);
-    const uint32 firstSubSize = begin2 - begin1;
-    const uint32 secondSubSize = end - begin2;
-    std::memcpy(g_buffer.data(), &_entities[begin1], size * sizeof(Entity));
-    std::memcpy(&_entities[begin1], &g_buffer[firstSubSize], secondSubSize * sizeof(Entity));
-    std::memcpy(&_entities[begin1 + secondSubSize], &g_buffer[0], firstSubSize * sizeof(Entity));
-
-    // Update the LUT
-    for (uint32 i = begin1; i < end; ++i) {
-        uint32& id = getId(_entities[i]);
-        NH3D_ASSERT(id != InvalidIndex, "Unexpected invalid index");
-        id = i;
-    }
-
-    // Swap the data around, exploits the fact that the HierarchyComponent is just a parent Entity
-    // If this assumption ever changes, allocate another g_buffer (or use the existing one as a byte array? nasty) or swap to a loop
-    NH3D_STATIC_ASSERT(sizeof(Entity) == sizeof(HierarchyComponent));
-    std::memcpy(g_buffer.data(), &_data[begin1], size * sizeof(Entity));
-    std::memcpy(&_data[begin1], &g_buffer[firstSubSize], secondSubSize * sizeof(Entity));
-    std::memcpy(&_data[begin1 + secondSubSize], &g_buffer[0], firstSubSize * sizeof(Entity));
-
-    g_buffer.clear();
-}
-
-template <typename T>
-inline void SparseSet<T>::ensureExists(const uint32 entity)
-    requires IsHierarchyComponent<T>
-{
-    NH3D_ASSERT(entity != InvalidEntity, "Unexpected invalid entity");
-    const uint32 g_bufferId = entity >> BufferBitSize;
-    const uint32 indexId = entity & (BufferSize - 1);
-    NH3D_ASSERT(g_bufferId < _entityLUT.size(), "Requested a component for an entity without storage");
-
-    if (entity == InvalidEntity || g_bufferId == _entityLUT.size()) {
-        HierarchyComponent comp;
-        comp._parent = InvalidEntity;
-
-        add(entity, std::move(comp));
-    }
 }
 
 }

@@ -31,8 +31,7 @@ struct HierarchyComponent {
 private:
     Entity _parent;
 
-    template <typename T>
-    friend class SparseSet;
+    friend class HierarchySparseSet;
 };
 
 }

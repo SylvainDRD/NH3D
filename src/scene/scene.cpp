@@ -1,6 +1,7 @@
 #include "scene.hpp"
 #include "misc/utils.hpp"
 #include "scene/ecs/entity.hpp"
+#include "scene/ecs/subtree_view.hpp"
 #include <filesystem>
 #include <nlohmann/json.hpp>
 #include <scene/ecs/components/mesh_component.hpp>
@@ -63,13 +64,16 @@ namespace _private {
 
 void Scene::remove(const Entity entity)
 {
-    // TODO: edge case where entity is NOT a leaf: delete every entity in the subtree
     NH3D_ASSERT(entity < _entityMasks.size(), "Attempting to delete a non-existant entity");
     NH3D_ASSERT(_entityMasks[entity] != SparseSetMap::InvalidEntityMask, "Attempting to delete an invalid entity");
 
-    _setMap.remove(entity, _entityMasks[entity]);
-    _entityMasks[entity] = SparseSetMap::InvalidEntityMask;
-    _availableEntities.emplace_back(entity);
+    SubtreeView subtree = getSubtree(entity);
+    for (const Entity e : subtree) {
+        _setMap.remove(e, _entityMasks[e]);
+        _entityMasks[e] = SparseSetMap::InvalidEntityMask;
+        _availableEntities.emplace_back(e);
+    }
+    _hierarchy.deleteSubtree(entity);
 }
 
 void Scene::setParent(const Entity entity, const Entity parent)
