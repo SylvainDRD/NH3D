@@ -1,4 +1,3 @@
-#include "gtest/gtest.h"
 #include <gtest/gtest.h>
 #include <misc/utils.hpp>
 #include <scene/ecs/entity.hpp>

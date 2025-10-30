@@ -1,5 +1,4 @@
 #include "mock_rhi.hpp"
-#include "gtest/gtest.h"
 #include <gtest/gtest.h>
 #include <rendering/core/split_pool.hpp>
 

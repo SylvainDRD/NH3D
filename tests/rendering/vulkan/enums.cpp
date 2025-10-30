@@ -88,13 +88,13 @@ TEST(VulkanEnumTests, TextureAspectFlagsMappingTest)
 
 TEST(VulkanEnumTests, CombinedTextureAspectFlagsMappingTest)
 {
-    constexpr VkBufferUsageFlags Expected[] = {
+    constexpr VkImageAspectFlags Expected[] = {
         VK_IMAGE_ASPECT_COLOR_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
         VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT | VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT
     };
 
-    constexpr uint32_t TestCases = sizeof(Expected) / sizeof(TextureAspectFlags);
+    constexpr uint32_t TestCases = sizeof(Expected) / sizeof(Expected[0]);
 
     constexpr TextureAspectFlags Flags[] = {
         TextureAspectFlagBits::ASPECT_COLOR_BIT | TextureAspectFlagBits::ASPECT_STENCIL_BIT,
@@ -135,7 +135,7 @@ TEST(VulkanEnumTests, CombinedTextureUsageFlagsMappingTest)
         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT
     };
 
-    constexpr uint32_t TestCases = sizeof(Expected) / sizeof(TextureAspectFlags);
+    constexpr uint32_t TestCases = sizeof(Expected) / sizeof(Expected[0]);
 
     constexpr TextureUsageFlags Flags[] = {
         TextureUsageFlagBits::USAGE_COLOR_BIT | TextureUsageFlagBits::USAGE_STORAGE_BIT,
@@ -199,10 +199,17 @@ TEST(VulkanEnumTests, BufferMemoryUsageMappingTest)
     constexpr uint32_t TestCases = sizeof(Expected) / sizeof(VmaMemoryUsage);
     EXPECT_EQ(TestCases, static_cast<uint32_t>(BufferMemoryUsage::NH3D_BUFFER_MEMORY_USAGE_MAX));
 
-    for (uint32_t i = 0; i < std::max(TestCases, static_cast<uint32_t>(BufferMemoryUsage::NH3D_BUFFER_MEMORY_USAGE_MAX)); ++i) {
+    for (uint32_t i = 0; i < TestCases; ++i) {
         EXPECT_EQ(MapBufferMemoryUsage(static_cast<BufferMemoryUsage>(i)), Expected[i]);
     }
     EXPECT_DEATH((void)MapBufferMemoryUsage(BufferMemoryUsage::NH3D_BUFFER_MEMORY_USAGE_MAX), ".*FATAL.*");
+}
+
+TEST(VulkanEnumTests, ZeroFlagsMapToZero)
+{
+    EXPECT_EQ(MapTextureAspectFlags(static_cast<TextureAspectFlags>(0)), 0u);
+    EXPECT_EQ(MapTextureUsageFlags(static_cast<TextureUsageFlags>(0)), 0u);
+    EXPECT_EQ(MapBufferUsageFlags(static_cast<BufferUsageFlags>(0)), 0u);
 }
 
 }
