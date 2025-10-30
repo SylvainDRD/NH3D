@@ -281,10 +281,7 @@ inline void HierarchySparseSet::swapConsecutiveSubarrays(const uint32 begin1, co
 inline void HierarchySparseSet::ensureExists(const uint32 entity)
 {
     if (!isAllocated(entity)) {
-        HierarchyComponent comp;
-        comp._parent = InvalidEntity;
-
-        add(entity, std::move(comp));
+        add(entity, std::move(HierarchyComponent{}));
     }
 }
 

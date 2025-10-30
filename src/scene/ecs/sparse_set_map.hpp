@@ -27,7 +27,7 @@ public:
 
     // Most significant bit reserved for invalid entity
     constexpr static uint8 MaxComponent = sizeof(ComponentMask) * 8 - 1;
-    static constexpr ComponentMask InvalidEntityMask = 1 << MaxComponent;
+    static constexpr ComponentMask InvalidEntityMask = 1U << MaxComponent;
 
     template <NotHierarchyComponent... Ts>
     [[nodiscard]] inline ComponentMask mask() const;
@@ -88,7 +88,7 @@ template <NotHierarchyComponent T>
 template <NotHierarchyComponent... Ts>
 [[nodiscard]] inline ComponentMask SparseSetMap::mask() const
 {
-    return ((1 << getId<std::remove_cvref_t<Ts>>()) | ...);
+    return ((1U << getId<std::remove_cvref_t<Ts>>()) | ...);
 }
 
 template <NotHierarchyComponent T>

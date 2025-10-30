@@ -40,7 +40,7 @@ protected:
 
 protected:
     constexpr static uint8 BufferBitSize = 10;
-    constexpr static uint32 BufferSize = 1 << BufferBitSize;
+    constexpr static uint32 BufferSize = 1U << BufferBitSize;
     constexpr static uint32 InvalidIndex = NH3D_MAX_T(uint32);
 
     using indices = Uptr<uint32[]>;

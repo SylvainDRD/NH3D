@@ -57,29 +57,29 @@ enum class TextureFormat : uint32_t {
 // TODO: check if DX12 friendly
 using TextureUsageFlags = uint32_t;
 enum TextureUsageFlagBits : uint32_t {
-    USAGE_COLOR_BIT = 1 << 0,
-    USAGE_DEPTH_STENCIL_BIT = 1 << 1,
-    USAGE_STORAGE_BIT = 1 << 2,
-    USAGE_SAMPLED_BIT = 1 << 3,
-    USAGE_INPUT_BIT = 1 << 4,
-    NH3D_TEXTURE_USAGE_MAX = 1 << 5
+    USAGE_COLOR_BIT = 1U << 0,
+    USAGE_DEPTH_STENCIL_BIT = 1U << 1,
+    USAGE_STORAGE_BIT = 1U << 2,
+    USAGE_SAMPLED_BIT = 1U << 3,
+    USAGE_INPUT_BIT = 1U << 4,
+    NH3D_TEXTURE_USAGE_MAX = 1U << 5
 };
 
 // TODO: check if DX12 friendly
 using TextureAspectFlags = uint32_t;
 enum TextureAspectFlagBits : uint32_t {
-    ASPECT_COLOR_BIT = 1 << 0,
-    ASPECT_DEPTH_BIT = 1 << 1,
-    ASPECT_STENCIL_BIT = 1 << 2,
-    NH3D_TEXTURE_ASPECT_MAX = 1 << 3
+    ASPECT_COLOR_BIT = 1U << 0,
+    ASPECT_DEPTH_BIT = 1U << 1,
+    ASPECT_STENCIL_BIT = 1U << 2,
+    NH3D_TEXTURE_ASPECT_MAX = 1U << 3
 };
 
 using BufferUsageFlags = uint32_t;
 enum BufferUsageFlagBits : uint32_t {
-    STORAGE_BUFFER_BIT = 1 << 0,
-    SRC_TRANSFER_BIT = 1 << 1,
-    DST_TRANSFER_BIT = 1 << 2,
-    NH3D_BUFFER_USAGE_MAX = 1 << 3
+    STORAGE_BUFFER_BIT = 1U << 0,
+    SRC_TRANSFER_BIT = 1U << 1,
+    DST_TRANSFER_BIT = 1U << 2,
+    NH3D_BUFFER_USAGE_MAX = 1U << 3
 };
 
 enum class BufferMemoryUsage : uint32_t {
