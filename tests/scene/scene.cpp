@@ -81,9 +81,73 @@ TEST(SceneTests, RemoveTest)
     EXPECT_DEATH(scene.remove(e), ".*FATAL.*");
     EXPECT_DEATH(scene.remove(e + 1), ".*FATAL.*");
 
-    EXPECT_FALSE(scene.checkComponents<char>(e));
-    EXPECT_FALSE(scene.checkComponents<int>(e));
-    EXPECT_FALSE(scene.checkComponents<bool>(e));
+    EXPECT_DEATH((void)scene.checkComponents<char>(e), ".*FATAL.*");
+    EXPECT_DEATH((void)scene.checkComponents<int>(e), ".*FATAL.*");
 }
 
+TEST(SceneTests, ClearAndReAddComponentTest)
+{
+    Scene scene;
+    const Entity e = scene.create('a', 2);
+
+    scene.clearComponents<char>(e);
+    EXPECT_FALSE(scene.checkComponents<char>(e));
+
+    scene.add(e, 'b');
+
+    EXPECT_TRUE(scene.checkComponents<char>(e));
+    EXPECT_EQ(scene.get<char>(e), 'b');
+    EXPECT_EQ(scene.get<int>(e), 2);
 }
+
+TEST(SceneTests, AddOnInvalidEntityDies)
+{
+    Scene scene;
+    const Entity e = scene.create(1);
+
+    scene.remove(e);
+
+    EXPECT_DEATH(scene.add(e, 2), ".*FATAL.*");
+}
+
+TEST(SceneTests, IsLeaf)
+{
+    Scene scene;
+    const Entity parent = scene.create(0);
+    const Entity child1 = scene.create(1);
+    const Entity child2 = scene.create(2);
+
+    scene.setParent(child1, parent);
+    scene.setParent(child2, parent);
+
+    EXPECT_FALSE(scene.isLeaf(parent));
+    EXPECT_TRUE(scene.isLeaf(child1));
+    EXPECT_TRUE(scene.isLeaf(child2));
+
+    scene.remove(child1);
+    EXPECT_FALSE(scene.isLeaf(parent));
+    EXPECT_DEATH((void)scene.isLeaf(child1), ".*FATAL.*");
+    EXPECT_TRUE(scene.isLeaf(child2));
+
+    scene.remove(child2);
+    EXPECT_TRUE(scene.isLeaf(parent));
+    EXPECT_DEATH((void)scene.isLeaf(child1), ".*FATAL.*");
+    EXPECT_DEATH((void)scene.isLeaf(child2), ".*FATAL.*");
+
+    EXPECT_DEATH((void)scene.isLeaf(999), ".*FATAL.*");
+
+    scene.remove(parent);
+    EXPECT_DEATH((void)scene.isLeaf(parent), ".*FATAL.*");
+}
+
+TEST(SceneTests, GetSubtreeInvalidEntityDies)
+{
+    Scene scene;
+    EXPECT_DEATH((void)scene.getSubtree(0), ".*FATAL.*");
+
+    const Entity e = scene.create(1);
+    scene.remove(e);
+    EXPECT_DEATH((void)scene.getSubtree(e), ".*FATAL.*");
+}
+
+} // namespace NH3D::Test

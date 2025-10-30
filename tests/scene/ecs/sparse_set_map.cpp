@@ -92,4 +92,21 @@ TEST(SparseSetMapTests, GetNonExistentComponentTest)
     EXPECT_DEATH((void)map.get<std::string>(e1), ".*FATAL.*");
 }
 
+TEST(SparseSetMapTests, RemoveClearsComponents)
+{
+    SparseSetMap map;
+
+    const Entity e = 0;
+    map.add(e, 42, 'a');
+
+    map.remove<int>(e);
+    EXPECT_DEATH((void)map.get<int>(e), ".*FATAL.*");
+
+    map.remove<char>(e);
+    EXPECT_DEATH((void)map.get<char>(e), ".*FATAL.*");
+
+    map.add(e, 33);
+    EXPECT_EQ(map.get<int>(e), 33);
+}
+
 } // namespace NH3D::Test

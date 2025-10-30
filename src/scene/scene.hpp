@@ -49,6 +49,9 @@ public:
     [[nodiscard]] inline bool isLeaf(const Entity entity) const;
 
 private:
+    [[nodiscard]] inline bool isValidEntity(const Entity entity) const;
+
+private:
     SparseSetMap _setMap;
     std::vector<ComponentMask> _entityMasks;
     std::vector<uint32> _availableEntities;
@@ -56,15 +59,22 @@ private:
     HierarchySparseSet _hierarchy;
 };
 
+[[nodiscard]] inline bool Scene::isValidEntity(const Entity entity) const
+{
+    return entity < _entityMasks.size() && (_entityMasks[entity] & SparseSetMap::InvalidEntityMask) == 0;
+}
+
 template <NotHierarchyComponent T>
 [[nodiscard]] inline T& Scene::get(const Entity entity)
 {
+    NH3D_ASSERT(isValidEntity(entity), "Attempting to get components of an invalid entity");
+    NH3D_ASSERT(checkComponents<T>(entity), "Entity mask is missing requested component");
     return _setMap.get<T>(entity);
 }
 
 [[nodiscard]] inline SubtreeView Scene::getSubtree(const Entity entity)
 {
-    // TODO: make this not UB when entity is a root-leaf
+    NH3D_ASSERT(isValidEntity(entity), "Attempting to get components of an invalid entity");
     return _hierarchy.getSubtree(entity);
 }
 
@@ -88,6 +98,7 @@ inline Entity Scene::create(Ts&&... components)
 template <NotHierarchyComponent... Ts>
 inline void Scene::add(const Entity entity, Ts&&... components)
 {
+    NH3D_ASSERT(isValidEntity(entity), "Attempting to add components to an invalid entity");
     const ComponentMask mask = _setMap.mask<Ts...>();
 
     _setMap.add(entity, std::forward<Ts>(components)...);
@@ -98,13 +109,14 @@ inline void Scene::add(const Entity entity, Ts&&... components)
 template <NotHierarchyComponent... Ts>
 [[nodiscard]] inline bool Scene::checkComponents(const Entity entity) const
 {
-    NH3D_ASSERT(entity < _entityMasks.size(), "Attempting to check components of a non-existing entity");
+    NH3D_ASSERT(isValidEntity(entity), "Attempting to check components of an invalid entity");
     return ComponentMaskUtils::checkComponents(_entityMasks[entity], _setMap.mask<Ts...>());
 }
 
 template <NotHierarchyComponent... Ts>
 inline void Scene::clearComponents(const Entity entity)
 {
+    NH3D_ASSERT(isValidEntity(entity), "Attempting to clear components of an invalid entity");
     NH3D_ASSERT(checkComponents<Ts...>(entity), "Entity mask is missing components to delete");
 
     (_setMap.remove<Ts>(entity), ...);
@@ -120,6 +132,8 @@ template <NotHierarchyComponent T, NotHierarchyComponent... Ts>
 
 [[nodiscard]] inline bool Scene::isLeaf(const Entity entity) const
 {
+    NH3D_ASSERT(isValidEntity(entity), "Attempting to check leaf status of an invalid entity");
+
     return _hierarchy.isLeaf(entity);
 }
 

@@ -59,6 +59,12 @@ TEST(ComponentViewTests, IterationTest)
         ++charCount;
     }
     EXPECT_EQ(charCount, 2);
+
+    EXPECT_EQ(scene.get<int>(0), 2);
+    EXPECT_EQ(scene.get<int>(1), 2);
+    EXPECT_EQ(scene.get<int>(2), 4);
+    EXPECT_EQ(scene.get<int>(3), 5);
+    EXPECT_EQ(scene.get<int>(4), 5);
 }
 
 TEST(ComponentViewTests, EmptyViewTest)
@@ -82,4 +88,21 @@ TEST(ComponentViewTests, NonExistentComponentAccess)
     EXPECT_DEATH((void)scene.get<uint32>(e), ".*FATAL.*");
 }
 
+TEST(ComponentViewTests, ViewSkipsRemovedEntities)
+{
+    Scene scene;
+    const Entity e1 = scene.create(1);
+    const Entity e2 = scene.create(2);
+
+    scene.remove(e1);
+
+    int count = 0;
+    for (auto [entity, value] : scene.makeView<int>()) {
+        EXPECT_EQ(entity, e2);
+        EXPECT_EQ(value, 2);
+        ++count;
+    }
+    EXPECT_EQ(count, 1);
 }
+
+} // namespace NH3D::Test

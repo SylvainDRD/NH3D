@@ -91,8 +91,36 @@ TEST(ResourceManagerTests, ClearTest)
 
     EXPECT_DEATH((void)resourceManager.getHotData<VulkanBuffer>(bufferHandle), ".*FATAL.*");
     EXPECT_DEATH((void)resourceManager.getColdData<VulkanBuffer>(bufferHandle), ".*FATAL.*");
-    // gtest is fucking weird sometimes
     EXPECT_DEATH(resourceManager.release<VulkanTexture>(rhi, { bufferHandle.index }), ".*FATAL.*");
+}
+
+TEST(ResourceManagerTests, ReleaseInvalidHandleTest)
+{
+    ResourceManager resourceManager;
+    MockRHI rhi;
+
+    EXPECT_DEATH(resourceManager.release<VulkanTexture>(rhi, { 99 }), ".*FATAL.*");
+
+    const Handle<Buffer> handle = resourceManager.store<VulkanBuffer>({ "Hello there!", true }, { 7 });
+    resourceManager.release<VulkanBuffer>(rhi, handle);
+    EXPECT_DEATH(resourceManager.release<VulkanBuffer>(rhi, handle), ".*FATAL.*");
+}
+
+TEST(ResourceManagerTests, StoreReusesReleasedSlot)
+{
+    ResourceManager resourceManager;
+    MockRHI rhi;
+
+    const Handle<Buffer> first = resourceManager.store<VulkanBuffer>({ "A", true }, { 1 });
+    const Handle<Buffer> second = resourceManager.store<VulkanBuffer>({ "B", true }, { 2 });
+
+    resourceManager.release<VulkanBuffer>(rhi, first);
+    const Handle<Buffer> reused = resourceManager.store<VulkanBuffer>({ "C", true }, { 3 });
+
+    EXPECT_EQ(reused.index, first.index);
+    EXPECT_EQ(resourceManager.getHotData<VulkanBuffer>(reused).hotValue, "C");
+
+    EXPECT_EQ(resourceManager.getHotData<VulkanBuffer>(second).hotValue, "B");
 }
 
 }

@@ -131,4 +131,21 @@ TEST(SparseSetTests, RemoveMultipleTest)
     set.remove(20);
 }
 
+TEST(SparseSetTests, ReinsertAfterRemovalTest)
+{
+    SparseSet<int> set;
+
+    set.add(10, 42);
+    set.add(20, 1337);
+
+    set.remove(10);
+    EXPECT_DEATH((void)set.get(10), ".*FATAL.*");
+
+    set.add(10, 84);
+
+    EXPECT_EQ(set.size(), 2);
+    EXPECT_EQ(set.get(10), 84);
+    EXPECT_EQ(set.entities().back(), 10);
+}
+
 } // namespace NH3D::Test

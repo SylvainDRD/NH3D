@@ -11,9 +11,14 @@ TEST(HierarchySparseSetTests, ParentAssignmentAndLeafChecks)
     set.setParent(2, 1);
 
     EXPECT_EQ(set.size(), 2);
-    EXPECT_EQ(set.get(2).parent(), 1u);
+    EXPECT_EQ(set.get(2).parent(), 1);
     EXPECT_FALSE(set.isLeaf(1));
     EXPECT_TRUE(set.isLeaf(2));
+
+    // For the hierarchy, any unallocated node is considered a leaf
+    // The scene should check that the entity is valid before querying isLeaf
+    EXPECT_TRUE(set.isLeaf(0));
+    EXPECT_TRUE(set.isLeaf(4));
 
     EXPECT_EQ(set.getRaw(0).parent(), InvalidEntity);
     EXPECT_EQ(set.getRaw(1).parent(), 1);
@@ -184,6 +189,8 @@ TEST(HierarchySparseSetTests, DeleteSubtreePreservesOtherSubtrees)
     EXPECT_EQ(set.entities()[0], 0);
     EXPECT_EQ(set.entities()[1], 4);
     EXPECT_EQ(set.entities()[2], 5);
+    EXPECT_FALSE(set.isLeaf(0));
+    EXPECT_TRUE(set.isLeaf(5));
 }
 
 TEST(HierarchySparseSetTests, GetSubtreeOfLeafReturnsSingleEntity)
