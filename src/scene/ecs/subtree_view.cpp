@@ -20,9 +20,19 @@ SubtreeView::SubtreeView(const Entity* const entities, const HierarchyComponent*
     NH3D_ASSERT(hierarchy != nullptr, "Null hierarchy array provided to SubtreeView");
 }
 
+SubtreeView::SubtreeView(const Entity entity) :
+    _entities { &_leafEntity }
+    , _hierarchy { nullptr }
+    , _size { 1 }
+    , _leafEntity { entity }
+{
+}
+
 SubtreeView::Iterator& SubtreeView::Iterator::operator++()
 {
     ++_id;
+
+    // In the case where we're iterating over a single leaf entity, should return right away
 
     // A bit of a hack but predetermining the actual size beforehand is costly
     if (_id >= _view._size) {

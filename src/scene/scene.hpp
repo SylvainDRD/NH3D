@@ -46,6 +46,8 @@ public:
     template <NotHierarchyComponent T, NotHierarchyComponent... Ts>
     [[nodiscard]] inline ComponentView<T, Ts...> makeView();
 
+    [[nodiscard]] inline bool isLeaf(const Entity entity) const;
+
 private:
     SparseSetMap _setMap;
     std::vector<ComponentMask> _entityMasks;
@@ -62,6 +64,7 @@ template <NotHierarchyComponent T>
 
 [[nodiscard]] inline SubtreeView Scene::getSubtree(const Entity entity)
 {
+    // TODO: make this not UB when entity is a root-leaf
     return _hierarchy.getSubtree(entity);
 }
 
@@ -113,6 +116,11 @@ template <NotHierarchyComponent T, NotHierarchyComponent... Ts>
 [[nodiscard]] inline ComponentView<T, Ts...> Scene::makeView()
 {
     return _setMap.makeView<T, Ts...>(_entityMasks);
+}
+
+[[nodiscard]] inline bool Scene::isLeaf(const Entity entity) const
+{
+    return _hierarchy.isLeaf(entity);
 }
 
 }

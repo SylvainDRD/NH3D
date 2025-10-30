@@ -186,4 +186,59 @@ TEST(HierarchySparseSetTests, DeleteSubtreePreservesOtherSubtrees)
     EXPECT_EQ(set.entities()[2], 5);
 }
 
+TEST(HierarchySparseSetTests, GetSubtreeOfLeafReturnsSingleEntity)
+{
+    HierarchySparseSet set;
+
+    set.setParent(2, 1);
+    set.setParent(3, 1);
+
+    SubtreeView subtree = set.getSubtree(3);
+
+    std::vector<Entity> entities;
+    for (const Entity entity : subtree) {
+        entities.push_back(entity);
+    }
+
+    EXPECT_EQ(entities.size(), 1);
+    EXPECT_EQ(entities[0], 3);
+}
+
+TEST(HierarchySparseSetTests, IsLeafOnInvalidEntityReturnsFalse)
+{
+    HierarchySparseSet set;
+
+    EXPECT_FALSE(set.isLeaf(InvalidEntity));
+}
+
+TEST(HierarchySparseSetTests, DeletingSubtreeOfLeafDeletesLeaf)
+{
+    HierarchySparseSet set;
+
+    set.setParent(2, 1);
+    set.setParent(3, 1);
+
+    EXPECT_EQ(set.size(), 3);
+
+    set.deleteSubtree(3);
+
+    EXPECT_EQ(set.size(), 2);
+    EXPECT_EQ(set.entities()[0], 1);
+    EXPECT_EQ(set.entities()[1], 2);
+}
+
+TEST(HierarchySparseSetTests, DeletingSubtreeDeletesOrphanedParents)
+{
+    HierarchySparseSet set;
+
+    set.setParent(2, 1);
+    set.setParent(3, 2);
+
+    EXPECT_EQ(set.size(), 3);
+
+    set.deleteSubtree(2);
+
+    EXPECT_EQ(set.size(), 0);
+}
+
 } // namespace NH3D::Test

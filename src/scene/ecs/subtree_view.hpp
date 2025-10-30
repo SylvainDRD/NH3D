@@ -1,6 +1,5 @@
 #pragma once
 
-#include "scene/ecs/components/transform_component.hpp"
 #include <scene/ecs/components/hierarchy_component.hpp>
 #include <scene/ecs/entity.hpp>
 #include <vector>
@@ -12,6 +11,8 @@ public:
     SubtreeView() = delete;
 
     SubtreeView(const Entity* const entities, const HierarchyComponent* const hierarchy, const uint32 size);
+
+    SubtreeView(const Entity entity);
 
     class Iterator {
     public:
@@ -42,6 +43,8 @@ private:
     const Entity* const _entities;
     const HierarchyComponent* const _hierarchy;
     const uint32 _size;
+
+    const Entity _leafEntity = InvalidEntity;
 
     // Preallocated buffer used as a stack for subtree iteration
     static std::vector<Entity> g_subtreeParentStack;

@@ -6,7 +6,7 @@ namespace NH3D {
 
 void TransformComponent::translate(Scene& scene, const Entity self, const vec3& translation)
 {
-    if (!scene.checkComponents<HierarchyComponent>(self)) {
+    if (!scene.isLeaf(self)) {
         _position += translation;
     } else {
         scene.get<HierarchyComponent>(self).translate(scene, self, translation);
@@ -15,7 +15,7 @@ void TransformComponent::translate(Scene& scene, const Entity self, const vec3& 
 
 void TransformComponent::rotate(Scene& scene, const Entity self, const quat& rotation)
 {
-    if (!scene.checkComponents<HierarchyComponent>(self)) {
+    if (!scene.isLeaf(self)) {
         _rotation *= rotation;
     } else {
         scene.get<HierarchyComponent>(self).rotate(scene, self, rotation);
@@ -24,7 +24,7 @@ void TransformComponent::rotate(Scene& scene, const Entity self, const quat& rot
 
 void TransformComponent::scale(Scene& scene, const Entity self, const vec3& scale)
 {
-    if (!scene.checkComponents<HierarchyComponent>(self)) {
+    if (!scene.isLeaf(self)) {
         _scale *= scale;
     } else {
         scene.get<HierarchyComponent>(self).scale(scene, self, scale);
