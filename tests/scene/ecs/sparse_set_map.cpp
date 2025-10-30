@@ -72,4 +72,24 @@ TEST(SparseSetMapTests, RemoveMaskTest)
     EXPECT_DEATH(map.remove(e1, SparseSetMap::InvalidEntityMask), ".*FATAL.*");
 }
 
+TEST(SparseSetMapTests, RemoveNonExistentComponentTest)
+{
+    SparseSetMap map;
+
+    const Entity e1 = 0;
+    map.add(e1, 42, 'a', A { 1337, true });
+
+    EXPECT_DEATH(map.remove<std::string>(e1), ".*FATAL.*");
 }
+
+TEST(SparseSetMapTests, GetNonExistentComponentTest)
+{
+    SparseSetMap map;
+
+    const Entity e1 = 0;
+    map.add(e1, 42, 'a', A { 1337, true });
+
+    EXPECT_DEATH((void)map.get<std::string>(e1), ".*FATAL.*");
+}
+
+} // namespace NH3D::Test

@@ -61,4 +61,25 @@ TEST(ComponentViewTests, IterationTest)
     EXPECT_EQ(charCount, 2);
 }
 
+TEST(ComponentViewTests, EmptyViewTest)
+{
+    Scene scene;
+    scene.create(1);
+    scene.create(2);
+
+    int count = 0;
+    for (auto [e, c] : scene.makeView<const char>()) {
+        ++count;
+    }
+    EXPECT_EQ(count, 0);
+}
+
+TEST(ComponentViewTests, NonExistentComponentAccess)
+{
+    Scene scene;
+    Entity e = scene.create(1, 'a');
+
+    EXPECT_DEATH((void)scene.get<uint32>(e), ".*FATAL.*");
+}
+
 }

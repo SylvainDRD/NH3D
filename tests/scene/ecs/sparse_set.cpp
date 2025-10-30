@@ -102,4 +102,33 @@ TEST(SparseSetTests, RemoveTest)
     EXPECT_EQ(set.entities().front(), 0);
 }
 
+TEST(SparseSetTests, RemoveInternalTest)
+{
+    SparseSet<int> set;
+
+    set.add(10, 42);
+    EXPECT_EQ(set.size(), 1);
+    EXPECT_EQ(set.entities().front(), 10);
+
+    set.remove(10);
+    EXPECT_EQ(set.size(), 0);
 }
+
+TEST(SparseSetTests, RemoveMultipleTest)
+{
+    SparseSet<int> set;
+
+    set.add(10, 42);
+    set.add(20, 1337);
+    EXPECT_EQ(set.size(), 2);
+    EXPECT_EQ(set.entities()[0], 10);
+    EXPECT_EQ(set.entities()[1], 20);
+
+    set.remove(10);
+    EXPECT_EQ(set.size(), 1);
+    EXPECT_EQ(set.entities().front(), 20);
+
+    set.remove(20);
+}
+
+} // namespace NH3D::Test
