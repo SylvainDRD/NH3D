@@ -77,7 +77,7 @@ TEST(VulkanEnumTests, TextureAspectFlagsMappingTest)
         VK_IMAGE_ASPECT_STENCIL_BIT
     };
 
-    constexpr uint32_t TestCases = sizeof(Expected) / sizeof(VkImageAspectFlags);
+    constexpr uint32_t TestCases = std::size(Expected);
     EXPECT_EQ(1 << TestCases, static_cast<uint32_t>(TextureAspectFlagBits::NH3D_TEXTURE_ASPECT_MAX));
 
     for (uint32_t i = 0; i < TestCases; ++i) {
@@ -94,7 +94,7 @@ TEST(VulkanEnumTests, CombinedTextureAspectFlagsMappingTest)
         VK_IMAGE_ASPECT_COLOR_BIT | VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT
     };
 
-    constexpr uint32_t TestCases = sizeof(Expected) / sizeof(Expected[0]);
+    constexpr uint32_t TestCases = std::size(Expected);
 
     constexpr TextureAspectFlags Flags[] = {
         TextureAspectFlagBits::ASPECT_COLOR_BIT | TextureAspectFlagBits::ASPECT_STENCIL_BIT,
@@ -117,7 +117,7 @@ TEST(VulkanEnumTests, TextureUsageFlagsMappingTest)
         VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT
     };
 
-    constexpr uint32_t TestCases = sizeof(Expected) / sizeof(VkImageUsageFlags);
+    constexpr uint32_t TestCases = std::size(Expected);
     EXPECT_EQ(1 << TestCases, static_cast<uint32_t>(TextureUsageFlagBits::NH3D_TEXTURE_USAGE_MAX));
 
     for (uint32_t i = 0; i < TestCases; ++i) {
@@ -135,7 +135,7 @@ TEST(VulkanEnumTests, CombinedTextureUsageFlagsMappingTest)
         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT
     };
 
-    constexpr uint32_t TestCases = sizeof(Expected) / sizeof(Expected[0]);
+    constexpr uint32_t TestCases = std::size(Expected);
 
     constexpr TextureUsageFlags Flags[] = {
         TextureUsageFlagBits::USAGE_COLOR_BIT | TextureUsageFlagBits::USAGE_STORAGE_BIT,
@@ -157,7 +157,7 @@ TEST(VulkanEnumTests, BufferUsageFlagsMappingTest)
         VK_BUFFER_USAGE_TRANSFER_DST_BIT
     };
 
-    constexpr uint32_t TestCases = sizeof(Expected) / sizeof(VkBufferUsageFlags);
+    constexpr uint32_t TestCases = std::size(Expected);
     EXPECT_EQ(1 << TestCases, static_cast<uint32_t>(BufferUsageFlagBits::NH3D_BUFFER_USAGE_MAX));
 
     for (uint32_t i = 0; i < TestCases; ++i) {
@@ -196,7 +196,7 @@ TEST(VulkanEnumTests, BufferMemoryUsageMappingTest)
         VMA_MEMORY_USAGE_GPU_TO_CPU
     };
 
-    constexpr uint32_t TestCases = sizeof(Expected) / sizeof(VmaMemoryUsage);
+    constexpr uint32_t TestCases = std::size(Expected);
     EXPECT_EQ(TestCases, static_cast<uint32_t>(BufferMemoryUsage::NH3D_BUFFER_MEMORY_USAGE_MAX));
 
     for (uint32_t i = 0; i < TestCases; ++i) {

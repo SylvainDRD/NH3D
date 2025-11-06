@@ -16,7 +16,7 @@ Window::Window()
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE); // TODO
-    _window = glfwCreateWindow(_width, _height, PROJECT_NAME, nullptr, nullptr);
+    _window = glfwCreateWindow(_width, _height, NH3D_NAME, nullptr, nullptr);
 
     if (!_window) {
         NH3D_ABORT("Window creation failed");

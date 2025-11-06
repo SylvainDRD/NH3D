@@ -89,13 +89,13 @@ VulkanRHI::VulkanRHI(const Window& Window)
     _computePipeline = std::make_unique<VulkanComputePipeline>(
         _device,
         _descriptorSetPoolCompute->getLayout(),
-        PROJECT_DIR "src/rendering/shaders/.cache/gradient.comp.spv");
+        NH3D_DIR "src/rendering/shaders/.cache/gradient.comp.spv");
 
     _graphicsPipeline = std::make_unique<VulkanGraphicsPipeline>(_device,
         nullptr,
         VulkanGraphicsPipeline::ShaderData {
-            .vertexShaderPath = PROJECT_DIR "src/rendering/shaders/.cache/triangle.vert.spv",
-            .fragmentShaderPath = PROJECT_DIR "src/rendering/shaders/.cache/triangle.frag.spv",
+            .vertexShaderPath = NH3D_DIR "src/rendering/shaders/.cache/triangle.vert.spv",
+            .fragmentShaderPath = NH3D_DIR "src/rendering/shaders/.cache/triangle.frag.spv",
             .colorAttachmentFormats { renderTargetsFormat } });
 }
 
@@ -258,10 +258,10 @@ VkInstance VulkanRHI::createVkInstance(std::vector<const char*>&& requiredWindow
 {
     VkApplicationInfo appInfo {
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-        .pApplicationName = PROJECT_NAME,
-        .applicationVersion = VK_MAKE_VERSION(PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR, PROJECT_VERSION_PATCH),
-        .pEngineName = PROJECT_NAME,
-        .engineVersion = VK_MAKE_VERSION(PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR, PROJECT_VERSION_PATCH),
+        .pApplicationName = NH3D_NAME,
+        .applicationVersion = VK_MAKE_VERSION(NH3D_VERSION_MAJOR, NH3D_VERSION_MINOR, NH3D_VERSION_PATCH),
+        .pEngineName = NH3D_NAME,
+        .engineVersion = VK_MAKE_VERSION(NH3D_VERSION_MAJOR, NH3D_VERSION_MINOR, NH3D_VERSION_PATCH),
         .apiVersion = VK_API_VERSION_1_3
     };
 

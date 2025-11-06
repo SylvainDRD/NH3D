@@ -6,7 +6,7 @@
 namespace NH3D {
 
 struct Buffer {
-    using Address = uint32;
+    using Address = uint64;
 
     struct CreateInfo {
         size_t size; // in bytes
