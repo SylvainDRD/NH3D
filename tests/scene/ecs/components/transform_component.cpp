@@ -1,14 +1,12 @@
 #include <gtest/gtest.h>
 #include <misc/math.hpp>
+#include <mock_rhi.hpp>
 #include <scene/ecs/components/transform_component.hpp>
 #include <scene/scene.hpp>
 
 namespace NH3D::Test {
 
-static bool approxEqual(const vec3& a, const vec3& b, float eps = 1e-5f)
-{
-    return length2(a - b) <= eps * eps;
-}
+static bool approxEqual(const vec3& a, const vec3& b, float eps = 1e-5f) { return length2(a - b) <= eps * eps; }
 
 static bool approxEqual(const quat& a, const quat& b, float eps = 1e-5f)
 {
@@ -19,7 +17,8 @@ static bool approxEqual(const quat& a, const quat& b, float eps = 1e-5f)
 
 TEST(TransformComponentTests, TranslatePropagatesAndTargetsSubtree)
 {
-    Scene scene;
+    MockRHI rhi;
+    Scene scene { rhi };
 
     const Entity root = scene.create(TransformComponent {});
     const Entity childA = scene.create(TransformComponent {});
@@ -57,7 +56,8 @@ TEST(TransformComponentTests, TranslatePropagatesAndTargetsSubtree)
 
 TEST(TransformComponentTests, RotatePropagatesAndComposes)
 {
-    Scene scene;
+    MockRHI rhi;
+    Scene scene { rhi };
 
     const Entity root = scene.create(TransformComponent {});
     const Entity childA = scene.create(TransformComponent {});
@@ -104,7 +104,8 @@ TEST(TransformComponentTests, RotatePropagatesAndComposes)
 
 TEST(TransformComponentTests, ScalePropagatesAndComposes)
 {
-    Scene scene;
+    MockRHI rhi;
+    Scene scene { rhi };
 
     const Entity root = scene.create(TransformComponent {});
     const Entity childA = scene.create(TransformComponent {});

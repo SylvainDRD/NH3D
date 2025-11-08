@@ -16,8 +16,9 @@ Engine::~Engine() { }
 
 void Engine::run()
 {
+    Scene scene { *_rhi.get() };
     while (!_window.windowClosing()) {
-        _rhi->render(RenderGraph { Scene("TODO :)") });
+        _rhi->render(scene);
         _window.update();
     }
 }

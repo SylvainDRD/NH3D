@@ -7,6 +7,7 @@
 
 namespace NH3D {
 
+class Scene;
 class RenderGraph;
 class Window;
 
@@ -26,7 +27,7 @@ public:
 
     virtual void destroyBuffer(const Handle<Buffer> handle) = 0;
 
-    virtual void render(const RenderGraph& graph) const = 0;
+    virtual void render(Scene& scene) const = 0;
 
 };
 

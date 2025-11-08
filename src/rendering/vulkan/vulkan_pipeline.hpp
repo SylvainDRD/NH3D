@@ -10,7 +10,7 @@ namespace NH3D {
 class VulkanPipeline {
     NH3D_NO_COPY_MOVE(VulkanPipeline)
 public:
-    VulkanPipeline(VkDevice device, VkDescriptorSetLayout layout);
+    VulkanPipeline(VkDevice device, VkDescriptorSetLayout layout, const std::vector<VkPushConstantRange>& pushConstantRanges = {});
 
     virtual ~VulkanPipeline() = default;
 

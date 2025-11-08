@@ -12,7 +12,7 @@ class VulkanGraphicsPipeline : public VulkanPipeline {
 public:
     struct ShaderData;
 
-    VulkanGraphicsPipeline(VkDevice device, VkDescriptorSetLayout layout, const ShaderData& shaderData);
+    VulkanGraphicsPipeline(VkDevice device, VkDescriptorSetLayout layout, const ShaderData& shaderData, const std::vector<VkPushConstantRange>& pushConstantRanges = {});
 
     void draw(VkCommandBuffer commandBuffer, VkExtent2D extent, const std::vector<VkRenderingAttachmentInfo>& colorAttachments, VkRenderingAttachmentInfo depthAttachment = {}, VkRenderingAttachmentInfo stencilAttachment = {});
 

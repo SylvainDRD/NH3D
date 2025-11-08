@@ -97,6 +97,8 @@ template <NotHierarchyComponent T>
     return getSet<T>().get(entity);
 }
 
+
+
 template <NotHierarchyComponent T, NotHierarchyComponent... Ts>
 [[nodiscard]] inline ComponentView<T, Ts...> SparseSetMap::makeView(const std::vector<ComponentMask>& entityMasks)
 {

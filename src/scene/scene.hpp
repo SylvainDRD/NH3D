@@ -14,37 +14,33 @@
 
 namespace NH3D {
 
+class IRHI;
+
 // TODO: scene cloning for in editor play mode
 class Scene {
     NH3D_NO_COPY_MOVE(Scene)
 public:
-    Scene();
+    Scene(IRHI& rhi);
 
-    Scene(const std::filesystem::path& filePath);
+    Scene(IRHI& rhi, const std::filesystem::path& filePath);
 
     void remove(const Entity entity);
 
     void setParent(const Entity entity, const Entity parent);
 
-    template <NotHierarchyComponent T>
-    [[nodiscard]] inline T& get(const Entity entity);
+    template <NotHierarchyComponent T> [[nodiscard]] inline T& get(const Entity entity);
 
     [[nodiscard]] inline SubtreeView getSubtree(const Entity entity);
 
-    template <NotHierarchyComponent... Ts>
-    inline Entity create(Ts&&... components);
+    template <NotHierarchyComponent... Ts> inline Entity create(Ts&&... components);
 
-    template <NotHierarchyComponent... Ts>
-    inline void add(const Entity entity, Ts&&... components);
+    template <NotHierarchyComponent... Ts> inline void add(const Entity entity, Ts&&... components);
 
-    template <NotHierarchyComponent... Ts>
-    [[nodiscard]] inline bool checkComponents(const Entity entity) const;
+    template <NotHierarchyComponent... Ts> [[nodiscard]] inline bool checkComponents(const Entity entity) const;
 
-    template <NotHierarchyComponent... Ts>
-    inline void clearComponents(const Entity entity);
+    template <NotHierarchyComponent... Ts> inline void clearComponents(const Entity entity);
 
-    template <NotHierarchyComponent T, NotHierarchyComponent... Ts>
-    [[nodiscard]] inline ComponentView<T, Ts...> makeView();
+    template <NotHierarchyComponent T, NotHierarchyComponent... Ts> [[nodiscard]] inline ComponentView<T, Ts...> makeView();
 
     [[nodiscard]] inline bool isLeaf(const Entity entity) const;
 
@@ -64,8 +60,7 @@ private:
     return entity < _entityMasks.size() && (_entityMasks[entity] & SparseSetMap::InvalidEntityMask) == 0;
 }
 
-template <NotHierarchyComponent T>
-[[nodiscard]] inline T& Scene::get(const Entity entity)
+template <NotHierarchyComponent T> [[nodiscard]] inline T& Scene::get(const Entity entity)
 {
     NH3D_ASSERT(isValidEntity(entity), "Attempting to get components of an invalid entity");
     NH3D_ASSERT(checkComponents<T>(entity), "Entity mask is missing requested component");
@@ -78,8 +73,7 @@ template <NotHierarchyComponent T>
     return _hierarchy.getSubtree(entity);
 }
 
-template <NotHierarchyComponent... Ts>
-inline Entity Scene::create(Ts&&... components)
+template <NotHierarchyComponent... Ts> inline Entity Scene::create(Ts&&... components)
 {
     Entity entity;
     if (!_availableEntities.empty()) {
@@ -95,8 +89,7 @@ inline Entity Scene::create(Ts&&... components)
     return entity;
 }
 
-template <NotHierarchyComponent... Ts>
-inline void Scene::add(const Entity entity, Ts&&... components)
+template <NotHierarchyComponent... Ts> inline void Scene::add(const Entity entity, Ts&&... components)
 {
     NH3D_ASSERT(isValidEntity(entity), "Attempting to add components to an invalid entity");
     const ComponentMask mask = _setMap.mask<Ts...>();
@@ -106,15 +99,13 @@ inline void Scene::add(const Entity entity, Ts&&... components)
     _entityMasks[entity] |= mask;
 }
 
-template <NotHierarchyComponent... Ts>
-[[nodiscard]] inline bool Scene::checkComponents(const Entity entity) const
+template <NotHierarchyComponent... Ts> [[nodiscard]] inline bool Scene::checkComponents(const Entity entity) const
 {
     NH3D_ASSERT(isValidEntity(entity), "Attempting to check components of an invalid entity");
     return ComponentMaskUtils::checkComponents(_entityMasks[entity], _setMap.mask<Ts...>());
 }
 
-template <NotHierarchyComponent... Ts>
-inline void Scene::clearComponents(const Entity entity)
+template <NotHierarchyComponent... Ts> inline void Scene::clearComponents(const Entity entity)
 {
     NH3D_ASSERT(isValidEntity(entity), "Attempting to clear components of an invalid entity");
     NH3D_ASSERT(checkComponents<Ts...>(entity), "Entity mask is missing components to delete");
@@ -124,8 +115,7 @@ inline void Scene::clearComponents(const Entity entity)
     _entityMasks[entity] ^= _setMap.mask<Ts...>();
 }
 
-template <NotHierarchyComponent T, NotHierarchyComponent... Ts>
-[[nodiscard]] inline ComponentView<T, Ts...> Scene::makeView()
+template <NotHierarchyComponent T, NotHierarchyComponent... Ts> [[nodiscard]] inline ComponentView<T, Ts...> Scene::makeView()
 {
     return _setMap.makeView<T, Ts...>(_entityMasks);
 }

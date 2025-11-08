@@ -181,6 +181,12 @@ namespace NH3D {
         case BufferUsageFlagBits::DST_TRANSFER_BIT:
             vkFlag |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
             break;
+        case BufferUsageFlagBits::INDEX_BUFFER_BIT:
+            vkFlag |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+            break;
+        case BufferUsageFlagBits::VERTEX_BUFFER_BIT:
+            vkFlag |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+            break;
         case BufferUsageFlagBits::NH3D_BUFFER_USAGE_MAX:
             NH3D_ABORT("Invalid BufferUsageFlagBits set");
         }

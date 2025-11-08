@@ -1,13 +1,15 @@
 #include <gtest/gtest.h>
 #include <misc/types.hpp>
 #include <misc/utils.hpp>
+#include <mock_rhi.hpp>
 #include <scene/scene.hpp>
 
 namespace NH3D::Test {
 
 TEST(ComponentViewTests, IterationTest)
 {
-    Scene scene;
+    MockRHI rhi;
+    Scene scene { rhi };
     scene.create(1, 'a');
     scene.create(2);
     scene.create(3, 'b', 42u);
@@ -69,7 +71,8 @@ TEST(ComponentViewTests, IterationTest)
 
 TEST(ComponentViewTests, EmptyViewTest)
 {
-    Scene scene;
+    MockRHI rhi;
+    Scene scene { rhi };
     scene.create(1);
     scene.create(2);
 
@@ -82,7 +85,8 @@ TEST(ComponentViewTests, EmptyViewTest)
 
 TEST(ComponentViewTests, NonExistentComponentAccess)
 {
-    Scene scene;
+    MockRHI rhi;
+    Scene scene { rhi };
     Entity e = scene.create(1, 'a');
 
     EXPECT_DEATH((void)scene.get<uint32>(e), ".*FATAL.*");
@@ -90,7 +94,8 @@ TEST(ComponentViewTests, NonExistentComponentAccess)
 
 TEST(ComponentViewTests, ViewSkipsRemovedEntities)
 {
-    Scene scene;
+    MockRHI rhi;
+    Scene scene { rhi };
     const Entity e1 = scene.create(1);
     const Entity e2 = scene.create(2);
 

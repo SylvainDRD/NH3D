@@ -11,7 +11,7 @@ function (declare_test path)
     add_executable(${TEST_NAME} ${path})
 
     target_compile_features(${TEST_NAME} PRIVATE ${NH3D_CXX_STANDARD})
-    target_include_directories(${TEST_NAME} PRIVATE ${NH3D_INCLUDES})
+    target_include_directories(${TEST_NAME} PRIVATE ${NH3D_INCLUDES} ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(${TEST_NAME} PRIVATE ${NH3D_LIB} ${NH3D_LIBRARIES} GTest::gtest_main)
     # Force assertions enabled even in release mode
 	target_compile_definitions(${TEST_NAME} PRIVATE NH3D_FORCE_ASSERTS) 

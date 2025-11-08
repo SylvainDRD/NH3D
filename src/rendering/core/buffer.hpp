@@ -12,6 +12,7 @@ struct Buffer {
         size_t size; // in bytes
         BufferUsageFlags usage;
         BufferMemoryUsage memory;
+        const byte* initialData; // optional
     };
 };
 

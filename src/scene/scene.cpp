@@ -13,22 +13,29 @@
 
 namespace NH3D {
 
-Scene::Scene()
+Scene::Scene(IRHI& rhi)
 {
     _entityMasks.reserve(400'000);
     _availableEntities.reserve(2'000);
+
+    create<MeshComponent>(MeshComponent { rhi,
+        {
+            { .position = vec3 { -1.f, 1.f, 0.5f }, .normal = vec3 { 0.0f, 1.0f, 0.0f }, .uv = vec2 { 0.0f, 0.0f } },
+            { .position = vec3 { 1.f, 1.f, 0.5f }, .normal = vec3 { 1.0f, 0.0f, 0.0f }, .uv = vec2 { 1.0f, 0.0f } },
+            { .position = vec3 { 0.f, -1.f, 0.5f }, .normal = vec3 { 0.0f, 0.0f, 1.0f }, .uv = vec2 { 0.5f, 1.0f } },
+        },
+        std::vector<uint32_t> { 0, 1, 2 } });
 }
 
-Scene::Scene(const std::filesystem::path& filePath)
+Scene::Scene(IRHI& rhi, const std::filesystem::path& filePath)
 {
     _entityMasks.reserve(400'000);
     _availableEntities.reserve(2'000);
 
-    // TODO: pre-allocate a loading struct with strings for errors & warnings/tinygltf::Model/vectors for mesh data pre-allocated
+    // TODO: pre-allocate a loading struct with strings for errors & warnings/tinygltf::Model/vectors for mesh data pre-allocated 
 }
 
 namespace _private {
-
     using namespace tinygltf;
 
     std::pair<std::vector<VertexData>, std::vector<uint32_t>> loadGLBMeshData(const std::filesystem::path& glbPath)
@@ -81,5 +88,4 @@ void Scene::setParent(const Entity entity, const Entity parent)
     NH3D_ASSERT(entity != InvalidEntity, "Unexpected invalid entity");
     _hierarchy.setParent(entity, parent);
 }
-
 }

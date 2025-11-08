@@ -2,8 +2,8 @@
 
 namespace NH3D {
 
-VulkanGraphicsPipeline::VulkanGraphicsPipeline(VkDevice device, VkDescriptorSetLayout layout, const ShaderData& shaderData)
-    : VulkanPipeline { device, layout }
+VulkanGraphicsPipeline::VulkanGraphicsPipeline(VkDevice device, VkDescriptorSetLayout layout, const ShaderData& shaderData, const std::vector<VkPushConstantRange>& pushConstantRanges)
+    : VulkanPipeline { device, layout, pushConstantRanges }
 {
     VkPipelineVertexInputStateCreateInfo vertexCI { .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
 
@@ -56,7 +56,7 @@ VulkanGraphicsPipeline::VulkanGraphicsPipeline(VkDevice device, VkDescriptorSetL
 
     VkPipelineColorBlendStateCreateInfo blendCI {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-        .logicOpEnable = VK_FALSE, // TODO: hmmmm
+        .logicOpEnable = VK_FALSE, // TODO: mmmmh
         .logicOp = VK_LOGIC_OP_COPY,
         .attachmentCount = 1,
         .pAttachments = &blendAttachment

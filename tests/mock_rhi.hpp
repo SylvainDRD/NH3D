@@ -21,7 +21,7 @@ public:
 
     virtual void destroyBuffer(const Handle<Buffer> handle) override { }
 
-    virtual void render(const RenderGraph& graph) const override { }
+    virtual void render(Scene& scene) const override { }
 };
 
 }

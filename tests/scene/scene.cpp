@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <mock_rhi.hpp>
 #include <scene/ecs/entity.hpp>
 #include <scene/scene.hpp>
 
@@ -6,7 +7,8 @@ namespace NH3D::Test {
 
 TEST(SceneTests, CreateTest)
 {
-    Scene scene;
+    MockRHI rhi;
+    Scene scene { rhi };
     EXPECT_DEATH((void)scene.get<int>(0), ".*FATAL.*");
 
     const Entity e = scene.create(3, 'a');
@@ -22,7 +24,8 @@ TEST(SceneTests, CreateTest)
 
 TEST(SceneTests, AddTest)
 {
-    Scene scene;
+    MockRHI rhi;
+    Scene scene { rhi };
     const Entity e1 = scene.create('a');
     const Entity e2 = scene.create('b');
 
@@ -35,7 +38,8 @@ TEST(SceneTests, AddTest)
 
 TEST(SceneTests, HasTest)
 {
-    Scene scene;
+    MockRHI rhi;
+    Scene scene { rhi };
     const Entity e1 = scene.create('a', 2);
     const Entity e2 = scene.create('b', true);
 
@@ -60,7 +64,8 @@ TEST(SceneTests, HasTest)
 
 TEST(SceneTests, ClearComponentTest)
 {
-    Scene scene;
+    MockRHI rhi;
+    Scene scene { rhi };
     const Entity e = scene.create('a', 2);
 
     scene.clearComponents<char>(e);
@@ -73,7 +78,8 @@ TEST(SceneTests, ClearComponentTest)
 
 TEST(SceneTests, RemoveTest)
 {
-    Scene scene;
+    MockRHI rhi;
+    Scene scene { rhi };
     const Entity e = scene.create('a', 2);
 
     scene.remove(e);
@@ -87,7 +93,8 @@ TEST(SceneTests, RemoveTest)
 
 TEST(SceneTests, ClearAndReAddComponentTest)
 {
-    Scene scene;
+    MockRHI rhi;
+    Scene scene { rhi };
     const Entity e = scene.create('a', 2);
 
     scene.clearComponents<char>(e);
@@ -102,7 +109,8 @@ TEST(SceneTests, ClearAndReAddComponentTest)
 
 TEST(SceneTests, AddOnInvalidEntityDies)
 {
-    Scene scene;
+    MockRHI rhi;
+    Scene scene { rhi };
     const Entity e = scene.create(1);
 
     scene.remove(e);
@@ -112,7 +120,8 @@ TEST(SceneTests, AddOnInvalidEntityDies)
 
 TEST(SceneTests, IsLeaf)
 {
-    Scene scene;
+    MockRHI rhi;
+    Scene scene { rhi };
     const Entity parent = scene.create(0);
     const Entity child1 = scene.create(1);
     const Entity child2 = scene.create(2);
@@ -142,7 +151,8 @@ TEST(SceneTests, IsLeaf)
 
 TEST(SceneTests, GetSubtreeInvalidEntityDies)
 {
-    Scene scene;
+    MockRHI rhi;
+    Scene scene { rhi };
     EXPECT_DEATH((void)scene.getSubtree(0), ".*FATAL.*");
 
     const Entity e = scene.create(1);

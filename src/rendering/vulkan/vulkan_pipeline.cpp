@@ -8,13 +8,13 @@
 
 namespace NH3D {
 
-VulkanPipeline::VulkanPipeline(VkDevice device, VkDescriptorSetLayout layout)
+VulkanPipeline::VulkanPipeline(VkDevice device, VkDescriptorSetLayout layout, const std::vector<VkPushConstantRange>& pushConstantRanges)
 {
-    VkPipelineLayoutCreateInfo layoutCreateInfo {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+    VkPipelineLayoutCreateInfo layoutCreateInfo { .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .setLayoutCount = layout != nullptr ? 1u : 0u,
-        .pSetLayouts = &layout
-    };
+        .pSetLayouts = &layout,
+        .pPushConstantRanges = pushConstantRanges.data(),
+        .pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size()) };
 
     if (vkCreatePipelineLayout(device, &layoutCreateInfo, nullptr, &_pipelineLayout) != VK_SUCCESS) {
         NH3D_ABORT_VK("Failed to create the pipeline layout");
@@ -57,9 +57,7 @@ bool VulkanPipeline::loadShader(VkDevice device, const std::filesystem::path& pa
     file.close();
 
     VkShaderModuleCreateInfo moduleCreateInfo {
-        .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-        .codeSize = size,
-        .pCode = reinterpret_cast<uint32_t*>(buffer.data())
+        .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO, .codeSize = size, .pCode = reinterpret_cast<uint32_t*>(buffer.data())
     };
 
     return vkCreateShaderModule(device, &moduleCreateInfo, nullptr, &module) == VK_SUCCESS;

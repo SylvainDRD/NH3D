@@ -36,6 +36,3 @@
 .vscode/
 build
 .cache/
-
-# Shaders compilation cache
-src/renderer/shaders/.cache/

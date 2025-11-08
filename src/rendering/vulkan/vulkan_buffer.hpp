@@ -1,7 +1,7 @@
 #pragma once
 
-#include <misc/utils.hpp>
 #include <misc/types.hpp>
+#include <misc/utils.hpp>
 #include <rendering/core/buffer.hpp>
 #include <rendering/core/rhi.hpp>
 #include <vk_mem_alloc.h>
@@ -11,11 +11,15 @@ namespace NH3D {
 
 class VulkanRHI;
 
+// TODO: manage memory property
 struct VulkanBuffer {
     // TODO
     using ResourceType = Buffer;
 
-    using Hot = VkBuffer;
+    struct Buffer {
+        VkBuffer buffer;
+    };
+    using Hot = Buffer;
 
     struct Allocation {
         VmaAllocation allocation;
@@ -23,14 +27,18 @@ struct VulkanBuffer {
     };
     using Cold = Allocation;
 
-    static std::pair<VkBuffer, Allocation> create(const VulkanRHI& rhi, size_t size, VkBufferUsageFlags usageFlags, VmaMemoryUsage memoryUsage);
+    static std::pair<VulkanBuffer::Buffer, Allocation> create(const VulkanRHI& rhi, const size_t size, const VkBufferUsageFlags usageFlags,
+        const VmaMemoryUsage memoryUsage, const void* initialData);
 
     // Used generically by the ResourceManager, must be API agnostic, non-const ref for invalidation
-    static void release(const IRHI& rhi, VkBuffer& buffer, Allocation& allocation);
+    static void release(const IRHI& rhi, Buffer& buffer, Allocation& allocation);
 
     // Used generically by the ResourceManager, must be API agnostic
-    [[nodiscard]] static inline bool valid(const VkBuffer& buffer, const Allocation& allocation) { return buffer != nullptr; }
-    
+    [[nodiscard]] static inline bool valid(const Buffer& buffer, const Allocation& allocation) { return buffer.buffer != nullptr; }
+
+    [[nodiscard]] static VkDeviceAddress getDeviceAddress(const VulkanRHI& rhi, const Buffer& buffer);
+
+    // TODO: mapping & co
 };
 
 }

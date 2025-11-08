@@ -23,9 +23,7 @@
 
 namespace NH3D {
 
-class Window;
-template <uint32_t>
-class VulkanDescriptorSetPool;
+template <uint32_t> class VulkanDescriptorSetPool;
 class VulkanComputePipeline;
 class VulkanGraphicsPipeline;
 
@@ -44,15 +42,17 @@ public:
 
     inline VkCommandBuffer getCommandBuffer() const { return _commandBuffers[_frameId % MaxFramesInFlight]; }
 
+    void executeImmediateCommandBuffer(const std::function<void(VkCommandBuffer)>& recordFunction) const;
+
     virtual Handle<Texture> createTexture(const Texture::CreateInfo& info) override;
 
     virtual void destroyTexture(const Handle<Texture> handle) override;
-    
+
     virtual Handle<Buffer> createBuffer(const Buffer::CreateInfo& info) override;
 
     virtual void destroyBuffer(const Handle<Buffer> handle) override;
 
-    virtual void render(const RenderGraph& graph) const override;
+    virtual void render(Scene& scene) const override;
 
 private:
     struct PhysicalDeviceQueueFamilyID {
@@ -62,7 +62,8 @@ private:
         bool isValid() const { return GraphicsQueueFamilyID != NH3D_MAX_T(uint32_t) && PresentQueueFamilyID != NH3D_MAX_T(uint32_t); }
     };
 
-    Handle<Texture> createTexture(VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, VkImageAspectFlags aspect, bool generateMipMaps);
+    Handle<Texture> createTexture(
+        VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, VkImageAspectFlags aspect, bool generateMipMaps);
 
     VkInstance createVkInstance(std::vector<const char*>&& requiredWindowExtensions) const;
 
@@ -72,7 +73,8 @@ private:
 
     VkDevice createLogicalDevice(VkPhysicalDevice gpu, PhysicalDeviceQueueFamilyID queues) const;
 
-    std::pair<VkSwapchainKHR, VkFormat> createSwapchain(VkDevice device, VkPhysicalDevice gpu, VkSurfaceKHR surface, PhysicalDeviceQueueFamilyID queues, VkExtent2D extent, VkSwapchainKHR previousSwapchain = nullptr) const;
+    std::pair<VkSwapchainKHR, VkFormat> createSwapchain(VkDevice device, VkPhysicalDevice gpu, VkSurfaceKHR surface,
+        PhysicalDeviceQueueFamilyID queues, VkExtent2D extent, VkSwapchainKHR previousSwapchain = nullptr) const;
 
     VkCommandPool createCommandPool(VkDevice device, uint32_t queueFamilyIndex) const;
 
@@ -86,7 +88,8 @@ private:
 
     VkSemaphoreSubmitInfo makeSemaphoreSubmitInfo(VkSemaphore semaphore, VkPipelineStageFlags2 stageMask) const;
 
-    void submitCommandBuffer(VkQueue queue, const VkSemaphoreSubmitInfo& waitSemaphore, const VkSemaphoreSubmitInfo& signalSemaphore, VkCommandBuffer commandBuffer, VkFence fence) const;
+    void submitCommandBuffer(VkQueue queue, const VkSemaphoreSubmitInfo& waitSemaphore, const VkSemaphoreSubmitInfo& signalSemaphore,
+        VkCommandBuffer commandBuffer, VkFence fence) const;
 
     VmaAllocator createVMAAllocator(VkInstance instance, VkPhysicalDevice gpu, VkDevice device) const;
 
@@ -109,6 +112,9 @@ private:
     std::vector<Handle<Texture>> _swapchainTextures;
 
     VkCommandPool _commandPool;
+    VkCommandPool _immediateCommandPool;
+    VkCommandBuffer _immediateCommandBuffer;
+    VkFence _immediateCommandFence;
 
     static constexpr uint32_t MaxFramesInFlight = 2;
     std::array<VkCommandBuffer, MaxFramesInFlight> _commandBuffers;
