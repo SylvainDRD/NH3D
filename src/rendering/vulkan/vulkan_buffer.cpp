@@ -34,7 +34,7 @@ std::pair<VulkanBuffer::Buffer, VulkanBuffer::Allocation> VulkanBuffer::create(
 
             rhi.executeImmediateCommandBuffer([size, stagingBuffer, buffer](VkCommandBuffer cmdBuffer) {
                 // Copy from staging buffer to the actual buffer
-                VkBufferCopy copyRegion { .size = size };
+                VkBufferCopy copyRegion { .size = size};
                 vkCmdCopyBuffer(cmdBuffer, stagingBuffer.buffer, buffer, 1, &copyRegion);
             });
 

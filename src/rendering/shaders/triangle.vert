@@ -5,9 +5,9 @@ layout (location = 0) out vec3 outColor;
 
 struct VertexInput 
 {
-	vec3 position;
-	vec3 normal;
-	vec2 uv;
+	vec4 position;
+	vec4 normal;
+	vec4 uv;
 };
 
 layout(buffer_reference, std430) readonly buffer VertexBuffer 
@@ -23,6 +23,6 @@ layout(push_constant) uniform PushConstants
 void main() 
 {
 	// output the position of each vertex
-	gl_Position = vec4(pushConstants.vertexBuffer.vertices[gl_VertexIndex].position, 1.0f);
-	outColor = pushConstants.vertexBuffer.vertices[gl_VertexIndex].normal;
+	gl_Position = pushConstants.vertexBuffer.vertices[gl_VertexIndex].position;
+	outColor = pushConstants.vertexBuffer.vertices[gl_VertexIndex].normal.xyz;
 }

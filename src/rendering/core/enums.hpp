@@ -79,8 +79,8 @@ enum BufferUsageFlagBits : uint32_t {
     STORAGE_BUFFER_BIT = 1U << 0,
     SRC_TRANSFER_BIT = 1U << 1,
     DST_TRANSFER_BIT = 1U << 2,
-    INDEX_BUFFER_BIT = 1U << 3,
-    VERTEX_BUFFER_BIT = 1U << 4,
+    VERTEX_BUFFER_BIT = 1U << 3,
+    INDEX_BUFFER_BIT = 1U << 4,
     NH3D_BUFFER_USAGE_MAX = 1U << 5
 };
 

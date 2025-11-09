@@ -67,6 +67,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
 
     _immediateCommandPool = createCommandPool(_device, queues.GraphicsQueueFamilyID);
     allocateCommandBuffers(_device, _immediateCommandPool, 1, &_immediateCommandBuffer);
+    _immediateCommandFence = createFence(_device, false);
 
     _renderSemaphores.resize(swapchainImageCount);
     for (uint32_t i = 0; i < _renderSemaphores.size(); ++i) {
@@ -76,7 +77,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
     const VkFormat renderTargetsFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
     for (uint32_t i = 0; i < MaxFramesInFlight; ++i) {
         _presentSemaphores[i] = createSemaphore(_device);
-        _frameFences[i] = createFence(_device);
+        _frameFences[i] = createFence(_device, true);
 
         _renderTargets[i] = createTexture(renderTargetsFormat, { Window.getWidth(), Window.getHeight(), 1 },
             static_cast<VkImageUsageFlags>(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT
@@ -119,6 +120,7 @@ VulkanRHI::~VulkanRHI()
         vkDestroySemaphore(_device, _renderSemaphores[i], nullptr);
     }
 
+    vkDestroyFence(_device, _immediateCommandFence, nullptr);
     vkDestroyCommandPool(_device, _immediateCommandPool, nullptr);
     vkDestroyCommandPool(_device, _commandPool, nullptr);
 
@@ -179,7 +181,6 @@ Handle<Buffer> VulkanRHI::createBuffer(const Buffer::CreateInfo& info)
 
 void VulkanRHI::destroyBuffer(const Handle<Buffer> handle) { _resourceManager.release<VulkanBuffer>(*this, handle); }
 
-// TODO: update pipeline to take push constants & pass push constants to pipeline
 void VulkanRHI::render(Scene& scene) const
 {
     const uint32_t frameInFlightId = _frameId % MaxFramesInFlight;
@@ -531,9 +532,9 @@ VkSemaphore VulkanRHI::createSemaphore(VkDevice device) const
     return semaphore;
 }
 
-VkFence VulkanRHI::createFence(VkDevice device) const
+VkFence VulkanRHI::createFence(VkDevice device, bool signaled) const
 {
-    VkFenceCreateInfo fenceCreateInfo { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags = VK_FENCE_CREATE_SIGNALED_BIT };
+    VkFenceCreateInfo fenceCreateInfo { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags = signaled ? VK_FENCE_CREATE_SIGNALED_BIT : VkFenceCreateFlags{} };
 
     VkFence fence;
     if (vkCreateFence(device, &fenceCreateInfo, nullptr, &fence) != VK_SUCCESS) {

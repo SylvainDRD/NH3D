@@ -10,9 +10,10 @@
 namespace NH3D {
 
 struct VertexData {
-    vec3 position;
-    vec3 normal;
+    vec4 position;
+    vec4 normal;
     vec2 uv;
+    vec2 __padding; // Padding to make the size a multiple of 16 bytes
 };
 
 struct MeshComponent {

@@ -82,7 +82,7 @@ private:
 
     VkSemaphore createSemaphore(VkDevice device) const;
 
-    VkFence createFence(VkDevice device) const;
+    VkFence createFence(VkDevice device, bool signaled) const;
 
     void beginCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferUsageFlags flags, bool resetCommandBuffer = true) const;
 

@@ -18,11 +18,12 @@ Scene::Scene(IRHI& rhi)
     _entityMasks.reserve(400'000);
     _availableEntities.reserve(2'000);
 
+    // Debug only
     create<MeshComponent>(MeshComponent { rhi,
         {
-            { .position = vec3 { -1.f, 1.f, 0.5f }, .normal = vec3 { 0.0f, 1.0f, 0.0f }, .uv = vec2 { 0.0f, 0.0f } },
-            { .position = vec3 { 1.f, 1.f, 0.5f }, .normal = vec3 { 1.0f, 0.0f, 0.0f }, .uv = vec2 { 1.0f, 0.0f } },
-            { .position = vec3 { 0.f, -1.f, 0.5f }, .normal = vec3 { 0.0f, 0.0f, 1.0f }, .uv = vec2 { 0.5f, 1.0f } },
+            { .position = vec4 { -1.f, 1.f, 0.f, 1.f }, .normal = vec4 { 1.0f, 0.0f, 0.0f, 0.0f }, .uv = vec2 { 1.0f, 0.0f } },
+            { .position = vec4 { 1.f, 1.f, 0.f, 1.f }, .normal = vec4 { 0.0f, 1.0f, 0.0f, 0.0f }, .uv = vec2 { 0.0f, 0.0f } },
+            { .position = vec4 { 0.f, -1.f, 0.f, 1.f }, .normal = vec4 { 0.0f, 0.0f, 1.0f, 0.0f }, .uv = vec2 { 0.5f, 1.0f } },
         },
         std::vector<uint32_t> { 0, 1, 2 } });
 }
