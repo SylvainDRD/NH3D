@@ -8,6 +8,9 @@
 
 namespace NH3D {
 
+struct VulkanShader : public VulkanPipeline {
+    using ResourceType = Shader;
+
 struct ShaderInfo {
     std::filesystem::path vertexShaderPath;
     std::filesystem::path fragmentShaderPath;
@@ -16,26 +19,22 @@ struct ShaderInfo {
     VkFormat stencilAttachmentFormat;
 };
 
-struct VulkanShader : public VulkanPipeline {
-    using ResourceType = Shader;
-
-    using Hot = VkPipeline;
-
-    using Cold = VkPipelineLayout;
-
     /// "Constructor"
-    [[nodiscard]] static std::pair<VkPipeline, VkPipelineLayout> create(VkDevice device, VkDescriptorSetLayout layout,
+    [[nodiscard]] static std::pair<Pipeline, PipelineLayout> create(VkDevice device, const VkDescriptorSetLayout layout,
         const ShaderInfo& shaderInfo, const std::vector<VkPushConstantRange>& pushConstantRanges = {});
 
+    // "Destructor": used generically by the ResourceManager, must be API agnostic, non-const ref for invalidation
+    static void release(const IRHI& rhi, Pipeline& pipeline, PipelineLayout& pipelineLayout);
+
     // Used generically by the ResourceManager, must be API agnostic
-    [[nodiscard]] static inline bool valid(const VkPipeline pipeline, const VkPipelineLayout layout)
+    [[nodiscard]] static inline bool valid(const Pipeline pipeline, const PipelineLayout layout)
     {
-        return pipeline != nullptr && layout != nullptr;
+        return pipeline.pipeline != nullptr && layout.layout != nullptr;
     }
 
-    static inline void draw(VkCommandBuffer commandBuffer, VkPipeline pipeline, VkExtent2D extent,
-        const std::vector<VkRenderingAttachmentInfo>& colorAttachments, VkRenderingAttachmentInfo depthAttachment = {},
-        VkRenderingAttachmentInfo stencilAttachment = {});
+    static void draw(VkCommandBuffer commandBuffer, const Pipeline pipeline, const VkExtent2D extent,
+        const std::vector<VkRenderingAttachmentInfo>& colorAttachments, const VkRenderingAttachmentInfo depthAttachment = {},
+        const VkRenderingAttachmentInfo stencilAttachment = {});
 };
 
 }

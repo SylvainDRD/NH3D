@@ -21,26 +21,26 @@ struct VulkanTexture {
     };
     using Hot = ImageView;
 
-    struct Meta {
+    struct Metadata {
         VkFormat format;
         VkExtent3D extent;
         VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
         VmaAllocation allocation = nullptr;
     };
-    using Cold = Meta;
+    using Cold = Metadata;
 
     /// "Constructors / Destructors"
-    [[nodiscard]] static std::pair<ImageView, Meta> create(
+    [[nodiscard]] static std::pair<ImageView, Metadata> create(
         const VulkanRHI& rhi, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, VkImageAspectFlags aspect, bool generateMipMaps);
 
-    [[nodiscard]] static std::pair<ImageView, Meta> wrapSwapchainImage(
+    [[nodiscard]] static std::pair<ImageView, Metadata> wrapSwapchainImage(
         const VulkanRHI& rhi, VkImage image, VkFormat format, VkExtent3D extent, VkImageAspectFlags aspect);
 
     // Used generically by the ResourceManager, must be API agnostic, non-const ref for invalidation
-    static void release(const IRHI& rhi, ImageView& imageViewData, Meta& metadata);
+    static void release(const IRHI& rhi, ImageView& imageViewData, Metadata& metadata);
 
     // Used generically by the ResourceManager, must be API agnostic
-    [[nodiscard]] static inline bool valid(const ImageView& imageViewData, const Meta& metadata)
+    [[nodiscard]] static inline bool valid(const ImageView& imageViewData, const Metadata& metadata)
     {
         return imageViewData.image != nullptr && imageViewData.view != nullptr;
     }

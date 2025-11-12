@@ -11,18 +11,20 @@ namespace NH3D {
 struct VulkanComputeShader : public VulkanPipeline {
     using ResourceType = ComputeShader;
 
-    using Hot = VkPipeline;
-
-    using Cold = VkPipelineLayout;
-
     /// "Constructor"
-    [[nodiscard]] static std::pair<VkPipeline, VkPipelineLayout> create(const VkDevice device, const VkDescriptorSetLayout layout,
+    [[nodiscard]] static std::pair<Pipeline, PipelineLayout> create(const VkDevice device, const VkDescriptorSetLayout layout,
         const std::filesystem::path& computeShaderPath, const std::vector<VkPushConstantRange>& pushConstantRanges = {});
 
-    // Used generically by the ResourceManager, must be API agnostic
-    [[nodiscard]] static inline bool valid(const VkPipeline pipeline, const VkPipelineLayout layout) { return pipeline != nullptr && layout != nullptr; }
+    // "Destructor": used generically by the ResourceManager, must be API agnostic, non-const ref for invalidation
+    static void release(const IRHI& rhi, Pipeline& pipeline, PipelineLayout& pipelineLayout);
 
-    static inline void dispatch(VkCommandBuffer commandBuffer, const VkPipeline pipeline, const vec3i kernelSize);
+    // Used generically by the ResourceManager, must be API agnostic
+    [[nodiscard]] static inline bool valid(const Pipeline pipeline, const PipelineLayout layout)
+    {
+        return pipeline.pipeline != nullptr && layout.layout != nullptr;
+    }
+
+    static void dispatch(VkCommandBuffer commandBuffer, const Pipeline pipeline, const vec3i kernelSize);
 };
 
 }

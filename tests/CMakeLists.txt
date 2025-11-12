@@ -21,7 +21,6 @@ endfunction()
 
 if(${Vulkan_FOUND})
     declare_test(rendering/core/resource_manager.cpp)
-    declare_test(rendering/core/split_pool.cpp)
     declare_test(rendering/vulkan/enums.cpp)
     declare_test(scene/ecs/component_view.cpp)
     declare_test(scene/ecs/sparse_set_map.cpp)

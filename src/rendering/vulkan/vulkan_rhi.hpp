@@ -27,9 +27,6 @@ namespace NH3D {
 class VulkanRHI : public IRHI {
     NH3D_NO_COPY_MOVE(VulkanRHI)
 public:
-    static constexpr uint32_t MaxFramesInFlight = 2;
-
-public:
     VulkanRHI() = delete;
 
     VulkanRHI(const Window& _window);
@@ -128,6 +125,11 @@ private:
     mutable ResourceManager<VulkanShader> _shaderManager;
     mutable ResourceManager<VulkanComputeShader> _computeShaderManager;
     mutable ResourceManager<VulkanBindGroup> _bindGroupManager;
+
+    // TODO: replace by a proper render loop
+    Handle<Shader> _graphicsShader;
+    Handle<ComputeShader> _computeShader;
+    Handle<BindGroup> _computeBindGroup;
 
     mutable uint32_t _frameId = 1;
 };

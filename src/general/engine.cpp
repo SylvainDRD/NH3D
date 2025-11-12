@@ -1,6 +1,5 @@
 #include "engine.hpp"
 #include <memory>
-#include <rendering/render_graph/render_graph.hpp>
 #include <rendering/vulkan/vulkan_rhi.hpp>
 #include <scene/scene.hpp>
 

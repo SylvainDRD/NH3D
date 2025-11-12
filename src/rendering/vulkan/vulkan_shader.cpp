@@ -2,8 +2,8 @@
 
 namespace NH3D {
 
-[[nodiscard]] std::pair<VkPipeline, VkPipelineLayout> VulkanShader::create(
-    VkDevice device, VkDescriptorSetLayout layout, const ShaderInfo& shaderInfo, const std::vector<VkPushConstantRange>& pushConstantRanges)
+[[nodiscard]] std::pair<VulkanPipeline::Pipeline, VulkanPipeline::PipelineLayout> VulkanShader::create(VkDevice device,
+    const VkDescriptorSetLayout layout, const ShaderInfo& shaderInfo, const std::vector<VkPushConstantRange>& pushConstantRanges)
 {
     const VkPipelineLayout pipelineLayout = createPipelineLayout(device, layout, pushConstantRanges);
 
@@ -98,12 +98,17 @@ namespace NH3D {
     vkDestroyShaderModule(device, vertexShader, nullptr);
     vkDestroyShaderModule(device, fragmentShader, nullptr);
 
-    return { pipeline, pipelineLayout };
+    return { { pipeline }, { pipelineLayout } };
 }
 
-void VulkanShader::draw(VkCommandBuffer commandBuffer, VkPipeline pipeline, VkExtent2D extent,
-    const std::vector<VkRenderingAttachmentInfo>& attachments, VkRenderingAttachmentInfo depthAttachment,
-    VkRenderingAttachmentInfo stencilAttachment)
+void VulkanShader::release(const IRHI& rhi, Pipeline& pipeline, PipelineLayout& pipelineLayout)
+{
+    VulkanPipeline::release(rhi, pipeline, pipelineLayout);
+}
+
+void VulkanShader::draw(VkCommandBuffer commandBuffer, const Pipeline pipeline, const VkExtent2D extent,
+    const std::vector<VkRenderingAttachmentInfo>& attachments, const VkRenderingAttachmentInfo depthAttachment,
+    const VkRenderingAttachmentInfo stencilAttachment)
 {
     VkRenderingInfo renderingInfo {
         .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
@@ -116,7 +121,7 @@ void VulkanShader::draw(VkCommandBuffer commandBuffer, VkPipeline pipeline, VkEx
     };
 
     vkCmdBeginRendering(commandBuffer, &renderingInfo);
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipeline);
 
     VkViewport viewport
         = { .x = 0, .y = 0, .width = float(extent.width), .height = float(extent.height), .minDepth = 0.f, .maxDepth = 1.f };

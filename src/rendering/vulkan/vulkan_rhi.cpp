@@ -8,7 +8,6 @@
 #include <misc/utils.hpp>
 #include <rendering/core/buffer.hpp>
 #include <rendering/core/resource_manager.hpp>
-#include <rendering/render_graph/render_graph.hpp>
 #include <rendering/vulkan/vulkan_enums.hpp>
 #include <scene/ecs/components/render_component.hpp>
 #include <scene/scene.hpp>
@@ -21,6 +20,11 @@ namespace NH3D {
 
 VulkanRHI::VulkanRHI(const Window& Window)
     : IRHI {}
+    , _textureManager { 1000, 100 }
+    , _bufferManager { 10000, 400 }
+    , _shaderManager { 100, 10 }
+    , _computeShaderManager { 100, 10 }
+    , _bindGroupManager { 200, 20 }
 {
     _instance = createVkInstance(Window.requiredVulkanExtensions());
 
@@ -54,7 +58,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
     for (int i = 0; i < swapchainImageCount; ++i) {
         auto&& [imageViewData, metadata] = VulkanTexture::wrapSwapchainImage(std::cref(*this), swapchainImages[i], surfaceFormat,
             VkExtent3D { Window.getWidth(), Window.getHeight(), 1 }, VK_IMAGE_ASPECT_COLOR_BIT);
-        _swapchainTextures[i] = _resourceManager.store<VulkanTexture>(std::move(imageViewData), std::move(metadata));
+        _swapchainTextures[i] = _textureManager.store(std::move(imageViewData), std::move(metadata));
     }
 
     _commandPool = createCommandPool(_device, queues.GraphicsQueueFamilyID);
@@ -80,31 +84,34 @@ VulkanRHI::VulkanRHI(const Window& Window)
             VK_IMAGE_ASPECT_COLOR_BIT, true);
     }
 
-    _descriptorSetPoolCompute = std::make_unique<VulkanBindGroup>(
-        _device, VK_SHADER_STAGE_COMPUTE_BIT, std::initializer_list<VkDescriptorType> { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE }, 1000);
+    auto [descriptorSets, metadata] = VulkanBindGroup::create(
+        _device, VK_SHADER_STAGE_COMPUTE_BIT, std::initializer_list<VkDescriptorType> { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE });
+    _computeBindGroup = _bindGroupManager.store(std::move(descriptorSets), std::move(metadata));
 
-    _computePipeline = std::make_unique<VulkanComputeShader>(
-        _device, _descriptorSetPoolCompute->getLayout(), NH3D_DIR "src/rendering/shaders/gradient.comp.spv");
+    auto [computeShader, computeLayout]
+        = VulkanComputeShader::create(_device, metadata.layout, NH3D_DIR "src/rendering/shaders/gradient.comp.spv");
+    _computeShader = _computeShaderManager.store(std::move(computeShader), std::move(computeLayout));
 
     VkPushConstantRange pushConstantRange { .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .offset = 0, .size = sizeof(uint64) };
 
     // TODO: also watch out for tiny vector allocs, though it's probably fine since it's only at load time
-    _graphicsPipeline = std::make_unique<VulkanShader>(_device, nullptr,
+    auto [shader, layout] = VulkanShader::create(_device, nullptr,
         VulkanShader::ShaderInfo { .vertexShaderPath = NH3D_DIR "src/rendering/shaders/triangle.vert.spv",
             .fragmentShaderPath = NH3D_DIR "src/rendering/shaders/triangle.frag.spv",
             .colorAttachmentFormats = { renderTargetsFormat } },
         std::vector<VkPushConstantRange> { pushConstantRange });
+    _graphicsShader = _shaderManager.store(std::move(shader), std::move(layout));
 }
 
 VulkanRHI::~VulkanRHI()
 {
     vkDeviceWaitIdle(_device);
 
-    _descriptorSetPoolCompute->releasePool(_device);
-    _computePipeline->release(_device);
-    _graphicsPipeline->release(_device);
-
-    _resourceManager.clear(*this);
+    _textureManager.clear(*this);
+    _bufferManager.clear(*this);
+    _shaderManager.clear(*this);
+    _computeShaderManager.clear(*this);
+    _bindGroupManager.clear(*this);
 
     for (uint32_t i = 0; i < MaxFramesInFlight; ++i) {
         vkDestroyFence(_device, _frameFences[i], nullptr);
@@ -161,20 +168,20 @@ Handle<Texture> VulkanRHI::createTexture(
 {
     auto&& [imageViewData, metadata] = VulkanTexture::create(*this, format, extent, usage, aspect, generateMipMaps);
 
-    return _resourceManager.store<VulkanTexture>(std::move(imageViewData), std::move(metadata));
+    return _textureManager.store(std::move(imageViewData), std::move(metadata));
 }
 
-void VulkanRHI::destroyTexture(const Handle<Texture> handle) { _resourceManager.release<VulkanTexture>(*this, handle); }
+void VulkanRHI::destroyTexture(const Handle<Texture> handle) { _textureManager.release(*this, handle); }
 
 Handle<Buffer> VulkanRHI::createBuffer(const Buffer::CreateInfo& info)
 {
     auto&& [buffer, allocation]
         = VulkanBuffer::create(*this, info.size, MapBufferUsageFlags(info.usage), MapBufferMemoryUsage(info.memory), info.initialData);
 
-    return _resourceManager.store<VulkanBuffer>(std::move(buffer), std::move(allocation));
+    return _bufferManager.store(std::move(buffer), std::move(allocation));
 }
 
-void VulkanRHI::destroyBuffer(const Handle<Buffer> handle) { _resourceManager.release<VulkanBuffer>(*this, handle); }
+void VulkanRHI::destroyBuffer(const Handle<Buffer> handle) { _bufferManager.release(*this, handle); }
 
 void VulkanRHI::render(Scene& scene) const
 {
@@ -196,39 +203,50 @@ void VulkanRHI::render(Scene& scene) const
 
     beginCommandBuffer(commandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
-    const auto& rtImageViewData = _resourceManager.getHotData<VulkanTexture>(_renderTargets[frameInFlightId]);
-    auto& rtMetadata = _resourceManager.getColdData<VulkanTexture>(_renderTargets[frameInFlightId]);
+    const auto& rtImageViewData = _textureManager.get<VulkanTexture::ImageView>(_renderTargets[frameInFlightId]);
+    auto& rtMetadata = _textureManager.get<VulkanTexture::Metadata>(_renderTargets[frameInFlightId]);
     VulkanTexture::changeLayoutBarrier(commandBuffer, rtImageViewData.image, rtMetadata.layout, VK_IMAGE_LAYOUT_GENERAL);
 
-    VkDescriptorSet descriptorSet = _descriptorSetPoolCompute->getDescriptorSet(_device, frameInFlightId);
+    const VulkanBindGroup::DescriptorSets& computeDescriptorSets
+        = _bindGroupManager.get<VulkanBindGroup::DescriptorSets>(_computeBindGroup);
+    const VulkanBindGroup::Metadata& computeBindGroupMetadata = _bindGroupManager.get<VulkanBindGroup::Metadata>(_computeBindGroup);
+    VkDescriptorSet descriptorSet = VulkanBindGroup::getDescriptorSet(_device, computeDescriptorSets, frameInFlightId);
 
-    // I think all this could be done just once this it never changes (for each frame descriptor and the push constants)
+    // I think all this could be done just once this it never changes (for each frame descriptor and the push constants)²
 
     // update push constants
     const RenderComponent& mesh = scene.get<RenderComponent>(Entity { 0 });
 
+    VulkanShader::Pipeline graphicsPipeline = _shaderManager.get<VulkanShader::Pipeline>(_graphicsShader);
+    VulkanShader::PipelineLayout graphicsPipelineLayout = _shaderManager.get<VulkanShader::PipelineLayout>(_graphicsShader);
+
     VkDeviceAddress meshVertexBufferAddress
-        = VulkanBuffer::getDeviceAddress(*this, _resourceManager.getHotData<VulkanBuffer>(mesh.getVertexBuffer()));
+        = VulkanBuffer::getDeviceAddress(*this, _bufferManager.get<VulkanBuffer::Buffer>(mesh.getVertexBuffer()));
     vkCmdPushConstants(
-        commandBuffer, _graphicsPipeline->getLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(VkDeviceAddress), &meshVertexBufferAddress);
+        commandBuffer, graphicsPipelineLayout.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(VkDeviceAddress), &meshVertexBufferAddress);
+
+    VulkanComputeShader::Pipeline computePipeline = _computeShaderManager.get<VulkanComputeShader::Pipeline>(_computeShader);
+    VulkanComputeShader::PipelineLayout computePipelineLayout
+        = _computeShaderManager.get<VulkanComputeShader::PipelineLayout>(_computeShader);
 
     // update DS, bind pipeline, bind DS, dispatch
     VkDescriptorImageInfo imageInfo { .imageView = rtImageViewData.view, .imageLayout = VK_IMAGE_LAYOUT_GENERAL };
-    _descriptorSetPoolCompute->updateDescriptorSet(_device, commandBuffer, descriptorSet, _computePipeline->getLayout(), imageInfo);
-    _descriptorSetPoolCompute->bind(commandBuffer, descriptorSet, VK_PIPELINE_BIND_POINT_COMPUTE, _computePipeline->getLayout());
-    _computePipeline->dispatch(commandBuffer, { std::ceil(rtMetadata.extent.width / 8.f), std::ceil(rtMetadata.extent.height / 8.f), 1 });
+    VulkanBindGroup::updateDescriptorSets(_device, computeDescriptorSets, imageInfo);
+    VulkanBindGroup::bind(commandBuffer, descriptorSet, VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout.layout);
+    VulkanComputeShader::dispatch(
+        commandBuffer, computePipeline, { std::ceil(rtMetadata.extent.width / 8.f), std::ceil(rtMetadata.extent.height / 8.f), 1 });
 
     VulkanTexture::changeLayoutBarrier(commandBuffer, rtImageViewData.image, rtMetadata.layout, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
     // TODO: watch for tiny vector allocations
-    _graphicsPipeline->draw(commandBuffer, { rtMetadata.extent.width, rtMetadata.extent.height },
+    VulkanShader::draw(commandBuffer, graphicsPipeline, { rtMetadata.extent.width, rtMetadata.extent.height },
         { VkRenderingAttachmentInfo {
             .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO, .imageView = rtImageViewData.view, .imageLayout = rtMetadata.layout } });
 
     VulkanTexture::changeLayoutBarrier(commandBuffer, rtImageViewData.image, rtMetadata.layout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
-    const auto& scImageViewData = _resourceManager.getHotData<VulkanTexture>(_swapchainTextures[swapchainImageId]);
-    auto& scMetadata = _resourceManager.getColdData<VulkanTexture>(_swapchainTextures[swapchainImageId]);
+    const auto& scImageViewData = _textureManager.get<VulkanTexture::ImageView>(_swapchainTextures[swapchainImageId]);
+    auto& scMetadata = _textureManager.get<VulkanTexture::Metadata>(_swapchainTextures[swapchainImageId]);
 
     VulkanTexture::changeLayoutBarrier(commandBuffer, scImageViewData.image, scMetadata.layout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
@@ -342,8 +360,12 @@ std::pair<VkPhysicalDevice, VulkanRHI::PhysicalDeviceQueueFamilyID> VulkanRHI::s
         VkPhysicalDeviceProperties properties;
         vkGetPhysicalDeviceProperties(availableGpus[i], &properties);
 
-        if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU
-            || (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU && deviceId == NH3D_MAX_T(uint32_t))) {
+        VkPhysicalDeviceFeatures features;
+        vkGetPhysicalDeviceFeatures(availableGpus[i], &features);
+
+        if (features.multiDrawIndirect
+            && (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU
+                || (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU && deviceId == NH3D_MAX_T(uint32_t)))) {
             uint32_t familyCount;
             vkGetPhysicalDeviceQueueFamilyProperties(availableGpus[i], &familyCount, nullptr);
 
@@ -399,7 +421,12 @@ VkDevice VulkanRHI::createLogicalDevice(VkPhysicalDevice gpu, PhysicalDeviceQueu
 
     VkPhysicalDeviceFeatures features {};
     VkPhysicalDeviceVulkan12Features features12 {
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES, .descriptorIndexing = VK_TRUE, .bufferDeviceAddress = VK_TRUE
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+        .descriptorIndexing = VK_TRUE,
+        .bufferDeviceAddress = VK_TRUE,
+        .descriptorBindingStorageImageUpdateAfterBind = VK_TRUE,
+        .descriptorBindingSampledImageUpdateAfterBind = VK_TRUE
+        // descriptorBindingUniformBufferUpdateAfterBind seems to be poorly supported, see https://vulkan.gpuinfo.org/listfeaturescore12.php
     };
     VkPhysicalDeviceVulkan13Features features13 { .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
         .pNext = &features12,

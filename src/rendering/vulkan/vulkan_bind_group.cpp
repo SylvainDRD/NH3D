@@ -1,21 +1,19 @@
 #include "vulkan_bind_group.hpp"
+#include <cstring>
+#include <rendering/vulkan/vulkan_rhi.hpp>
 
 namespace NH3D {
 
-// TODO: fix
 std::pair<VulkanBindGroup::DescriptorSets, VulkanBindGroup::Metadata> VulkanBindGroup::create(
-    VkDevice device, const VkShaderStageFlags stageFlags, const std::initializer_list<VkDescriptorType>& bindingTypes)
+    const VkDevice device, const VkShaderStageFlags stageFlags, const std::initializer_list<VkDescriptorType>& bindingTypes)
 {
-    for (uint32_t i = 0; i < VulkanRHI::MaxFramesInFlight; ++i) {
-        _descriptorSets[i].reserve(_maxSets / VulkanRHI::MaxFramesInFlight);
-    }
-
-    // TODO: write a custom linear allocator for these kind of small allocations
-    std::vector<VkDescriptorSetLayoutBinding> descriptorBindings {};
+    static std::vector<VkDescriptorSetLayoutBinding> descriptorBindings {};
     descriptorBindings.reserve(bindingTypes.size());
+    descriptorBindings.clear();
 
-    std::unordered_map<VkDescriptorType, uint32_t> descriptorTypeCounts {};
+    static std::unordered_map<VkDescriptorType, uint32_t> descriptorTypeCounts {};
     descriptorTypeCounts.reserve(bindingTypes.size());
+    descriptorTypeCounts.clear();
 
     uint32_t i = 0;
     for (VkDescriptorType descriptorType : bindingTypes) {
@@ -24,59 +22,74 @@ std::pair<VulkanBindGroup::DescriptorSets, VulkanBindGroup::Metadata> VulkanBind
         ++descriptorTypeCounts[descriptorType];
     }
 
+    VkDescriptorBindingFlags bindingFlags = { VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT };
+
+    VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlag {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO, .bindingCount = 1, .pBindingFlags = &bindingFlags
+    };
+
     VkDescriptorSetLayoutCreateInfo layoutCreateInfo {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .flags = 0,
+        .pNext = &bindingFlag,
+        .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT,
         .bindingCount = static_cast<uint32_t>(descriptorBindings.size()),
         .pBindings = descriptorBindings.data(),
     };
 
-    if (vkCreateDescriptorSetLayout(device, &layoutCreateInfo, nullptr, &_layout) != VK_SUCCESS) {
+    VkDescriptorSetLayout layout;
+    if (vkCreateDescriptorSetLayout(device, &layoutCreateInfo, nullptr, &layout) != VK_SUCCESS) {
         NH3D_ABORT_VK("Failed to create Vulkan descritor set layout");
     }
 
-    std::vector<VkDescriptorPoolSize> poolSizes {};
+    static std::vector<VkDescriptorPoolSize> poolSizes {};
     poolSizes.reserve(descriptorTypeCounts.size());
+    poolSizes.clear();
 
     for (auto [descriptorType, count] : descriptorTypeCounts) {
-        poolSizes.emplace_back(VkDescriptorPoolSize { descriptorType, _maxSets * count });
+        poolSizes.emplace_back(VkDescriptorPoolSize { descriptorType, IRHI::MaxFramesInFlight * count });
     }
 
     VkDescriptorPoolCreateInfo poolCreateInfo { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-        .maxSets = _maxSets,
+        .flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT,
+        .maxSets = IRHI::MaxFramesInFlight,
         .poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
         .pPoolSizes = poolSizes.data() };
 
-    if (vkCreateDescriptorPool(device, &poolCreateInfo, nullptr, &_pool) != VK_SUCCESS) {
+    VkDescriptorPool pool;
+    if (vkCreateDescriptorPool(device, &poolCreateInfo, nullptr, &pool) != VK_SUCCESS) {
         NH3D_ABORT_VK("Failed to create Vulkan descriptor pool");
     }
 
     // Allocate descriptor sets
-    std::array<VkDescriptorSetLayout, VulkanRHI::MaxFramesInFlight> layouts;
-    layouts.fill(_layout);
+    std::array<VkDescriptorSetLayout, IRHI::MaxFramesInFlight> layouts;
+    layouts.fill(layout);
 
+    DescriptorSets descriptorSets {};
     VkDescriptorSetAllocateInfo allocInfo { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-        .descriptorPool = _pool,
-        .descriptorSetCount = VulkanRHI::MaxFramesInFlight,
+        .descriptorPool = pool,
+        .descriptorSetCount = IRHI::MaxFramesInFlight,
         .pSetLayouts = layouts.data() };
-    if (vkAllocateDescriptorSets(device, &allocInfo, _descriptorSets.sets) != VK_SUCCESS) {
+    if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.sets.data()) != VK_SUCCESS) {
         NH3D_ABORT_VK("Failed to allocate Vulkan descriptor sets");
     }
+
+    return { descriptorSets, Metadata { layout, pool } };
 }
 
-void VulkanBindGroup::release(const VkDevice device, DescriptorSets& descriptorSets, Metadata& cold)
+void VulkanBindGroup::release(const IRHI& rhi, DescriptorSets& descriptorSets, Metadata& cold)
 {
-    vkDestroyDescriptorSetLayout(device, cold.layout, nullptr);
+    const VulkanRHI& vrhi = static_cast<const VulkanRHI&>(rhi);
+    vkDestroyDescriptorSetLayout(vrhi.getVkDevice(), cold.layout, nullptr);
     cold.layout = nullptr;
 
-    vkDestroyDescriptorPool(device, cold.pool, nullptr);
+    vkDestroyDescriptorPool(vrhi.getVkDevice(), cold.pool, nullptr);
     cold.pool = nullptr;
 }
 
 VkDescriptorSet VulkanBindGroup::getDescriptorSet(
     const VkDevice device, const DescriptorSets& descriptorSets, const uint32_t frameInFlightId)
 {
-    NH3D_ASSERT(frameInFlightId < MaxFramesInFlight, "Requested out of bound descriptor set");
+    NH3D_ASSERT(frameInFlightId < IRHI::MaxFramesInFlight, "Requested out of bound descriptor set");
 
     return descriptorSets.sets[frameInFlightId];
 }

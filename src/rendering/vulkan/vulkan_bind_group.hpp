@@ -4,6 +4,7 @@
 #include <initializer_list>
 #include <misc/utils.hpp>
 #include <rendering/core/bind_group.hpp>
+#include <rendering/core/rhi.hpp>
 #include <vulkan/vulkan_core.h>
 
 namespace NH3D {
@@ -11,9 +12,8 @@ namespace NH3D {
 struct VulkanBindGroup {
     using ResourceType = BindGroup;
 
-    // TODO: fix circular dependency
     struct DescriptorSets {
-        std::array<VkDescriptorSet, VulkanRHI::MaxFramesInFlight> sets;
+        std::array<VkDescriptorSet, IRHI::MaxFramesInFlight> sets;
     };
     using Hot = DescriptorSets;
 
@@ -27,7 +27,8 @@ struct VulkanBindGroup {
     [[nodiscard]] static std::pair<DescriptorSets, Metadata> create(
         VkDevice device, const VkShaderStageFlags stageFlags, const std::initializer_list<VkDescriptorType>& bindingTypes);
 
-    static void release(const VkDevice device, DescriptorSets& descriptorSets, Metadata& cold);
+    // Used generically by the ResourceManager, must be API agnostic, non-const ref for invalidation
+    static void release(const IRHI& rhi, DescriptorSets& descriptorSets, Metadata& cold);
 
     // Used generically by the ResourceManager, must be API agnostic
     static inline bool valid(const DescriptorSets& descriptorSets, const Metadata& cold)
@@ -46,10 +47,11 @@ struct VulkanBindGroup {
     }
 
     // TODO: buffer write to make sure the set is not in used while updating
-    template <typename T> inline void updateDescriptorSet(VkDevice device, const DescriptorSets& descriptorSets, const T& info)
+    template <typename T> static inline void updateDescriptorSets(VkDevice device, const DescriptorSets& descriptorSets, const T& info)
     {
         VkWriteDescriptorSet descWrite;
 
+        // TODO: generalize the descriptor type, its currently too specific
         for (const VkDescriptorSet descriptorSet : descriptorSets.sets) {
             if constexpr (std::is_same_v<T, VkDescriptorImageInfo>) {
                 descWrite = VkWriteDescriptorSet { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -57,23 +59,21 @@ struct VulkanBindGroup {
                     .dstBinding = 0,
                     .dstArrayElement = 0,
                     .descriptorCount = 1,
-                    .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                    .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 
                     .pImageInfo = &info };
-            } else
-                constexpr(std::is_same_v<T, VkDescriptorBufferInfo>)
-                {
-                    descWrite = VkWriteDescriptorSet { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                        .dstSet = descriptorSet,
-                        .dstBinding = 0,
-                        .dstArrayElement = 0,
-                        .descriptorCount = 1,
-                        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                        .pBufferInfo = &info };
-                }
+            } else if constexpr (std::is_same_v<T, VkDescriptorBufferInfo>) {
+                descWrite = VkWriteDescriptorSet { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                    .dstSet = descriptorSet,
+                    .dstBinding = 0,
+                    .dstArrayElement = 0,
+                    .descriptorCount = 1,
+                    .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                    .pBufferInfo = &info };
+            }
 
             vkUpdateDescriptorSets(device, 1, &descWrite, 0, nullptr);
         }
     }
 };
-    
+
 }

@@ -10,14 +10,16 @@
 
 namespace NH3D {
 
-template <typename T> class SplitPool {
-    NH3D_NO_COPY(SplitPool)
+template <typename T> class ResourceManager {
+    NH3D_NO_COPY(ResourceManager)
 public:
     using Hot = typename T::Hot;
     using Cold = typename T::Cold;
     using HandleType = Handle<typename T::ResourceType>;
 
-    SplitPool(size_t preallocSize, size_t freelistSize);
+    ResourceManager() = delete;
+
+    ResourceManager(size_t preallocSize, size_t freelistSize);
 
     [[nodiscard]] inline size_t size() const;
 
@@ -35,14 +37,14 @@ private:
     std::vector<HandleType> _availableHandles;
 };
 
-template <typename T> [[nodiscard]] inline SplitPool<T>::SplitPool(size_t preallocSize, size_t freelistSize)
+template <typename T> [[nodiscard]] inline ResourceManager<T>::ResourceManager(size_t preallocSize, size_t freelistSize)
 {
     _hot.reserve(preallocSize);
     _cold.reserve(preallocSize);
     _availableHandles.reserve(freelistSize);
 }
 
-template <typename T> template <typename U> [[nodiscard]] inline U& SplitPool<T>::get(HandleType handle)
+template <typename T> template <typename U> [[nodiscard]] inline U& ResourceManager<T>::get(HandleType handle)
 {
     // Cannot reasonnably check that the resource is valid without trashing the cache with cold data, which would destroy the performance
     // This will be checked in a test
@@ -53,11 +55,9 @@ template <typename T> template <typename U> [[nodiscard]] inline U& SplitPool<T>
     } else if constexpr (std::is_same_v<U, Cold>) {
         return _cold[handle.index];
     }
-
-    return _hot[handle.index];
 }
 
-template <typename T> [[nodiscard]] inline SplitPool<T>::HandleType SplitPool<T>::store(Hot&& hotData, Cold&& coldData)
+template <typename T> [[nodiscard]] inline ResourceManager<T>::HandleType ResourceManager<T>::store(Hot&& hotData, Cold&& coldData)
 {
     HandleType handle;
     if (!_availableHandles.empty()) {
@@ -75,12 +75,12 @@ template <typename T> [[nodiscard]] inline SplitPool<T>::HandleType SplitPool<T>
     return handle;
 }
 
-template <typename T> inline void SplitPool<T>::release(const IRHI& rhi, HandleType handle)
+template <typename T> inline void ResourceManager<T>::release(const IRHI& rhi, HandleType handle)
 {
     NH3D_ASSERT(handle.index < _cold.size(), "Invalid handle index");
 
-    Hot& hot = getHotData(handle);
-    Cold& cold = getColdData(handle);
+    Hot& hot = get<Hot>(handle);
+    Cold& cold = get<Cold>(handle);
 
     NH3D_ASSERT(T::valid(hot, cold), "Trying to release an invalid handle");
     T::release(rhi, hot, cold);
@@ -89,12 +89,12 @@ template <typename T> inline void SplitPool<T>::release(const IRHI& rhi, HandleT
     _availableHandles.emplace_back(handle.index);
 }
 
-template <typename T> inline void SplitPool<T>::clear(const IRHI& rhi)
+template <typename T> inline void ResourceManager<T>::clear(const IRHI& rhi)
 {
     for (uint32 i = 0; i < _hot.size(); ++i) {
         const HandleType handle { i };
-        Hot& hot = getHotData(handle);
-        Cold& cold = getColdData(handle);
+        Hot& hot = get<Hot>(handle);
+        Cold& cold = get<Cold>(handle);
 
         if (T::valid(hot, cold)) {
             T::release(rhi, hot, cold);

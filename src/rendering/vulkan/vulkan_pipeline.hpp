@@ -3,41 +3,36 @@
 #include <filesystem>
 #include <fstream>
 #include <misc/utils.hpp>
+#include <rendering/core/rhi.hpp>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace NH3D {
 
 struct VulkanPipeline {
+public:
+    struct Pipeline {
+        VkPipeline pipeline;
+    };
+    using Hot = Pipeline;
+
+    struct PipelineLayout {
+        VkPipelineLayout layout;
+    };
+    using Cold = PipelineLayout;
+
     // "Destructor": used generically by the ResourceManager, must be API agnostic, non-const ref for invalidation
-    static inline void VulkanPipeline::release(const IRHI& rhi, VkPipelineLayout& pipelineLayout, VkPipeline& pipeline)
-    {
-        const VulkanRHI& vrhi = static_cast<const VulkanRHI&>(rhi);
-        if (pipelineLayout) {
-            vkDestroyPipelineLayout(vrhi.getVkDevice(), pipelineLayout, nullptr);
-            pipelineLayout = nullptr;
-        }
-
-        // // TODO: destroy after pipeline creation
-        // for (VkShaderModule module : _shaderModules) {
-        //     vkDestroyShaderModule(device, module, nullptr);
-        // }
-
-        if (pipeline) {
-            vkDestroyPipeline(vrhi.getVkDevice(), pipeline, nullptr);
-            pipeline = nullptr;
-        }
-    }
+    static void release(const IRHI& rhi, Pipeline& pipeline, PipelineLayout& pipelineLayout);
 
 protected:
     static inline VkPipelineLayout createPipelineLayout(
-        VkDevice device, VkDescriptorSetLayout layout, const std::vector<VkPushConstantRange>& pushConstantRanges)
+        VkDevice device, const VkDescriptorSetLayout layout, const std::vector<VkPushConstantRange>& pushConstantRanges)
     {
         VkPipelineLayoutCreateInfo layoutCreateInfo { .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
             .setLayoutCount = layout != nullptr ? 1u : 0u,
             .pSetLayouts = &layout,
-            .pPushConstantRanges = pushConstantRanges.data(),
-            .pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size()) };
+            .pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size()),
+            .pPushConstantRanges = pushConstantRanges.data() };
 
         VkPipelineLayout pipelineLayout;
         if (vkCreatePipelineLayout(device, &layoutCreateInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {

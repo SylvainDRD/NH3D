@@ -5,7 +5,7 @@
 
 namespace NH3D {
 
-std::pair<VulkanTexture::ImageView, VulkanTexture::Meta> VulkanTexture::create(const VulkanRHI& rhi, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, VkImageAspectFlags aspect, bool generateMipMaps)
+std::pair<VulkanTexture::ImageView, VulkanTexture::Metadata> VulkanTexture::create(const VulkanRHI& rhi, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, VkImageAspectFlags aspect, bool generateMipMaps)
 {
     VkImageCreateInfo imageCreateInfo {
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -49,10 +49,10 @@ std::pair<VulkanTexture::ImageView, VulkanTexture::Meta> VulkanTexture::create(c
         NH3D_ABORT_VK("Failed to create Vulkan image view");
     }
 
-    return { ImageView { image, view }, Meta { format, extent, VK_IMAGE_LAYOUT_UNDEFINED, allocation } };
+    return { ImageView { image, view }, Metadata { format, extent, VK_IMAGE_LAYOUT_UNDEFINED, allocation } };
 }
 
-std::pair<VulkanTexture::ImageView, VulkanTexture::Meta> VulkanTexture::wrapSwapchainImage(const VulkanRHI& rhi, VkImage image, VkFormat format, VkExtent3D extent, VkImageAspectFlags aspect)
+std::pair<VulkanTexture::ImageView, VulkanTexture::Metadata> VulkanTexture::wrapSwapchainImage(const VulkanRHI& rhi, VkImage image, VkFormat format, VkExtent3D extent, VkImageAspectFlags aspect)
 {
     VkImageViewCreateInfo viewCreateInfo {
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -72,10 +72,10 @@ std::pair<VulkanTexture::ImageView, VulkanTexture::Meta> VulkanTexture::wrapSwap
         NH3D_ABORT_VK("Vulkan image view creation failed");
     }
 
-    return { ImageView { image, view }, Meta { format, extent, VK_IMAGE_LAYOUT_UNDEFINED, nullptr } };
+    return { ImageView { image, view }, Metadata { format, extent, VK_IMAGE_LAYOUT_UNDEFINED, nullptr } };
 }
 
-void VulkanTexture::release(const IRHI& rhi, ImageView& imageViewData, Meta& metadata)
+void VulkanTexture::release(const IRHI& rhi, ImageView& imageViewData, Metadata& metadata)
 {
     const VulkanRHI& vrhi = static_cast<const VulkanRHI&>(rhi);
     if (imageViewData.view) {
