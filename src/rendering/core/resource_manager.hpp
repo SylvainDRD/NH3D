@@ -13,8 +13,8 @@ namespace NH3D {
 template <typename T> class ResourceManager {
     NH3D_NO_COPY(ResourceManager)
 public:
-    using Hot = typename T::Hot;
-    using Cold = typename T::Cold;
+    using HotType = typename T::HotType;
+    using ColdType = typename T::ColdType;
     using HandleType = Handle<typename T::ResourceType>;
 
     ResourceManager() = delete;
@@ -25,15 +25,15 @@ public:
 
     template <typename U> [[nodiscard]] inline U& get(HandleType handle);
 
-    [[nodiscard]] inline HandleType store(Hot&& hotData, Cold&& coldData);
+    [[nodiscard]] inline HandleType store(HotType&& hotData, ColdType&& coldData);
 
     inline void release(const IRHI& rhi, HandleType handle);
 
     inline void clear(const IRHI& rhi);
 
 private:
-    std::vector<Hot> _hot;
-    std::vector<Cold> _cold;
+    std::vector<HotType> _hot;
+    std::vector<ColdType> _cold;
     std::vector<HandleType> _availableHandles;
 };
 
@@ -50,26 +50,26 @@ template <typename T> template <typename U> [[nodiscard]] inline U& ResourceMana
     // This will be checked in a test
     NH3D_ASSERT(handle.index < _hot.size(), "Invalid handle index");
 
-    if constexpr (std::is_same_v<U, Hot>) {
+    if constexpr (std::is_same_v<U, HotType>) {
         return _hot[handle.index];
-    } else if constexpr (std::is_same_v<U, Cold>) {
+    } else if constexpr (std::is_same_v<U, ColdType>) {
         return _cold[handle.index];
     }
 }
 
-template <typename T> [[nodiscard]] inline ResourceManager<T>::HandleType ResourceManager<T>::store(Hot&& hotData, Cold&& coldData)
+template <typename T> [[nodiscard]] inline ResourceManager<T>::HandleType ResourceManager<T>::store(HotType&& hotData, ColdType&& coldData)
 {
     HandleType handle;
     if (!_availableHandles.empty()) {
         handle = _availableHandles.back();
         _availableHandles.pop_back();
 
-        _hot[handle.index] = std::forward<Hot>(hotData);
-        _cold[handle.index] = std::forward<Cold>(coldData);
+        _hot[handle.index] = std::forward<HotType>(hotData);
+        _cold[handle.index] = std::forward<ColdType>(coldData);
     } else {
         handle = { static_cast<uint32>(_hot.size()) };
-        _hot.emplace_back(std::forward<Hot>(hotData));
-        _cold.emplace_back(std::forward<Cold>(coldData));
+        _hot.emplace_back(std::forward<HotType>(hotData));
+        _cold.emplace_back(std::forward<ColdType>(coldData));
     }
 
     return handle;
@@ -79,8 +79,8 @@ template <typename T> inline void ResourceManager<T>::release(const IRHI& rhi, H
 {
     NH3D_ASSERT(handle.index < _cold.size(), "Invalid handle index");
 
-    Hot& hot = get<Hot>(handle);
-    Cold& cold = get<Cold>(handle);
+    HotType& hot = get<HotType>(handle);
+    ColdType& cold = get<ColdType>(handle);
 
     NH3D_ASSERT(T::valid(hot, cold), "Trying to release an invalid handle");
     T::release(rhi, hot, cold);
@@ -93,8 +93,8 @@ template <typename T> inline void ResourceManager<T>::clear(const IRHI& rhi)
 {
     for (uint32 i = 0; i < _hot.size(); ++i) {
         const HandleType handle { i };
-        Hot& hot = get<Hot>(handle);
-        Cold& cold = get<Cold>(handle);
+        HotType& hot = get<HotType>(handle);
+        ColdType& cold = get<ColdType>(handle);
 
         if (T::valid(hot, cold)) {
             T::release(rhi, hot, cold);

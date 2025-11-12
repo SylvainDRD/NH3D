@@ -6,38 +6,46 @@
 
 namespace NH3D {
 
+struct TextureHotType {
+    int hotValue;
+};
+
+struct TextureColdType {
+    std::string coldValue;
+};
+
 // structure stubs
 struct VulkanTexture {
     using ResourceType = Texture;
 
-    struct Hot {
-        int hotValue;
-    };
+    using HotType = TextureHotType;
 
-    struct Cold {
-        std::string coldValue;
-    };
+    using ColdType = TextureColdType;
 
-    [[nodiscard]] static inline bool valid(const Hot& hot, const Cold& cold) { return true; }
+    [[nodiscard]] static inline bool valid(const HotType& hot, const ColdType& cold) { return true; }
 
-    static void release(const IRHI& rhi, Hot& hot, Cold& cold) { }
+    static void release(const IRHI& rhi, HotType& hot, ColdType& cold) { }
+};
+
+struct BufferHotType {
+    std::string hotValue;
+    bool valid = true;
+};
+
+struct BufferColdType {
+    uint8_t coldValue;
 };
 
 struct VulkanBuffer {
     using ResourceType = Buffer;
 
-    struct Hot {
-        std::string hotValue;
-        bool valid = true;
-    };
+    using HotType = BufferHotType;
 
-    struct Cold {
-        uint8_t coldValue;
-    };
+    using ColdType = BufferColdType;
 
-    [[nodiscard]] static inline bool valid(const Hot& hot, const Cold& cold) { return hot.valid; }
+    [[nodiscard]] static inline bool valid(const BufferHotType& hot, const ColdType& cold) { return hot.valid; }
 
-    static void release(const IRHI& rhi, Hot& hot, Cold& cold) { hot.valid = false; }
+    static void release(const IRHI& rhi, BufferHotType& hot, ColdType& cold) { hot.valid = false; }
 };
 
 }
@@ -52,11 +60,11 @@ TEST(ResourceManagerTests, GeneralTest)
 
     Handle<Texture> textureHandle = resourceManager.store({ 1337 }, { "Hello there!" });
 
-    EXPECT_EQ(resourceManager.get<VulkanTexture::Hot>(textureHandle).hotValue, 1337);
-    EXPECT_EQ(resourceManager.get<VulkanTexture::Cold>(textureHandle).coldValue, "Hello there!");
+    EXPECT_EQ(resourceManager.get<TextureHotType>(textureHandle).hotValue, 1337);
+    EXPECT_EQ(resourceManager.get<TextureColdType>(textureHandle).coldValue, "Hello there!");
 
-    EXPECT_DEATH((void)resourceManager.get<VulkanTexture::Hot>({ 4 }), ".*FATAL.*");
-    EXPECT_DEATH((void)resourceManager.get<VulkanTexture::Cold>({ 4 }), ".*FATAL.*");
+    EXPECT_DEATH((void)resourceManager.get<TextureHotType>({ 4 }), ".*FATAL.*");
+    EXPECT_DEATH((void)resourceManager.get<TextureColdType>({ 4 }), ".*FATAL.*");
 }
 
 TEST(ResourceManagerTests, ReleaseTest)
@@ -68,7 +76,7 @@ TEST(ResourceManagerTests, ReleaseTest)
     MockRHI rhi;
     resourceManager.release(rhi, bufferHandle);
     // Assertion only present on cold getter for debug performance
-    EXPECT_FALSE(VulkanBuffer::valid(resourceManager.get<VulkanBuffer::Hot>(bufferHandle), { 42 }));
+    EXPECT_FALSE(VulkanBuffer::valid(resourceManager.get<BufferHotType>(bufferHandle), { 42 }));
 }
 
 TEST(ResourceManagerTests, ClearTest)
@@ -80,8 +88,8 @@ TEST(ResourceManagerTests, ClearTest)
     MockRHI rhi;
     resourceManager.clear(rhi);
 
-    EXPECT_DEATH((void)resourceManager.get<VulkanBuffer::Hot>(bufferHandle), ".*FATAL.*");
-    EXPECT_DEATH((void)resourceManager.get<VulkanBuffer::Cold>(bufferHandle), ".*FATAL.*");
+    EXPECT_DEATH((void)resourceManager.get<BufferHotType>(bufferHandle), ".*FATAL.*");
+    EXPECT_DEATH((void)resourceManager.get<BufferColdType>(bufferHandle), ".*FATAL.*");
     EXPECT_DEATH(resourceManager.release(rhi, { bufferHandle.index }), ".*FATAL.*");
 }
 
@@ -107,9 +115,9 @@ TEST(ResourceManagerTests, StoreReusesReleasedSlot)
     const Handle<Buffer> reused = resourceManager.store({ "C", true }, { 3 });
 
     EXPECT_EQ(reused.index, first.index);
-    EXPECT_EQ(resourceManager.get<VulkanBuffer::Hot>(reused).hotValue, "C");
+    EXPECT_EQ(resourceManager.get<BufferHotType>(reused).hotValue, "C");
 
-    EXPECT_EQ(resourceManager.get<VulkanBuffer::Hot>(second).hotValue, "B");
+    EXPECT_EQ(resourceManager.get<BufferHotType>(second).hotValue, "B");
 }
 
 }

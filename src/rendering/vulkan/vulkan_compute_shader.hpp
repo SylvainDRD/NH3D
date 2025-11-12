@@ -12,19 +12,19 @@ struct VulkanComputeShader : public VulkanPipeline {
     using ResourceType = ComputeShader;
 
     /// "Constructor"
-    [[nodiscard]] static std::pair<Pipeline, PipelineLayout> create(const VkDevice device, const VkDescriptorSetLayout layout,
+    [[nodiscard]] static std::pair<VkPipeline, VkPipelineLayout> create(const VkDevice device, const VkDescriptorSetLayout layout,
         const std::filesystem::path& computeShaderPath, const std::vector<VkPushConstantRange>& pushConstantRanges = {});
 
     // "Destructor": used generically by the ResourceManager, must be API agnostic, non-const ref for invalidation
-    static void release(const IRHI& rhi, Pipeline& pipeline, PipelineLayout& pipelineLayout);
+    static void release(const IRHI& rhi, VkPipeline& pipeline, VkPipelineLayout& pipelineLayout);
 
     // Used generically by the ResourceManager, must be API agnostic
-    [[nodiscard]] static inline bool valid(const Pipeline pipeline, const PipelineLayout layout)
+    [[nodiscard]] static inline bool valid(const VkPipeline pipeline, const VkPipelineLayout layout)
     {
-        return pipeline.pipeline != nullptr && layout.layout != nullptr;
+        return pipeline != nullptr && layout != nullptr;
     }
 
-    static void dispatch(VkCommandBuffer commandBuffer, const Pipeline pipeline, const vec3i kernelSize);
+    static void dispatch(VkCommandBuffer commandBuffer, const VkPipeline pipeline, const vec3i kernelSize);
 };
 
 }

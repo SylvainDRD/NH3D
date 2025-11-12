@@ -3,17 +3,17 @@
 
 namespace NH3D {
 
-void VulkanPipeline::release(const IRHI& rhi, Pipeline& pipeline, PipelineLayout& pipelineLayout)
+void VulkanPipeline::release(const IRHI& rhi, VkPipeline& pipeline, VkPipelineLayout& pipelineLayout)
 {
     const VulkanRHI& vrhi = static_cast<const VulkanRHI&>(rhi);
-    if (pipelineLayout.layout) {
-        vkDestroyPipelineLayout(vrhi.getVkDevice(), pipelineLayout.layout, nullptr);
-        pipelineLayout.layout = nullptr;
+    if (pipelineLayout) {
+        vkDestroyPipelineLayout(vrhi.getVkDevice(), pipelineLayout, nullptr);
+        pipelineLayout = nullptr;
     }
 
-    if (pipeline.pipeline) {
-        vkDestroyPipeline(vrhi.getVkDevice(), pipeline.pipeline, nullptr);
-        pipeline.pipeline = nullptr;
+    if (pipeline) {
+        vkDestroyPipeline(vrhi.getVkDevice(), pipeline, nullptr);
+        pipeline = nullptr;
     }
 }
 }

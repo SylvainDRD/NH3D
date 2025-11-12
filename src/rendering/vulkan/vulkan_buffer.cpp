@@ -4,7 +4,7 @@
 
 namespace NH3D {
 
-std::pair<VulkanBuffer::Buffer, VulkanBuffer::Allocation> VulkanBuffer::create(
+std::pair<VkBuffer, BufferAllocationInfo> VulkanBuffer::create(
     const VulkanRHI& rhi, const size_t size, const VkBufferUsageFlags usageFlags, const VmaMemoryUsage memoryUsage, const void* initialData)
 {
     // TODO: see if this works out in the future
@@ -34,31 +34,31 @@ std::pair<VulkanBuffer::Buffer, VulkanBuffer::Allocation> VulkanBuffer::create(
 
             rhi.executeImmediateCommandBuffer([size, stagingBuffer, buffer](VkCommandBuffer cmdBuffer) {
                 // Copy from staging buffer to the actual buffer
-                VkBufferCopy copyRegion { .size = size};
-                vkCmdCopyBuffer(cmdBuffer, stagingBuffer.buffer, buffer, 1, &copyRegion);
+                VkBufferCopy copyRegion { .size = size };
+                vkCmdCopyBuffer(cmdBuffer, stagingBuffer, buffer, 1, &copyRegion);
             });
 
             VulkanBuffer::release(rhi, stagingBuffer, stagingAllocation);
         }
     }
 
-    return { { buffer }, { allocation, allocationInfo } };
+    return { buffer, { allocation, allocationInfo } };
 }
 
-void VulkanBuffer::release(const IRHI& rhi, Buffer& buffer, Allocation& allocation)
+void VulkanBuffer::release(const IRHI& rhi, VkBuffer& buffer, BufferAllocationInfo& allocation)
 {
     const VulkanRHI& vrhi = static_cast<const VulkanRHI&>(rhi);
 
-    vmaDestroyBuffer(vrhi.getAllocator(), buffer.buffer, allocation.allocation);
+    vmaDestroyBuffer(vrhi.getAllocator(), buffer, allocation.allocation);
+    buffer = nullptr;
+    allocation.allocation = nullptr;
+    allocation.allocationInfo = {};
 }
 
-
-    [[nodiscard]] VkDeviceAddress VulkanBuffer::getDeviceAddress(const VulkanRHI& rhi, const Buffer& buffer) {
-        VkBufferDeviceAddressInfo deviceAddressInfo {
-            .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-            .buffer = buffer.buffer
-        };
-        return vkGetBufferDeviceAddress(rhi.getVkDevice(), &deviceAddressInfo);
-    }
+[[nodiscard]] VkDeviceAddress VulkanBuffer::getDeviceAddress(const VulkanRHI& rhi, const VkBuffer buffer)
+{
+    VkBufferDeviceAddressInfo deviceAddressInfo { .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = buffer };
+    return vkGetBufferDeviceAddress(rhi.getVkDevice(), &deviceAddressInfo);
+}
 
 }

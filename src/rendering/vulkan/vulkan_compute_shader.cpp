@@ -2,9 +2,8 @@
 
 namespace NH3D {
 
-[[nodiscard]] std::pair<VulkanComputeShader::Pipeline, VulkanComputeShader::PipelineLayout> VulkanComputeShader::create(
-    const VkDevice device, const VkDescriptorSetLayout layout, const std::filesystem::path& computeShaderPath,
-    const std::vector<VkPushConstantRange>& pushConstantRanges)
+[[nodiscard]] std::pair<VkPipeline, VkPipelineLayout> VulkanComputeShader::create(const VkDevice device, const VkDescriptorSetLayout layout,
+    const std::filesystem::path& computeShaderPath, const std::vector<VkPushConstantRange>& pushConstantRanges)
 {
     const VkPipelineLayout pipelineLayout = createPipelineLayout(device, layout, pushConstantRanges);
 
@@ -26,17 +25,17 @@ namespace NH3D {
 
     vkDestroyShaderModule(device, shaderModule, nullptr);
 
-    return { { pipeline }, { pipelineLayout } };
+    return { pipeline, pipelineLayout };
 }
 
-void VulkanComputeShader::release(const IRHI& rhi, Pipeline& pipeline, PipelineLayout& pipelineLayout)
+void VulkanComputeShader::release(const IRHI& rhi, VkPipeline& pipeline, VkPipelineLayout& pipelineLayout)
 {
     VulkanPipeline::release(rhi, pipeline, pipelineLayout);
 }
 
-void VulkanComputeShader::dispatch(VkCommandBuffer commandBuffer, const Pipeline pipeline, const vec3i kernelSize)
+void VulkanComputeShader::dispatch(VkCommandBuffer commandBuffer, const VkPipeline pipeline, const vec3i kernelSize)
 {
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline.pipeline);
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
 
     vkCmdDispatch(commandBuffer, kernelSize.x, kernelSize.y, kernelSize.z);
 }

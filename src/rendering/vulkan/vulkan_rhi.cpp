@@ -207,9 +207,7 @@ void VulkanRHI::render(Scene& scene) const
     auto& rtMetadata = _textureManager.get<VulkanTexture::Metadata>(_renderTargets[frameInFlightId]);
     VulkanTexture::changeLayoutBarrier(commandBuffer, rtImageViewData.image, rtMetadata.layout, VK_IMAGE_LAYOUT_GENERAL);
 
-    const VulkanBindGroup::DescriptorSets& computeDescriptorSets
-        = _bindGroupManager.get<VulkanBindGroup::DescriptorSets>(_computeBindGroup);
-    const VulkanBindGroup::Metadata& computeBindGroupMetadata = _bindGroupManager.get<VulkanBindGroup::Metadata>(_computeBindGroup);
+    const auto& computeDescriptorSets = _bindGroupManager.get<DescriptorSets>(_computeBindGroup);
     VkDescriptorSet descriptorSet = VulkanBindGroup::getDescriptorSet(_device, computeDescriptorSets, frameInFlightId);
 
     // I think all this could be done just once this it never changes (for each frame descriptor and the push constants)²
@@ -217,25 +215,24 @@ void VulkanRHI::render(Scene& scene) const
     // update push constants
     const RenderComponent& mesh = scene.get<RenderComponent>(Entity { 0 });
 
-    VulkanShader::Pipeline graphicsPipeline = _shaderManager.get<VulkanShader::Pipeline>(_graphicsShader);
-    VulkanShader::PipelineLayout graphicsPipelineLayout = _shaderManager.get<VulkanShader::PipelineLayout>(_graphicsShader);
+    auto graphicsPipeline = _shaderManager.get<VkPipeline>(_graphicsShader);
+    auto graphicsLayout = _shaderManager.get<VkPipelineLayout>(_graphicsShader);
 
-    VkDeviceAddress meshVertexBufferAddress
-        = VulkanBuffer::getDeviceAddress(*this, _bufferManager.get<VulkanBuffer::Buffer>(mesh.getVertexBuffer()));
-    vkCmdPushConstants(
-        commandBuffer, graphicsPipelineLayout.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(VkDeviceAddress), &meshVertexBufferAddress);
+    const VkDeviceAddress meshVertexBufferAddress
+        = VulkanBuffer::getDeviceAddress(*this, _bufferManager.get<VkBuffer>(mesh.getVertexBuffer()));
+    vkCmdPushConstants(commandBuffer, graphicsLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(VkDeviceAddress), &meshVertexBufferAddress);
 
-    VulkanComputeShader::Pipeline computePipeline = _computeShaderManager.get<VulkanComputeShader::Pipeline>(_computeShader);
-    VulkanComputeShader::PipelineLayout computePipelineLayout
-        = _computeShaderManager.get<VulkanComputeShader::PipelineLayout>(_computeShader);
+    auto computePipeline = _computeShaderManager.get<VkPipeline>(_computeShader);
+    auto computePipelineLayout = _computeShaderManager.get<VkPipelineLayout>(_computeShader);
 
     // update DS, bind pipeline, bind DS, dispatch
-    VkDescriptorImageInfo imageInfo { .imageView = rtImageViewData.view, .imageLayout = VK_IMAGE_LAYOUT_GENERAL };
-    // /!\ Dangerous, only works because the descriptor is updated with same value every time, need to buffer the updates
-    VulkanBindGroup::updateDescriptorSets(_device, computeDescriptorSets, imageInfo);
-    VulkanBindGroup::bind(commandBuffer, descriptorSet, VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout.layout);
-    VulkanComputeShader::dispatch(
-        commandBuffer, computePipeline, { std::ceil(rtMetadata.extent.width / 8.f), std::ceil(rtMetadata.extent.height / 8.f), 1 });
+    const VkDescriptorImageInfo imageInfo { .imageView = rtImageViewData.view, .imageLayout = VK_IMAGE_LAYOUT_GENERAL };
+
+    VulkanBindGroup::updateDescriptorSet(_device, descriptorSet, imageInfo);
+    VulkanBindGroup::bind(commandBuffer, descriptorSet, VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout);
+
+    const vec3i kernelSize { std::ceil(rtMetadata.extent.width / 8.f), std::ceil(rtMetadata.extent.height / 8.f), 1 };
+    VulkanComputeShader::dispatch(commandBuffer, computePipeline, kernelSize);
 
     VulkanTexture::changeLayoutBarrier(commandBuffer, rtImageViewData.image, rtMetadata.layout, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 

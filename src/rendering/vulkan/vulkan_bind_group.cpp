@@ -4,7 +4,7 @@
 
 namespace NH3D {
 
-std::pair<VulkanBindGroup::DescriptorSets, VulkanBindGroup::Metadata> VulkanBindGroup::create(
+std::pair<DescriptorSets, BindGroupMetadata> VulkanBindGroup::create(
     const VkDevice device, const VkShaderStageFlags stageFlags, const std::initializer_list<VkDescriptorType>& bindingTypes)
 {
     static std::vector<VkDescriptorSetLayoutBinding> descriptorBindings {};
@@ -73,10 +73,10 @@ std::pair<VulkanBindGroup::DescriptorSets, VulkanBindGroup::Metadata> VulkanBind
         NH3D_ABORT_VK("Failed to allocate Vulkan descriptor sets");
     }
 
-    return { descriptorSets, Metadata { layout, pool } };
+    return { descriptorSets, BindGroupMetadata { layout, pool } };
 }
 
-void VulkanBindGroup::release(const IRHI& rhi, DescriptorSets& descriptorSets, Metadata& cold)
+void VulkanBindGroup::release(const IRHI& rhi, DescriptorSets& descriptorSets, BindGroupMetadata& cold)
 {
     const VulkanRHI& vrhi = static_cast<const VulkanRHI&>(rhi);
     vkDestroyDescriptorSetLayout(vrhi.getVkDevice(), cold.layout, nullptr);

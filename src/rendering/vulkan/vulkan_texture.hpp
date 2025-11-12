@@ -19,7 +19,7 @@ struct VulkanTexture {
         VkImage image;
         VkImageView view;
     };
-    using Hot = ImageView;
+    using HotType = ImageView;
 
     struct Metadata {
         VkFormat format;
@@ -27,7 +27,7 @@ struct VulkanTexture {
         VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
         VmaAllocation allocation = nullptr;
     };
-    using Cold = Metadata;
+    using ColdType = Metadata;
 
     /// "Constructors / Destructors"
     [[nodiscard]] static std::pair<ImageView, Metadata> create(

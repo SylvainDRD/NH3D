@@ -9,29 +9,31 @@
 
 namespace NH3D {
 
+struct DescriptorSets {
+    std::array<VkDescriptorSet, IRHI::MaxFramesInFlight> sets;
+};
+
+struct BindGroupMetadata {
+    VkDescriptorSetLayout layout;
+    VkDescriptorPool pool;
+};
+
 struct VulkanBindGroup {
     using ResourceType = BindGroup;
 
-    struct DescriptorSets {
-        std::array<VkDescriptorSet, IRHI::MaxFramesInFlight> sets;
-    };
-    using Hot = DescriptorSets;
+    using HotType = DescriptorSets;
 
-    struct Metadata {
-        VkDescriptorSetLayout layout;
-        VkDescriptorPool pool;
-    };
-    using Cold = Metadata;
+    using ColdType = BindGroupMetadata;
 
     /// "Constructor / Destructor"
-    [[nodiscard]] static std::pair<DescriptorSets, Metadata> create(
+    [[nodiscard]] static std::pair<DescriptorSets, BindGroupMetadata> create(
         VkDevice device, const VkShaderStageFlags stageFlags, const std::initializer_list<VkDescriptorType>& bindingTypes);
 
     // Used generically by the ResourceManager, must be API agnostic, non-const ref for invalidation
-    static void release(const IRHI& rhi, DescriptorSets& descriptorSets, Metadata& cold);
+    static void release(const IRHI& rhi, DescriptorSets& descriptorSets, BindGroupMetadata& cold);
 
     // Used generically by the ResourceManager, must be API agnostic
-    static inline bool valid(const DescriptorSets& descriptorSets, const Metadata& cold)
+    static inline bool valid(const DescriptorSets& descriptorSets, const BindGroupMetadata& cold)
     {
         return descriptorSets.sets[0] != nullptr && cold.layout != nullptr && cold.pool != nullptr;
     }
@@ -46,32 +48,37 @@ struct VulkanBindGroup {
         vkCmdBindDescriptorSets(commandBuffer, bindPoint, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
     }
 
-    // TODO: buffer write to make sure the set is not in used while updating
-    template <typename T> static inline void updateDescriptorSets(VkDevice device, const DescriptorSets& descriptorSets, const T& info)
+    template <typename T> static inline void updateDescriptorSet(VkDevice device, const VkDescriptorSet descriptorSet, const T& info)
     {
         VkWriteDescriptorSet descWrite;
 
         // TODO: generalize the descriptor type, its currently too specific
-        for (const VkDescriptorSet descriptorSet : descriptorSets.sets) {
-            if constexpr (std::is_same_v<T, VkDescriptorImageInfo>) {
-                descWrite = VkWriteDescriptorSet { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                    .dstSet = descriptorSet,
-                    .dstBinding = 0,
-                    .dstArrayElement = 0,
-                    .descriptorCount = 1,
-                    .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 
-                    .pImageInfo = &info };
-            } else if constexpr (std::is_same_v<T, VkDescriptorBufferInfo>) {
-                descWrite = VkWriteDescriptorSet { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                    .dstSet = descriptorSet,
-                    .dstBinding = 0,
-                    .dstArrayElement = 0,
-                    .descriptorCount = 1,
-                    .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                    .pBufferInfo = &info };
-            }
+        if constexpr (std::is_same_v<T, VkDescriptorImageInfo>) {
+            descWrite = VkWriteDescriptorSet { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .dstSet = descriptorSet,
+                .dstBinding = 0,
+                .dstArrayElement = 0,
+                .descriptorCount = 1,
+                .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+                .pImageInfo = &info };
+        } else if constexpr (std::is_same_v<T, VkDescriptorBufferInfo>) {
+            descWrite = VkWriteDescriptorSet { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .dstSet = descriptorSet,
+                .dstBinding = 0,
+                .dstArrayElement = 0,
+                .descriptorCount = 1,
+                .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                .pBufferInfo = &info };
+        }
+        vkUpdateDescriptorSets(device, 1, &descWrite, 0, nullptr);
+    }
 
-            vkUpdateDescriptorSets(device, 1, &descWrite, 0, nullptr);
+    template <typename T>
+    static inline void descriptorSetsBufferedUpdate(VkDevice device, const DescriptorSets& descriptorSets, const T& info)
+    {
+        // TODO: buffer write to make sure the set is not in used while updating
+        for (const VkDescriptorSet descriptorSet : descriptorSets.sets) {
+            updateDescriptorSet(device, descriptorSet, info);
         }
     }
 };

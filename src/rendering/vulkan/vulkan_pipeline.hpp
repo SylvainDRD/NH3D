@@ -11,18 +11,12 @@ namespace NH3D {
 
 struct VulkanPipeline {
 public:
-    struct Pipeline {
-        VkPipeline pipeline;
-    };
-    using Hot = Pipeline;
+    using HotType = VkPipeline;
 
-    struct PipelineLayout {
-        VkPipelineLayout layout;
-    };
-    using Cold = PipelineLayout;
+    using ColdType = VkPipelineLayout;
 
     // "Destructor": used generically by the ResourceManager, must be API agnostic, non-const ref for invalidation
-    static void release(const IRHI& rhi, Pipeline& pipeline, PipelineLayout& pipelineLayout);
+    static void release(const IRHI& rhi, VkPipeline& pipeline, VkPipelineLayout& pipelineLayout);
 
 protected:
     static inline VkPipelineLayout createPipelineLayout(
