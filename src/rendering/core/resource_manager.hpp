@@ -1,104 +1,109 @@
 #pragma once
 
+#include <cstddef>
 #include <misc/types.hpp>
 #include <misc/utils.hpp>
-#include <rendering/core/buffer.hpp>
 #include <rendering/core/handle.hpp>
 #include <rendering/core/rhi.hpp>
-#include <rendering/core/split_pool.hpp>
-#include <rendering/core/texture.hpp>
-#include <type_traits>
+#include <utility>
+#include <vector>
 
 namespace NH3D {
 
-struct VulkanTexture;
-struct VulkanBuffer;
-
-class ResourceManager {
-    NH3D_NO_COPY_MOVE(ResourceManager)
+template <typename T> class SplitPool {
+    NH3D_NO_COPY(SplitPool)
 public:
-    inline ResourceManager();
+    using Hot = typename T::Hot;
+    using Cold = typename T::Cold;
+    using HandleType = Handle<typename T::ResourceType>;
 
-    template <typename T>
-    [[nodiscard]] inline T::Hot& getHotData(Handle<typename T::ResourceType> handle);
+    SplitPool(size_t preallocSize, size_t freelistSize);
 
-    template <typename T>
-    [[nodiscard]] inline T::Cold& getColdData(Handle<typename T::ResourceType> handle);
+    [[nodiscard]] inline size_t size() const;
 
-    template <typename T>
-    [[nodiscard]] inline Handle<typename T::ResourceType> store(typename T::Hot&& hotData, typename T::Cold&& coldData);
+    template <typename U> [[nodiscard]] inline U& get(HandleType handle);
 
-    template <typename T>
-    inline void release(const IRHI& rhi, Handle<typename T::ResourceType> handle);
+    [[nodiscard]] inline HandleType store(Hot&& hotData, Cold&& coldData);
+
+    inline void release(const IRHI& rhi, HandleType handle);
 
     inline void clear(const IRHI& rhi);
 
 private:
-    template <typename T>
-    constexpr SplitPool<T>& getPool();
-
-private:
-    // Vulkan
-    SplitPool<VulkanTexture> _vulkanTextureData;
-    SplitPool<VulkanBuffer> _vulkanBufferData;
-
-    // TODO: DX12 ...
-
-    // Note: tuple based declaration would require feeding every single type at declaration time, which sucks
+    std::vector<Hot> _hot;
+    std::vector<Cold> _cold;
+    std::vector<HandleType> _availableHandles;
 };
 
-inline ResourceManager::ResourceManager()
-    : _vulkanTextureData(20000, 10000)
-    , _vulkanBufferData(20000, 10000)
+template <typename T> [[nodiscard]] inline SplitPool<T>::SplitPool(size_t preallocSize, size_t freelistSize)
 {
+    _hot.reserve(preallocSize);
+    _cold.reserve(preallocSize);
+    _availableHandles.reserve(freelistSize);
 }
 
-template <typename T>
-constexpr SplitPool<T>& ResourceManager::getPool()
+template <typename T> template <typename U> [[nodiscard]] inline U& SplitPool<T>::get(HandleType handle)
 {
-    if constexpr (std::is_same_v<VulkanTexture, T>) {
-        return _vulkanTextureData;
-    } else if constexpr (std::is_same_v<VulkanBuffer, T>) {
-        return _vulkanBufferData;
+    // Cannot reasonnably check that the resource is valid without trashing the cache with cold data, which would destroy the performance
+    // This will be checked in a test
+    NH3D_ASSERT(handle.index < _hot.size(), "Invalid handle index");
+
+    if constexpr (std::is_same_v<U, Hot>) {
+        return _hot[handle.index];
+    } else if constexpr (std::is_same_v<U, Cold>) {
+        return _cold[handle.index];
     }
+
+    return _hot[handle.index];
 }
 
-template <typename T>
-[[nodiscard]] inline typename T::Hot& ResourceManager::getHotData(Handle<typename T::ResourceType> handle)
+template <typename T> [[nodiscard]] inline SplitPool<T>::HandleType SplitPool<T>::store(Hot&& hotData, Cold&& coldData)
 {
-    SplitPool<T>& pool = getPool<T>();
+    HandleType handle;
+    if (!_availableHandles.empty()) {
+        handle = _availableHandles.back();
+        _availableHandles.pop_back();
 
-    return pool.getHotData(handle);
+        _hot[handle.index] = std::forward<Hot>(hotData);
+        _cold[handle.index] = std::forward<Cold>(coldData);
+    } else {
+        handle = { static_cast<uint32>(_hot.size()) };
+        _hot.emplace_back(std::forward<Hot>(hotData));
+        _cold.emplace_back(std::forward<Cold>(coldData));
+    }
+
+    return handle;
 }
 
-template <typename T>
-[[nodiscard]] inline typename T::Cold& ResourceManager::getColdData(Handle<typename T::ResourceType> handle)
+template <typename T> inline void SplitPool<T>::release(const IRHI& rhi, HandleType handle)
 {
-    SplitPool<T>& pool = getPool<T>();
+    NH3D_ASSERT(handle.index < _cold.size(), "Invalid handle index");
 
-    return pool.getColdData(handle);
+    Hot& hot = getHotData(handle);
+    Cold& cold = getColdData(handle);
+
+    NH3D_ASSERT(T::valid(hot, cold), "Trying to release an invalid handle");
+    T::release(rhi, hot, cold);
+    NH3D_ASSERT(!T::valid(hot, cold), "Released handle should not be valid: resource is not cleaned up properly");
+
+    _availableHandles.emplace_back(handle.index);
 }
 
-template <typename T>
-[[nodiscard]] inline Handle<typename T::ResourceType> ResourceManager::store(typename T::Hot&& hotData, typename T::Cold&& coldData)
+template <typename T> inline void SplitPool<T>::clear(const IRHI& rhi)
 {
-    SplitPool<T>& pool = getPool<T>();
+    for (uint32 i = 0; i < _hot.size(); ++i) {
+        const HandleType handle { i };
+        Hot& hot = getHotData(handle);
+        Cold& cold = getColdData(handle);
 
-    return pool.store(std::forward<typename T::Hot>(hotData), std::forward<typename T::Cold>(coldData));
-}
+        if (T::valid(hot, cold)) {
+            T::release(rhi, hot, cold);
+        }
+    }
 
-template <typename T>
-inline void ResourceManager::release(const IRHI& rhi, Handle<typename T::ResourceType> handle)
-{
-    SplitPool<T>& pool = getPool<T>();
-
-    pool.release(rhi, handle);
-}
-
-inline void ResourceManager::clear(const IRHI& rhi)
-{
-    _vulkanTextureData.clear(rhi);
-    _vulkanBufferData.clear(rhi);
+    _hot.clear();
+    _cold.clear();
+    _availableHandles.clear();
 }
 
 }

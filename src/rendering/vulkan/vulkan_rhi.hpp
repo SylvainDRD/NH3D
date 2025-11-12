@@ -1,20 +1,21 @@
 #pragma once
 
-// Resources have to be included before the resource manager, otherwise clang will complain
-#include "rendering/core/buffer.hpp"
-#include "rendering/core/handle.hpp"
-#include "rendering/core/texture.hpp"
-#include "rendering/vulkan/vulkan_buffer.hpp"
-#include "rendering/vulkan/vulkan_texture.hpp"
-
 #include <array>
 #include <cstdint>
 #include <misc/utils.hpp>
+#include <rendering/core/bind_group.hpp>
+#include <rendering/core/buffer.hpp>
+#include <rendering/core/compute_shader.hpp>
+#include <rendering/core/handle.hpp>
 #include <rendering/core/resource_manager.hpp>
 #include <rendering/core/rhi.hpp>
-#include <rendering/render_graph/render_graph.hpp>
+#include <rendering/core/shader.hpp>
+#include <rendering/core/texture.hpp>
+#include <rendering/vulkan/vulkan_bind_group.hpp>
 #include <rendering/vulkan/vulkan_buffer.hpp>
+#include <rendering/vulkan/vulkan_compute_shader.hpp>
 #include <rendering/vulkan/vulkan_enums.hpp>
+#include <rendering/vulkan/vulkan_shader.hpp>
 #include <rendering/vulkan/vulkan_texture.hpp>
 #include <utility>
 #include <vk_mem_alloc.h>
@@ -23,12 +24,11 @@
 
 namespace NH3D {
 
-template <uint32_t> class VulkanDescriptorSetPool;
-class VulkanComputePipeline;
-class VulkanGraphicsPipeline;
-
 class VulkanRHI : public IRHI {
     NH3D_NO_COPY_MOVE(VulkanRHI)
+public:
+    static constexpr uint32_t MaxFramesInFlight = 2;
+
 public:
     VulkanRHI() = delete;
 
@@ -116,7 +116,6 @@ private:
     VkCommandBuffer _immediateCommandBuffer;
     VkFence _immediateCommandFence;
 
-    static constexpr uint32_t MaxFramesInFlight = 2;
     std::array<VkCommandBuffer, MaxFramesInFlight> _commandBuffers;
     std::array<VkFence, MaxFramesInFlight> _frameFences;
     std::array<Handle<Texture>, MaxFramesInFlight> _renderTargets;
@@ -124,12 +123,11 @@ private:
     std::array<VkSemaphore, MaxFramesInFlight> _presentSemaphores;
     std::vector<VkSemaphore> _renderSemaphores;
 
-    Uptr<VulkanDescriptorSetPool<MaxFramesInFlight>> _descriptorSetPoolCompute = nullptr;
-
-    mutable ResourceManager _resourceManager;
-
-    Uptr<VulkanComputePipeline> _computePipeline = nullptr;
-    Uptr<VulkanGraphicsPipeline> _graphicsPipeline = nullptr;
+    mutable ResourceManager<VulkanTexture> _textureManager;
+    mutable ResourceManager<VulkanBuffer> _bufferManager;
+    mutable ResourceManager<VulkanShader> _shaderManager;
+    mutable ResourceManager<VulkanComputeShader> _computeShaderManager;
+    mutable ResourceManager<VulkanBindGroup> _bindGroupManager;
 
     mutable uint32_t _frameId = 1;
 };

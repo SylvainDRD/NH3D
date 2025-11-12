@@ -96,12 +96,13 @@ void VulkanTexture::release(const IRHI& rhi, ImageView& imageViewData, Meta& met
     }
 }
 
-void VulkanTexture::insertBarrier(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout layout)
+void VulkanTexture::insertBarrier(VkCommandBuffer commandBuffer, const VkImage image, const VkImageLayout layout)
 {
-    changeLayoutBarrier(commandBuffer, image, layout, layout);
+    VkImageLayout updatedLayout = layout;
+    changeLayoutBarrier(commandBuffer, image, updatedLayout, layout);
 }
 
-void VulkanTexture::changeLayoutBarrier(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout& layout, VkImageLayout newLayout)
+void VulkanTexture::changeLayoutBarrier(VkCommandBuffer commandBuffer, const VkImage image, VkImageLayout& layout, const VkImageLayout newLayout)
 {
     VkImageMemoryBarrier2 barrier {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
@@ -129,15 +130,15 @@ void VulkanTexture::changeLayoutBarrier(VkCommandBuffer commandBuffer, VkImage i
     vkCmdPipelineBarrier2(commandBuffer, &depInfo);
 }
 
-void VulkanTexture::clear(VkCommandBuffer commandBuffer, VkImage image, color4 color)
+void VulkanTexture::clear(VkCommandBuffer commandBuffer, VkImage image, const color4 color)
 {
     VkImageSubresourceRange imageRange = VkImageSubresourceRange { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
         .levelCount = VK_REMAINING_MIP_LEVELS,
         .layerCount = VK_REMAINING_ARRAY_LAYERS };
-    vkCmdClearColorImage(commandBuffer, image, VK_IMAGE_LAYOUT_GENERAL, reinterpret_cast<VkClearColorValue*>(&color), 1, &imageRange);
+    vkCmdClearColorImage(commandBuffer, image, VK_IMAGE_LAYOUT_GENERAL, reinterpret_cast<const VkClearColorValue*>(&color), 1, &imageRange);
 }
 
-void VulkanTexture::blit(VkCommandBuffer commandBuffer, VkImage srcImage, VkExtent3D srcExtent, VkImage dstImage, VkExtent3D dstExtent)
+void VulkanTexture::blit(VkCommandBuffer commandBuffer, const VkImage srcImage, const VkExtent3D srcExtent, VkImage dstImage, const VkExtent3D dstExtent)
 {
     VkImageBlit imageBlit {
         .srcSubresource = {

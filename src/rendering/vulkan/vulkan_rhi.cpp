@@ -1,6 +1,4 @@
 #include "vulkan_rhi.hpp"
-#include "rendering/vulkan/vulkan_buffer.hpp" // Must be included before the resource manager
-#include "rendering/vulkan/vulkan_texture.hpp" // Must be included before the resource manager
 #include <cmath>
 #include <cstdint>
 #include <general/window.hpp>
@@ -11,11 +9,8 @@
 #include <rendering/core/buffer.hpp>
 #include <rendering/core/resource_manager.hpp>
 #include <rendering/render_graph/render_graph.hpp>
-#include <rendering/vulkan/vulkan_compute_pipeline.hpp>
-#include <rendering/vulkan/vulkan_descriptor_set_pool.hpp>
 #include <rendering/vulkan/vulkan_enums.hpp>
-#include <rendering/vulkan/vulkan_graphics_pipeline.hpp>
-#include <scene/ecs/components/mesh_component.hpp>
+#include <scene/ecs/components/render_component.hpp>
 #include <scene/scene.hpp>
 #include <unordered_set>
 #include <vulkan/vulkan_core.h>
@@ -85,17 +80,17 @@ VulkanRHI::VulkanRHI(const Window& Window)
             VK_IMAGE_ASPECT_COLOR_BIT, true);
     }
 
-    _descriptorSetPoolCompute = std::make_unique<VulkanDescriptorSetPool<MaxFramesInFlight>>(
+    _descriptorSetPoolCompute = std::make_unique<VulkanBindGroup>(
         _device, VK_SHADER_STAGE_COMPUTE_BIT, std::initializer_list<VkDescriptorType> { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE }, 1000);
 
-    _computePipeline = std::make_unique<VulkanComputePipeline>(
+    _computePipeline = std::make_unique<VulkanComputeShader>(
         _device, _descriptorSetPoolCompute->getLayout(), NH3D_DIR "src/rendering/shaders/gradient.comp.spv");
 
     VkPushConstantRange pushConstantRange { .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .offset = 0, .size = sizeof(uint64) };
 
     // TODO: also watch out for tiny vector allocs, though it's probably fine since it's only at load time
-    _graphicsPipeline = std::make_unique<VulkanGraphicsPipeline>(_device, nullptr,
-        VulkanGraphicsPipeline::ShaderData { .vertexShaderPath = NH3D_DIR "src/rendering/shaders/triangle.vert.spv",
+    _graphicsPipeline = std::make_unique<VulkanShader>(_device, nullptr,
+        VulkanShader::ShaderInfo { .vertexShaderPath = NH3D_DIR "src/rendering/shaders/triangle.vert.spv",
             .fragmentShaderPath = NH3D_DIR "src/rendering/shaders/triangle.frag.spv",
             .colorAttachmentFormats = { renderTargetsFormat } },
         std::vector<VkPushConstantRange> { pushConstantRange });
@@ -191,6 +186,7 @@ void VulkanRHI::render(Scene& scene) const
     vkResetFences(_device, 1, &_frameFences[frameInFlightId]);
 
     uint32_t swapchainImageId;
+    // TODO: handle resize
     if (vkAcquireNextImageKHR(_device, _swapchain, NH3D_MAX_T(uint64_t), _presentSemaphores[frameInFlightId], nullptr, &swapchainImageId)
         != VK_SUCCESS) {
         NH3D_ABORT_VK("Failed to acquire next swapchain image");
@@ -209,7 +205,7 @@ void VulkanRHI::render(Scene& scene) const
     // I think all this could be done just once this it never changes (for each frame descriptor and the push constants)
 
     // update push constants
-    const MeshComponent& mesh = scene.get<MeshComponent>(Entity { 0 });
+    const RenderComponent& mesh = scene.get<RenderComponent>(Entity { 0 });
 
     VkDeviceAddress meshVertexBufferAddress
         = VulkanBuffer::getDeviceAddress(*this, _resourceManager.getHotData<VulkanBuffer>(mesh.getVertexBuffer()));
@@ -534,7 +530,8 @@ VkSemaphore VulkanRHI::createSemaphore(VkDevice device) const
 
 VkFence VulkanRHI::createFence(VkDevice device, bool signaled) const
 {
-    VkFenceCreateInfo fenceCreateInfo { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags = signaled ? VK_FENCE_CREATE_SIGNALED_BIT : VkFenceCreateFlags{} };
+    VkFenceCreateInfo fenceCreateInfo { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+        .flags = signaled ? VK_FENCE_CREATE_SIGNALED_BIT : VkFenceCreateFlags {} };
 
     VkFence fence;
     if (vkCreateFence(device, &fenceCreateInfo, nullptr, &fence) != VK_SUCCESS) {

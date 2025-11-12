@@ -16,17 +16,25 @@ struct VertexData {
     vec2 __padding; // Padding to make the size a multiple of 16 bytes
 };
 
-struct MeshComponent {
+// Separated because potentially reused w/ other shaders/materials
+struct MeshData {
+    Handle<Buffer> vertexBuffer;
+    Handle<Buffer> indexBuffer;
+};
+
+struct RenderComponent {
 public:
-    MeshComponent(IRHI& rhi, const std::vector<VertexData>& vertexData, const std::vector<uint32>& indices);
+    RenderComponent(IRHI& rhi, const std::vector<VertexData>& vertexData, const std::vector<uint32>& indices);
 
     [[nodiscard]] Handle<Buffer> getVertexBuffer() const;
 
     [[nodiscard]] Handle<Buffer> getIndexBuffer() const;
 
 private:
-    Handle<Buffer> _vertexBuffer;
-    Handle<Buffer> _indexBuffer;
+    MeshData _meshData;
+
+    Handle<BindGroup> _bindGroup; // TODO: material system
+    Handle<Shader> _shader;   // TODO: material system
 };
 
 }

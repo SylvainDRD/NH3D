@@ -4,7 +4,7 @@
 #include "scene/ecs/subtree_view.hpp"
 #include <filesystem>
 #include <nlohmann/json.hpp>
-#include <scene/ecs/components/mesh_component.hpp>
+#include <scene/ecs/components/render_component.hpp>
 #define TINYGLTF_NO_INCLUDE_JSON
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
@@ -19,7 +19,7 @@ Scene::Scene(IRHI& rhi)
     _availableEntities.reserve(2'000);
 
     // Debug only
-    create<MeshComponent>(MeshComponent { rhi,
+    create<RenderComponent>(RenderComponent { rhi,
         {
             { .position = vec4 { -1.f, 1.f, 0.f, 1.f }, .normal = vec4 { 1.0f, 0.0f, 0.0f, 0.0f }, .uv = vec2 { 1.0f, 0.0f } },
             { .position = vec4 { 1.f, 1.f, 0.f, 1.f }, .normal = vec4 { 0.0f, 1.0f, 0.0f, 0.0f }, .uv = vec2 { 0.0f, 0.0f } },
