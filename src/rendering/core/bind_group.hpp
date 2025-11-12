@@ -6,10 +6,8 @@
 namespace NH3D {
 
 struct BindGroup {
-    /* data */
-
     struct CreateInfo {
-        // TODO: layout
+        // TODO the day I'll need these in user space
     };
 };
 

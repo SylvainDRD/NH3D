@@ -231,6 +231,7 @@ void VulkanRHI::render(Scene& scene) const
 
     // update DS, bind pipeline, bind DS, dispatch
     VkDescriptorImageInfo imageInfo { .imageView = rtImageViewData.view, .imageLayout = VK_IMAGE_LAYOUT_GENERAL };
+    // /!\ Dangerous, only works because the descriptor is updated with same value every time, need to buffer the updates
     VulkanBindGroup::updateDescriptorSets(_device, computeDescriptorSets, imageInfo);
     VulkanBindGroup::bind(commandBuffer, descriptorSet, VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout.layout);
     VulkanComputeShader::dispatch(
@@ -423,9 +424,9 @@ VkDevice VulkanRHI::createLogicalDevice(VkPhysicalDevice gpu, PhysicalDeviceQueu
     VkPhysicalDeviceVulkan12Features features12 {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
         .descriptorIndexing = VK_TRUE,
-        .bufferDeviceAddress = VK_TRUE,
+        .descriptorBindingSampledImageUpdateAfterBind = VK_TRUE,
         .descriptorBindingStorageImageUpdateAfterBind = VK_TRUE,
-        .descriptorBindingSampledImageUpdateAfterBind = VK_TRUE
+        .bufferDeviceAddress = VK_TRUE
         // descriptorBindingUniformBufferUpdateAfterBind seems to be poorly supported, see https://vulkan.gpuinfo.org/listfeaturescore12.php
     };
     VkPhysicalDeviceVulkan13Features features13 { .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,

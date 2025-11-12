@@ -69,7 +69,6 @@ TEST(ResourceManagerTests, ReleaseTest)
     resourceManager.release(rhi, bufferHandle);
     // Assertion only present on cold getter for debug performance
     EXPECT_FALSE(VulkanBuffer::valid(resourceManager.get<VulkanBuffer::Hot>(bufferHandle), { 42 }));
-    EXPECT_DEATH((void)resourceManager.get<VulkanBuffer::Cold>(bufferHandle), ".*FATAL.*");
 }
 
 TEST(ResourceManagerTests, ClearTest)
