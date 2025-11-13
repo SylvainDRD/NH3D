@@ -19,52 +19,10 @@ public:
     static void release(const IRHI& rhi, VkPipeline& pipeline, VkPipelineLayout& pipelineLayout);
 
 protected:
-    static inline VkPipelineLayout createPipelineLayout(
-        VkDevice device, const VkDescriptorSetLayout layout, const std::vector<VkPushConstantRange>& pushConstantRanges)
-    {
-        VkPipelineLayoutCreateInfo layoutCreateInfo { .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-            .setLayoutCount = layout != nullptr ? 1u : 0u,
-            .pSetLayouts = &layout,
-            .pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size()),
-            .pPushConstantRanges = pushConstantRanges.data() };
+    static VkPipelineLayout createPipelineLayout(
+        VkDevice device, const VkDescriptorSetLayout layout, const std::vector<VkPushConstantRange>& pushConstantRanges);
 
-        VkPipelineLayout pipelineLayout;
-        if (vkCreatePipelineLayout(device, &layoutCreateInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
-            NH3D_ABORT_VK("Failed to create the pipeline layout");
-        }
-
-        return pipelineLayout;
-    }
-
-    static inline VkShaderModule loadShader(VkDevice device, const std::filesystem::path& path)
-    {
-        if (!path.has_filename() || !std::filesystem::exists(path)) {
-            NH3D_ABORT("Shader at \"" << path << "\" does not exist");
-        }
-
-        std::ifstream file { path, std::ios::ate | std::ios::binary };
-        if (!file.is_open()) {
-            NH3D_ABORT("Failed to open shader at \"" << path << "\"");
-        }
-
-        size_t size = file.tellg();
-        file.seekg(0);
-
-        std::vector<char> buffer(size);
-        file.read(buffer.data(), size);
-        file.close();
-
-        VkShaderModuleCreateInfo moduleCreateInfo {
-            .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO, .codeSize = size, .pCode = reinterpret_cast<uint32_t*>(buffer.data())
-        };
-
-        VkShaderModule shader;
-        if (vkCreateShaderModule(device, &moduleCreateInfo, nullptr, &shader) != VK_SUCCESS) {
-            NH3D_ABORT("Failed to create shader module from \"" << path << "\"");
-        }
-
-        return shader;
-    }
+    static VkShaderModule loadShaderModule(VkDevice device, const std::filesystem::path& path);
 };
 
 }

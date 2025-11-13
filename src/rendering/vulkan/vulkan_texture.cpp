@@ -5,10 +5,10 @@
 
 namespace NH3D {
 
-std::pair<VulkanTexture::ImageView, VulkanTexture::Metadata> VulkanTexture::create(const VulkanRHI& rhi, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, VkImageAspectFlags aspect, bool generateMipMaps)
+[[nodiscard]] std::pair<ImageView, TextureMetadata> VulkanTexture::create(const VulkanRHI& rhi, const VkFormat format,
+    const VkExtent3D extent, const VkImageUsageFlags usage, const VkImageAspectFlags aspect, const bool generateMipMaps)
 {
-    VkImageCreateInfo imageCreateInfo {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+    VkImageCreateInfo imageCreateInfo { .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
         .imageType = extent.depth == 1 ? VK_IMAGE_TYPE_2D : VK_IMAGE_TYPE_3D,
         .format = format,
         .extent = extent,
@@ -17,13 +17,10 @@ std::pair<VulkanTexture::ImageView, VulkanTexture::Metadata> VulkanTexture::crea
         .samples = VK_SAMPLE_COUNT_1_BIT,
         .tiling = VK_IMAGE_TILING_OPTIMAL,
         .usage = usage,
-        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED
-    };
+        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED };
 
-    VmaAllocationCreateInfo allocCreateInfo {
-        .usage = VMA_MEMORY_USAGE_GPU_ONLY,
-        .requiredFlags = VkMemoryPropertyFlags { VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT }
-    };
+    VmaAllocationCreateInfo allocCreateInfo { .usage = VMA_MEMORY_USAGE_GPU_ONLY,
+        .requiredFlags = VkMemoryPropertyFlags { VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT } };
 
     VkImage image;
     VmaAllocation allocation;
@@ -31,51 +28,38 @@ std::pair<VulkanTexture::ImageView, VulkanTexture::Metadata> VulkanTexture::crea
         NH3D_ABORT_VK("VMA image creation failed");
     }
 
-    VkImageViewCreateInfo viewCreateInfo {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+    VkImageViewCreateInfo viewCreateInfo { .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
         .image = image,
         .viewType = extent.depth == 1 ? VK_IMAGE_VIEW_TYPE_2D : VK_IMAGE_VIEW_TYPE_3D,
         .format = format,
-        .subresourceRange = {
-            .aspectMask = aspect,
-            .baseMipLevel = 0,
-            .levelCount = 1,
-            .baseArrayLayer = 0,
-            .layerCount = 1 }
-    };
+        .subresourceRange = { .aspectMask = aspect, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1 } };
 
     VkImageView view;
     if (vkCreateImageView(rhi.getVkDevice(), &viewCreateInfo, nullptr, &view) != VK_SUCCESS) {
         NH3D_ABORT_VK("Failed to create Vulkan image view");
     }
 
-    return { ImageView { image, view }, Metadata { format, extent, VK_IMAGE_LAYOUT_UNDEFINED, allocation } };
+    return { ImageView { image, view }, TextureMetadata { format, extent, VK_IMAGE_LAYOUT_UNDEFINED, allocation } };
 }
 
-std::pair<VulkanTexture::ImageView, VulkanTexture::Metadata> VulkanTexture::wrapSwapchainImage(const VulkanRHI& rhi, VkImage image, VkFormat format, VkExtent3D extent, VkImageAspectFlags aspect)
+[[nodiscard]] std::pair<ImageView, TextureMetadata> VulkanTexture::wrapSwapchainImage(
+    const VulkanRHI& rhi, const VkImage image, const VkFormat format, const VkExtent3D extent, const VkImageAspectFlags aspect)
 {
-    VkImageViewCreateInfo viewCreateInfo {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+    VkImageViewCreateInfo viewCreateInfo { .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
         .image = image,
         .viewType = extent.depth == 1 ? VK_IMAGE_VIEW_TYPE_2D : VK_IMAGE_VIEW_TYPE_3D,
         .format = format,
-        .subresourceRange = {
-            .aspectMask = aspect,
-            .baseMipLevel = 0,
-            .levelCount = 1,
-            .baseArrayLayer = 0,
-            .layerCount = 1 }
-    };
+        .subresourceRange = { .aspectMask = aspect, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1 } };
 
     VkImageView view;
     if (vkCreateImageView(rhi.getVkDevice(), &viewCreateInfo, nullptr, &view) != VK_SUCCESS) {
         NH3D_ABORT_VK("Vulkan image view creation failed");
     }
 
-    return { ImageView { image, view }, Metadata { format, extent, VK_IMAGE_LAYOUT_UNDEFINED, nullptr } };
+    return { ImageView { image, view }, TextureMetadata { format, extent, VK_IMAGE_LAYOUT_UNDEFINED, nullptr } };
 }
 
-void VulkanTexture::release(const IRHI& rhi, ImageView& imageViewData, Metadata& metadata)
+void VulkanTexture::release(const IRHI& rhi, ImageView& imageViewData, TextureMetadata& metadata)
 {
     const VulkanRHI& vrhi = static_cast<const VulkanRHI&>(rhi);
     if (imageViewData.view) {
@@ -96,16 +80,22 @@ void VulkanTexture::release(const IRHI& rhi, ImageView& imageViewData, Metadata&
     }
 }
 
+bool VulkanTexture::valid(const ImageView& imageViewData, const TextureMetadata& /*metadata*/)
+{
+    // The allocation can be null in case of a swapchain image
+    return imageViewData.image != nullptr && imageViewData.view != nullptr;
+}
+
 void VulkanTexture::insertBarrier(VkCommandBuffer commandBuffer, const VkImage image, const VkImageLayout layout)
 {
     VkImageLayout updatedLayout = layout;
     changeLayoutBarrier(commandBuffer, image, updatedLayout, layout);
 }
 
-void VulkanTexture::changeLayoutBarrier(VkCommandBuffer commandBuffer, const VkImage image, VkImageLayout& layout, const VkImageLayout newLayout)
+void VulkanTexture::changeLayoutBarrier(
+    VkCommandBuffer commandBuffer, const VkImage image, VkImageLayout& layout, const VkImageLayout newLayout)
 {
-    VkImageMemoryBarrier2 barrier {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+    VkImageMemoryBarrier2 barrier { .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
         .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, // TODO: improve
         .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT, // TODO: improve
         .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, // TODO: improve
@@ -114,51 +104,38 @@ void VulkanTexture::changeLayoutBarrier(VkCommandBuffer commandBuffer, const VkI
         .newLayout = newLayout,
         .image = image,
         .subresourceRange = {
-            .aspectMask = static_cast<VkImageAspectFlags>((newLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT),
+            .aspectMask = static_cast<VkImageAspectFlags>(
+                (newLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT),
             .levelCount = VK_REMAINING_MIP_LEVELS,
             .layerCount = VK_REMAINING_ARRAY_LAYERS,
-        }
-    };
+        } };
     layout = newLayout;
 
-    VkDependencyInfo depInfo {
-        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-        .imageMemoryBarrierCount = 1,
-        .pImageMemoryBarriers = &barrier
-    };
+    VkDependencyInfo depInfo { .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO, .imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &barrier };
 
     vkCmdPipelineBarrier2(commandBuffer, &depInfo);
 }
 
 void VulkanTexture::clear(VkCommandBuffer commandBuffer, VkImage image, const color4 color)
 {
-    VkImageSubresourceRange imageRange = VkImageSubresourceRange { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-        .levelCount = VK_REMAINING_MIP_LEVELS,
-        .layerCount = VK_REMAINING_ARRAY_LAYERS };
+    VkImageSubresourceRange imageRange = VkImageSubresourceRange {
+        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .levelCount = VK_REMAINING_MIP_LEVELS, .layerCount = VK_REMAINING_ARRAY_LAYERS
+    };
     vkCmdClearColorImage(commandBuffer, image, VK_IMAGE_LAYOUT_GENERAL, reinterpret_cast<const VkClearColorValue*>(&color), 1, &imageRange);
 }
 
-void VulkanTexture::blit(VkCommandBuffer commandBuffer, const VkImage srcImage, const VkExtent3D srcExtent, VkImage dstImage, const VkExtent3D dstExtent)
+void VulkanTexture::blit(
+    VkCommandBuffer commandBuffer, const VkImage srcImage, const VkExtent3D srcExtent, VkImage dstImage, const VkExtent3D dstExtent)
 {
     VkImageBlit imageBlit {
-        .srcSubresource = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .mipLevel = 0,
-            .baseArrayLayer = 0,
-            .layerCount = 1 },
+        .srcSubresource = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1 },
         .srcOffsets = { { 0, 0, 0 }, { static_cast<int32_t>(srcExtent.width), static_cast<int32_t>(srcExtent.height), 1 } },
         .dstSubresource = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1 },
         .dstOffsets = { { 0, 0, 0 }, { static_cast<int32_t>(dstExtent.width), static_cast<int32_t>(dstExtent.height), 1 } },
     };
 
-    vkCmdBlitImage(commandBuffer,
-        srcImage,
-        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-        dstImage,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        1,
-        &imageBlit,
-        VK_FILTER_NEAREST);
+    vkCmdBlitImage(commandBuffer, srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+        &imageBlit, VK_FILTER_NEAREST);
 }
 
 }

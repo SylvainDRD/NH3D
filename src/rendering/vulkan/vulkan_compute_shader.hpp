@@ -19,10 +19,7 @@ struct VulkanComputeShader : public VulkanPipeline {
     static void release(const IRHI& rhi, VkPipeline& pipeline, VkPipelineLayout& pipelineLayout);
 
     // Used generically by the ResourceManager, must be API agnostic
-    [[nodiscard]] static inline bool valid(const VkPipeline pipeline, const VkPipelineLayout layout)
-    {
-        return pipeline != nullptr && layout != nullptr;
-    }
+    static bool valid(const VkPipeline pipeline, const VkPipelineLayout layout);
 
     static void dispatch(VkCommandBuffer commandBuffer, const VkPipeline pipeline, const vec3i kernelSize);
 };

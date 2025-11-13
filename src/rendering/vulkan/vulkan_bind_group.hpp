@@ -11,6 +11,13 @@ namespace NH3D {
 
 struct DescriptorSets {
     std::array<VkDescriptorSet, IRHI::MaxFramesInFlight> sets;
+
+private:
+    // I don't like how much this pollutes the struct, but I expect only few direct set manipulations per frame
+    using UpdateArrayType = std::vector<VkWriteDescriptorSet>;
+    mutable std::array<UpdateArrayType, IRHI::MaxFramesInFlight> updates;
+
+    friend struct VulkanBindGroup;
 };
 
 struct BindGroupMetadata {
@@ -30,56 +37,68 @@ struct VulkanBindGroup {
         VkDevice device, const VkShaderStageFlags stageFlags, const std::initializer_list<VkDescriptorType>& bindingTypes);
 
     // Used generically by the ResourceManager, must be API agnostic, non-const ref for invalidation
-    static void release(const IRHI& rhi, DescriptorSets& descriptorSets, BindGroupMetadata& cold);
+    static void release(const IRHI& rhi, DescriptorSets& descriptorSets, BindGroupMetadata& metadata);
 
-    // Used generically by the ResourceManager, must be API agnostic
-    static inline bool valid(const DescriptorSets& descriptorSets, const BindGroupMetadata& cold)
-    {
-        return descriptorSets.sets[0] != nullptr && cold.layout != nullptr && cold.pool != nullptr;
-    }
+    static bool valid(const DescriptorSets& descriptorSets, const BindGroupMetadata& metadata);
 
     /// Helper functions
-    [[nodiscard]] static VkDescriptorSet getDescriptorSet(
+    [[nodiscard]] static VkDescriptorSet getUpdatedDescriptorSet(
         const VkDevice device, const DescriptorSets& descriptorSets, const uint32_t frameInFlightId);
 
-    static inline void bind(VkCommandBuffer commandBuffer, const VkDescriptorSet descriptorSet, const VkPipelineBindPoint bindPoint,
-        const VkPipelineLayout pipelineLayout)
-    {
-        vkCmdBindDescriptorSets(commandBuffer, bindPoint, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
-    }
+    static void bind(VkCommandBuffer commandBuffer, const VkDescriptorSet descriptorSet, const VkPipelineBindPoint bindPoint,
+        const VkPipelineLayout pipelineLayout);
 
-    template <typename T> static inline void updateDescriptorSet(VkDevice device, const VkDescriptorSet descriptorSet, const T& info)
+    template <typename T>
+    static inline void updateDescriptorSet(
+        VkDevice device, const VkDescriptorSet descriptorSet, const T& info, const VkDescriptorType type, uint32 binding = 0)
     {
-        VkWriteDescriptorSet descWrite;
-
-        // TODO: generalize the descriptor type, its currently too specific
-        if constexpr (std::is_same_v<T, VkDescriptorImageInfo>) {
-            descWrite = VkWriteDescriptorSet { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .dstSet = descriptorSet,
-                .dstBinding = 0,
-                .dstArrayElement = 0,
-                .descriptorCount = 1,
-                .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-                .pImageInfo = &info };
-        } else if constexpr (std::is_same_v<T, VkDescriptorBufferInfo>) {
-            descWrite = VkWriteDescriptorSet { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .dstSet = descriptorSet,
-                .dstBinding = 0,
-                .dstArrayElement = 0,
-                .descriptorCount = 1,
-                .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                .pBufferInfo = &info };
-        }
+        const VkWriteDescriptorSet descWrite = createWriteDescriptorSet(descriptorSet, info, type, binding);
         vkUpdateDescriptorSets(device, 1, &descWrite, 0, nullptr);
     }
 
     template <typename T>
-    static inline void descriptorSetsBufferedUpdate(VkDevice device, const DescriptorSets& descriptorSets, const T& info)
+    static inline void registerBufferedUpdate(
+        const DescriptorSets& descriptorSets, const T& info, const VkDescriptorType type, uint32_t binding = 0)
     {
-        // TODO: buffer write to make sure the set is not in used while updating
-        for (const VkDescriptorSet descriptorSet : descriptorSets.sets) {
-            updateDescriptorSet(device, descriptorSet, info);
+        for (uint32 i = 0; i < IRHI::MaxFramesInFlight; ++i) {
+            VkWriteDescriptorSet descWrite = createWriteDescriptorSet(descriptorSets.sets[i], info, type, binding);
+            descriptorSets.updates[i].emplace_back(descWrite);
         }
+    }
+
+private:
+    template <typename T>
+    constexpr static inline VkWriteDescriptorSet createWriteDescriptorSet(
+        const VkDescriptorSet descriptorSet, const T& info, const VkDescriptorType type, uint32 binding)
+    {
+        VkWriteDescriptorSet descWrite;
+
+        if constexpr (std::is_same_v<T, VkDescriptorImageInfo>) {
+            NH3D_ASSERT(type == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE || type == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE
+                    || type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER || type == VK_DESCRIPTOR_TYPE_SAMPLER,
+                "Descriptor type does not match info type");
+
+            descWrite = VkWriteDescriptorSet { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .dstSet = descriptorSet,
+                .dstBinding = binding,
+                .dstArrayElement = 0,
+                .descriptorCount = 1,
+                .descriptorType = type,
+                .pImageInfo = &info };
+        } else if constexpr (std::is_same_v<T, VkDescriptorBufferInfo>) {
+            NH3D_ASSERT(type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER || type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
+                    || type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC || type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC,
+                "Descriptor type does not match info type");
+
+            descWrite = VkWriteDescriptorSet { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .dstSet = descriptorSet,
+                .dstBinding = binding,
+                .dstArrayElement = 0,
+                .descriptorCount = 1,
+                .descriptorType = type,
+                .pBufferInfo = &info };
+        }
+        return descWrite;
     }
 };
 

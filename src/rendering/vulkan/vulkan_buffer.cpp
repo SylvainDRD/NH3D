@@ -25,7 +25,6 @@ std::pair<VkBuffer, BufferAllocationInfo> VulkanBuffer::create(
     if (initialData) {
         if (allocationInfo.pMappedData) {
             std::memcpy(allocationInfo.pMappedData, initialData, size);
-            // TODO: check if flush is required based on memory type
             vmaFlushAllocation(rhi.getAllocator(), allocation, 0, size);
         } else {
             // TODO: reuse staging buffers for multiple uploads
@@ -53,6 +52,11 @@ void VulkanBuffer::release(const IRHI& rhi, VkBuffer& buffer, BufferAllocationIn
     buffer = nullptr;
     allocation.allocation = nullptr;
     allocation.allocationInfo = {};
+}
+
+bool VulkanBuffer::valid(const VkBuffer buffer, const BufferAllocationInfo& allocation)
+{
+    return buffer != nullptr && allocation.allocation != nullptr;
 }
 
 [[nodiscard]] VkDeviceAddress VulkanBuffer::getDeviceAddress(const VulkanRHI& rhi, const VkBuffer buffer)

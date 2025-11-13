@@ -31,7 +31,7 @@ struct VulkanBuffer {
     static void release(const IRHI& rhi, VkBuffer& buffer, BufferAllocationInfo& allocation);
 
     // Used generically by the ResourceManager, must be API agnostic
-    [[nodiscard]] static inline bool valid(const VkBuffer buffer, const BufferAllocationInfo& allocation) { return buffer != nullptr; }
+    static bool valid(const VkBuffer buffer, const BufferAllocationInfo& allocation);
 
     [[nodiscard]] static VkDeviceAddress getDeviceAddress(const VulkanRHI& rhi, const VkBuffer buffer);
 

@@ -203,12 +203,12 @@ void VulkanRHI::render(Scene& scene) const
 
     beginCommandBuffer(commandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
-    const auto& rtImageViewData = _textureManager.get<VulkanTexture::ImageView>(_renderTargets[frameInFlightId]);
-    auto& rtMetadata = _textureManager.get<VulkanTexture::Metadata>(_renderTargets[frameInFlightId]);
+    const auto& rtImageViewData = _textureManager.get<ImageView>(_renderTargets[frameInFlightId]);
+    auto& rtMetadata = _textureManager.get<TextureMetadata>(_renderTargets[frameInFlightId]);
     VulkanTexture::changeLayoutBarrier(commandBuffer, rtImageViewData.image, rtMetadata.layout, VK_IMAGE_LAYOUT_GENERAL);
 
     const auto& computeDescriptorSets = _bindGroupManager.get<DescriptorSets>(_computeBindGroup);
-    VkDescriptorSet descriptorSet = VulkanBindGroup::getDescriptorSet(_device, computeDescriptorSets, frameInFlightId);
+    VkDescriptorSet descriptorSet = VulkanBindGroup::getUpdatedDescriptorSet(_device, computeDescriptorSets, frameInFlightId);
 
     // I think all this could be done just once this it never changes (for each frame descriptor and the push constants)²
 
@@ -228,7 +228,7 @@ void VulkanRHI::render(Scene& scene) const
     // update DS, bind pipeline, bind DS, dispatch
     const VkDescriptorImageInfo imageInfo { .imageView = rtImageViewData.view, .imageLayout = VK_IMAGE_LAYOUT_GENERAL };
 
-    VulkanBindGroup::updateDescriptorSet(_device, descriptorSet, imageInfo);
+    VulkanBindGroup::updateDescriptorSet(_device, descriptorSet, imageInfo, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
     VulkanBindGroup::bind(commandBuffer, descriptorSet, VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout);
 
     const vec3i kernelSize { std::ceil(rtMetadata.extent.width / 8.f), std::ceil(rtMetadata.extent.height / 8.f), 1 };
@@ -243,8 +243,8 @@ void VulkanRHI::render(Scene& scene) const
 
     VulkanTexture::changeLayoutBarrier(commandBuffer, rtImageViewData.image, rtMetadata.layout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
-    const auto& scImageViewData = _textureManager.get<VulkanTexture::ImageView>(_swapchainTextures[swapchainImageId]);
-    auto& scMetadata = _textureManager.get<VulkanTexture::Metadata>(_swapchainTextures[swapchainImageId]);
+    const auto& scImageViewData = _textureManager.get<ImageView>(_swapchainTextures[swapchainImageId]);
+    auto& scMetadata = _textureManager.get<TextureMetadata>(_swapchainTextures[swapchainImageId]);
 
     VulkanTexture::changeLayoutBarrier(commandBuffer, scImageViewData.image, scMetadata.layout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
@@ -354,6 +354,8 @@ std::pair<VkPhysicalDevice, VulkanRHI::PhysicalDeviceQueueFamilyID> VulkanRHI::s
     std::string selectedDeviceName;
     uint32_t deviceId = NH3D_MAX_T(uint32_t);
 
+    const VkQueueFlags requiredQueueFlags = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT;
+
     for (uint32_t i = 0; i < physicalDeviceCount; ++i) {
         VkPhysicalDeviceProperties properties;
         vkGetPhysicalDeviceProperties(availableGpus[i], &properties);
@@ -373,7 +375,7 @@ std::pair<VkPhysicalDevice, VulkanRHI::PhysicalDeviceQueueFamilyID> VulkanRHI::s
             queues = {};
             for (int32_t queueId = 0; queueId < familyCount; ++queueId) {
                 if (queues.GraphicsQueueFamilyID == NH3D_MAX_T(decltype(queues.GraphicsQueueFamilyID))
-                    && queueData[queueId].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+                    && queueData[queueId].queueFlags & requiredQueueFlags) {
                     queues.GraphicsQueueFamilyID = queueId;
                 }
 
@@ -424,7 +426,8 @@ VkDevice VulkanRHI::createLogicalDevice(VkPhysicalDevice gpu, PhysicalDeviceQueu
         .descriptorBindingSampledImageUpdateAfterBind = VK_TRUE,
         .descriptorBindingStorageImageUpdateAfterBind = VK_TRUE,
         .bufferDeviceAddress = VK_TRUE
-        // descriptorBindingUniformBufferUpdateAfterBind seems to be poorly supported, see https://vulkan.gpuinfo.org/listfeaturescore12.php
+        // descriptorBindingUniformBufferUpdateAfterBind seems to be poorly supported, see
+        // https://vulkan.gpuinfo.org/listfeaturescore12.php
     };
     VkPhysicalDeviceVulkan13Features features13 { .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
         .pNext = &features12,
@@ -490,7 +493,7 @@ std::pair<VkSwapchainKHR, VkFormat> VulkanRHI::createSwapchain(VkDevice device, 
         .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
         .preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
         .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-        .presentMode = VK_PRESENT_MODE_FIFO_KHR,
+        .presentMode = VK_PRESENT_MODE_FIFO_KHR, // TODO: allow uncapped framerate
         .clipped = VK_TRUE,
         .oldSwapchain = previousSwapchain };
 
@@ -621,5 +624,4 @@ VmaAllocator VulkanRHI::createVMAAllocator(VkInstance instance, VkPhysicalDevice
 
     return allocator;
 }
-
 }

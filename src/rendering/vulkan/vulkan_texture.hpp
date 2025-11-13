@@ -12,38 +12,37 @@ namespace NH3D {
 
 class VulkanRHI;
 
+struct ImageView {
+    VkImage image;
+    VkImageView view;
+};
+
+struct TextureMetadata {
+    VkFormat format;
+    VkExtent3D extent;
+    VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    VmaAllocation allocation = nullptr;
+};
+
 struct VulkanTexture {
     using ResourceType = Texture;
 
-    struct ImageView {
-        VkImage image;
-        VkImageView view;
-    };
     using HotType = ImageView;
 
-    struct Metadata {
-        VkFormat format;
-        VkExtent3D extent;
-        VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
-        VmaAllocation allocation = nullptr;
-    };
-    using ColdType = Metadata;
+    using ColdType = TextureMetadata;
 
     /// "Constructors / Destructors"
-    [[nodiscard]] static std::pair<ImageView, Metadata> create(
-        const VulkanRHI& rhi, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, VkImageAspectFlags aspect, bool generateMipMaps);
+    [[nodiscard]] static std::pair<ImageView, TextureMetadata> create(const VulkanRHI& rhi, const VkFormat format, const VkExtent3D extent,
+        const VkImageUsageFlags usage, const VkImageAspectFlags aspect, const bool generateMipMaps);
 
-    [[nodiscard]] static std::pair<ImageView, Metadata> wrapSwapchainImage(
-        const VulkanRHI& rhi, VkImage image, VkFormat format, VkExtent3D extent, VkImageAspectFlags aspect);
+    [[nodiscard]] static std::pair<ImageView, TextureMetadata> wrapSwapchainImage(
+        const VulkanRHI& rhi, const VkImage image, const VkFormat format, const VkExtent3D extent, const VkImageAspectFlags aspect);
 
     // Used generically by the ResourceManager, must be API agnostic, non-const ref for invalidation
-    static void release(const IRHI& rhi, ImageView& imageViewData, Metadata& metadata);
+    static void release(const IRHI& rhi, ImageView& imageViewData, TextureMetadata& metadata);
 
     // Used generically by the ResourceManager, must be API agnostic
-    [[nodiscard]] static inline bool valid(const ImageView& imageViewData, const Metadata& metadata)
-    {
-        return imageViewData.image != nullptr && imageViewData.view != nullptr;
-    }
+    static bool valid(const ImageView& imageViewData, const TextureMetadata& metadata);
 
     /// Helper functions
     static void insertBarrier(VkCommandBuffer commandBuffer, const VkImage image, const VkImageLayout layout);
@@ -53,7 +52,8 @@ struct VulkanTexture {
 
     static void clear(VkCommandBuffer commandBuffer, VkImage image, const color4 color);
 
-    static void blit(VkCommandBuffer commandBuffer, const VkImage srcImage, const VkExtent3D srcExtent, VkImage dstImage, const VkExtent3D dstExtent);
+    static void blit(
+        VkCommandBuffer commandBuffer, const VkImage srcImage, const VkExtent3D srcExtent, VkImage dstImage, const VkExtent3D dstExtent);
 };
 
 }
