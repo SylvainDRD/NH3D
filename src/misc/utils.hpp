@@ -8,14 +8,15 @@ namespace NH3D {
 #define NH3D_MIN_T(T) std::numeric_limits<T>::min()
 #define NH3D_MAX_T(T) std::numeric_limits<T>::max()
 
-#define _NH3D_ENDLOG " - " << __FILE__ << ":" << __LINE__ << "\033[0m" << std::endl
+#define _NH3D_RAWENDLOG "\033[0m" << std::endl
+#define _NH3D_ENDLOG " - " << __FILE__ << ":" << __LINE__ << _NH3D_RAWENDLOG
 
 #define NH3D_LOG(msg) std::cout << "[LOG]: " << msg << _NH3D_ENDLOG
-#define NH3D_LOG_VK(msg) std::cout << "[VK LOG]: " << msg << _NH3D_ENDLOG
+#define NH3D_LOG_VK(msg) std::cout << "[VK LOG]: " << msg << _NH3D_RAWENDLOG
 #define NH3D_WARN(msg) std::cerr << "\033[93m[WARNING]: " << msg << _NH3D_ENDLOG
-#define NH3D_WARN_VK(msg) std::cerr << "\033[93m[VK WARNING]: " << msg << _NH3D_ENDLOG
+#define NH3D_WARN_VK(msg) std::cerr << "\033[93m[VK WARNING]: " << msg << _NH3D_RAWENDLOG
 #define NH3D_ERROR(msg) std::cerr << "\033[31m[ERROR]: " << msg << _NH3D_ENDLOG
-#define NH3D_ERROR_VK(msg) std::cerr << "\033[31m[VK ERROR]: " << msg << _NH3D_ENDLOG
+#define NH3D_ERROR_VK(msg) std::cerr << "\033[31m[VK ERROR]: " << msg << _NH3D_RAWENDLOG
 
 #define _NH3D_FATAL(msg) std::cerr << "\033[31m[FATAL]: " << msg << _NH3D_ENDLOG
 #define NH3D_ABORT(reason)   \

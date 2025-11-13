@@ -45,9 +45,10 @@ namespace NH3D {
 [[nodiscard]] std::pair<ImageView, TextureMetadata> VulkanTexture::wrapSwapchainImage(
     const VulkanRHI& rhi, const VkImage image, const VkFormat format, const VkExtent3D extent, const VkImageAspectFlags aspect)
 {
+    NH3D_ASSERT(extent.depth == 1, "Swapchain images must be 2D");
     VkImageViewCreateInfo viewCreateInfo { .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
         .image = image,
-        .viewType = extent.depth == 1 ? VK_IMAGE_VIEW_TYPE_2D : VK_IMAGE_VIEW_TYPE_3D,
+        .viewType = VK_IMAGE_VIEW_TYPE_2D ,
         .format = format,
         .subresourceRange = { .aspectMask = aspect, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1 } };
 

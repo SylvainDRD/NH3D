@@ -278,6 +278,8 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vulkanValidationCallback(VkDebugUtilsMessa
         NH3D_WARN_VK(pCallbackData->pMessage);
     } else if (severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
         NH3D_ERROR_VK(pCallbackData->pMessage);
+    } else if (type & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) {
+        NH3D_WARN_VK(pCallbackData->pMessage);
     }
 
     return VK_FALSE;
