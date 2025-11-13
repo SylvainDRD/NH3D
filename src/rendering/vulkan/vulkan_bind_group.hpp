@@ -32,9 +32,9 @@ struct VulkanBindGroup {
 
     using ColdType = BindGroupMetadata;
 
-    /// "Constructor / Destructor"
-    [[nodiscard]] static std::pair<DescriptorSets, BindGroupMetadata> create(
-        VkDevice device, const VkShaderStageFlags stageFlags, const std::initializer_list<VkDescriptorType>& bindingTypes);
+    /// "Constructor / Destructor": finalBindingCount is used to determine if we are using variable descriptor count
+    [[nodiscard]] static std::pair<DescriptorSets, BindGroupMetadata> create(VkDevice device, const VkShaderStageFlags stageFlags,
+        const std::initializer_list<VkDescriptorType>& bindingTypes, const uint32 finalBindingCount = 1);
 
     // Used generically by the ResourceManager, must be API agnostic, non-const ref for invalidation
     static void release(const IRHI& rhi, DescriptorSets& descriptorSets, BindGroupMetadata& metadata);

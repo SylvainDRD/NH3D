@@ -4,37 +4,49 @@
 
 namespace NH3D {
 
-[[nodiscard]] std::pair<DescriptorSets, BindGroupMetadata> VulkanBindGroup::create(
-    const VkDevice device, const VkShaderStageFlags stageFlags, const std::initializer_list<VkDescriptorType>& bindingTypes)
+[[nodiscard]] std::pair<DescriptorSets, BindGroupMetadata> VulkanBindGroup::create(const VkDevice device,
+    const VkShaderStageFlags stageFlags, const std::initializer_list<VkDescriptorType>& bindingTypes, const uint32 finalBindingCount)
 {
+    NH3D_ASSERT(bindingTypes.size() != 0, "Binding types list cannot be empty");
+
     static std::vector<VkDescriptorSetLayoutBinding> descriptorBindings {};
-    descriptorBindings.reserve(bindingTypes.size());
-    descriptorBindings.clear();
+    descriptorBindings.resize(bindingTypes.size());
 
     static std::unordered_map<VkDescriptorType, uint32_t> descriptorTypeCounts {};
     descriptorTypeCounts.reserve(bindingTypes.size());
     descriptorTypeCounts.clear();
 
-    uint32_t i = 0;
+    static std::vector<VkDescriptorBindingFlags> bindingFlags {};
+    bindingFlags.resize(bindingTypes.size());
+    std::memset(bindingFlags.data(), 0, bindingFlags.size() * sizeof(VkDescriptorBindingFlags));
+
+    uint32 bindingId = 0;
     for (VkDescriptorType descriptorType : bindingTypes) {
-        descriptorBindings.emplace_back(VkDescriptorSetLayoutBinding {
-            .binding = i++, .descriptorType = descriptorType, .descriptorCount = 1, .stageFlags = stageFlags });
+        descriptorBindings[bindingId] = VkDescriptorSetLayoutBinding {
+            .binding = bindingId, .descriptorType = descriptorType, .descriptorCount = 1, .stageFlags = stageFlags
+        };
         ++descriptorTypeCounts[descriptorType];
+
+        // If the last binding has more than one descriptor, use a variable count binding
+        if (bindingId == bindingTypes.size() - 1 && finalBindingCount > 1) {
+            bindingFlags[bindingId] = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
+            NH3D_ASSERT(descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                "Currently expect only combined image samplers to have variable descriptor count");
+        }
+
+        ++bindingId;
     }
 
-    const VkDescriptorBindingFlags bindingFlags = { VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT };
+    const VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlag { .sType
+        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
+        .bindingCount = static_cast<uint32_t>(bindingFlags.size()),
+        .pBindingFlags = bindingFlags.data() };
 
-    const VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlag {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO, .bindingCount = 1, .pBindingFlags = &bindingFlags
-    };
-
-    const VkDescriptorSetLayoutCreateInfo layoutCreateInfo {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+    const VkDescriptorSetLayoutCreateInfo layoutCreateInfo { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
         .pNext = &bindingFlag,
         .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT,
         .bindingCount = static_cast<uint32_t>(descriptorBindings.size()),
-        .pBindings = descriptorBindings.data(),
-    };
+        .pBindings = descriptorBindings.data() };
 
     VkDescriptorSetLayout layout;
     if (vkCreateDescriptorSetLayout(device, &layoutCreateInfo, nullptr, &layout) != VK_SUCCESS) {
@@ -69,10 +81,21 @@ namespace NH3D {
         .descriptorPool = pool,
         .descriptorSetCount = IRHI::MaxFramesInFlight,
         .pSetLayouts = layouts.data() };
+
+    if (finalBindingCount > 1) {
+        const std::array<uint32, IRHI::MaxFramesInFlight> bindingSizes { finalBindingCount, finalBindingCount };
+
+        VkDescriptorSetVariableDescriptorCountAllocateInfo varDescCountInfo { .sType
+            = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO,
+            .descriptorSetCount = bindingSizes.size(),
+            .pDescriptorCounts = bindingSizes.data() };
+        allocInfo.pNext = &varDescCountInfo;
+    }
+
     if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.sets.data()) != VK_SUCCESS) {
         NH3D_ABORT_VK("Failed to allocate Vulkan descriptor sets");
     }
-    
+
     return { { descriptorSets }, BindGroupMetadata { layout, pool } };
 }
 
@@ -103,8 +126,8 @@ bool VulkanBindGroup::valid(const DescriptorSets& descriptorSets, const BindGrou
     return descriptorSets.sets[frameInFlightId];
 }
 
-void VulkanBindGroup::bind(
-    VkCommandBuffer commandBuffer, const VkDescriptorSet descriptorSet, const VkPipelineBindPoint bindPoint, const VkPipelineLayout pipelineLayout)
+void VulkanBindGroup::bind(VkCommandBuffer commandBuffer, const VkDescriptorSet descriptorSet, const VkPipelineBindPoint bindPoint,
+    const VkPipelineLayout pipelineLayout)
 {
     vkCmdBindDescriptorSets(commandBuffer, bindPoint, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
 }
