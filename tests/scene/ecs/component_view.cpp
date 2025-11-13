@@ -110,4 +110,23 @@ TEST(ComponentViewTests, ViewSkipsRemovedEntities)
     EXPECT_EQ(count, 1);
 }
 
+TEST(ComponentViewTests, TagFilterTest)
+{
+    MockRHI rhi;
+    Scene scene { rhi };
+    const Entity e1 = scene.create(0);
+    const Entity e2 = scene.create(1);
+    const Entity e3 = scene.create(2);
+
+    scene.unsetTagFlags(e1, EntityTags::Visible);
+    scene.unsetTagFlags(e3, EntityTags::Enabled);
+
+    int count = 0;
+    for (auto [entity, value] : scene.makeView<int>(EntityTags::Visible)) {
+        EXPECT_TRUE(entity == e2 || entity == e3);
+        ++count;
+    }
+    EXPECT_EQ(count, 2);
+}
+
 } // namespace NH3D::Test

@@ -17,15 +17,6 @@ Scene::Scene(IRHI& rhi)
 {
     _entityMasks.reserve(400'000);
     _availableEntities.reserve(2'000);
-
-    // Debug only
-    create<RenderComponent>(RenderComponent { rhi,
-        {
-            { .position = vec4 { -1.f, 1.f, 0.f, 1.f }, .normal = vec4 { 1.0f, 0.0f, 0.0f, 0.0f }, .uv = vec2 { 1.0f, 0.0f } },
-            { .position = vec4 { 1.f, 1.f, 0.f, 1.f }, .normal = vec4 { 0.0f, 1.0f, 0.0f, 0.0f }, .uv = vec2 { 0.0f, 0.0f } },
-            { .position = vec4 { 0.f, -1.f, 0.f, 1.f }, .normal = vec4 { 0.0f, 0.0f, 1.0f, 0.0f }, .uv = vec2 { 0.5f, 1.0f } },
-        },
-        std::vector<uint32_t> { 0, 1, 2 } });
 }
 
 Scene::Scene(IRHI& rhi, const std::filesystem::path& filePath)
@@ -33,7 +24,7 @@ Scene::Scene(IRHI& rhi, const std::filesystem::path& filePath)
     _entityMasks.reserve(400'000);
     _availableEntities.reserve(2'000);
 
-    // TODO: pre-allocate a loading struct with strings for errors & warnings/tinygltf::Model/vectors for mesh data pre-allocated 
+    // TODO: pre-allocate a loading struct with strings for errors & warnings/tinygltf::Model/vectors for mesh data pre-allocated
 }
 
 namespace _private {
@@ -70,6 +61,11 @@ namespace _private {
 
 }
 
+[[nodiscard]] bool Scene::isValidEntity(const Entity entity) const
+{
+    return entity < _entityMasks.size() && (_entityMasks[entity] & SparseSetMap::InvalidEntityMask) == 0;
+}
+
 void Scene::remove(const Entity entity)
 {
     NH3D_ASSERT(entity < _entityMasks.size(), "Attempting to delete a non-existant entity");
@@ -89,4 +85,52 @@ void Scene::setParent(const Entity entity, const Entity parent)
     NH3D_ASSERT(entity != InvalidEntity, "Unexpected invalid entity");
     _hierarchy.setParent(entity, parent);
 }
+
+[[nodiscard]] bool Scene::isLeaf(const Entity entity) const
+{
+    NH3D_ASSERT(isValidEntity(entity), "Attempting to check leaf status of an invalid entity");
+
+    return _hierarchy.isLeaf(entity);
+}
+
+[[nodiscard]] Entity Scene::getMainCamera() const { return _mainCamera; }
+
+void Scene::setMainCamera(const Entity entity)
+{
+    NH3D_ASSERT(isValidEntity(entity), "Attempting to set main camera to an invalid entity");
+    NH3D_ASSERT(checkComponents<CameraComponent>(entity), "Attempting to set main camera to an entity without CameraComponent");
+
+    if (_mainCamera != InvalidEntity) {
+        _entityTags[_mainCamera] &= ~EntityTags::MainCamera;
+    }
+
+    _mainCamera = entity;
+    _entityTags[entity] |= EntityTags::MainCamera;
+}
+
+void Scene::setTagFlags(const Entity entity, EntityTag tag)
+{
+    NH3D_ASSERT(isValidEntity(entity), "Attempting to set tag flag of an invalid entity");
+    NH3D_ASSERT(!EntityTags::checkTag(tag, EntityTags::MAX), "Cannot set MAX tag flag");
+    NH3D_ASSERT(!EntityTags::checkTag(tag, EntityTags::MainCamera), "Cannot set MainCamera tag flag directly");
+
+    _entityTags[entity] |= tag;
+}
+
+void Scene::unsetTagFlags(const Entity entity, EntityTag tag)
+{
+    NH3D_ASSERT(isValidEntity(entity), "Attempting to unset tag flag of an invalid entity");
+    NH3D_ASSERT(!EntityTags::checkTag(tag, EntityTags::MAX), "Cannot unset MAX tag flag");
+    NH3D_ASSERT(!EntityTags::checkTag(tag, EntityTags::MainCamera), "Cannot unset MainCamera tag flag directly");
+
+    _entityTags[entity] &= ~tag;
+}
+
+[[nodiscard]] EntityTag Scene::getTag(const Entity entity) const
+{
+    NH3D_ASSERT(isValidEntity(entity), "Attempting to get tag of an invalid entity");
+
+    return _entityTags[entity];
+}
+
 }

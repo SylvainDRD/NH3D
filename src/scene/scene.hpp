@@ -4,6 +4,7 @@
 #include <misc/types.hpp>
 #include <misc/utils.hpp>
 #include <scene/ecs/component_view.hpp>
+#include <scene/ecs/components/camera_component.hpp>
 #include <scene/ecs/components/hierarchy_component.hpp>
 #include <scene/ecs/entity.hpp>
 #include <scene/ecs/hierarchy_sparse_set.hpp>
@@ -40,25 +41,34 @@ public:
 
     template <NotHierarchyComponent... Ts> inline void clearComponents(const Entity entity);
 
-    template <NotHierarchyComponent T, NotHierarchyComponent... Ts> [[nodiscard]] inline ComponentView<T, Ts...> makeView();
+    template <NotHierarchyComponent T, NotHierarchyComponent... Ts>
+    [[nodiscard]] inline ComponentView<T, Ts...> makeView(const EntityTag tagFilter = 0);
 
-    [[nodiscard]] inline bool isLeaf(const Entity entity) const;
+    [[nodiscard]] bool isLeaf(const Entity entity) const;
+
+    [[nodiscard]] Entity getMainCamera() const;
+
+    void setMainCamera(const Entity entity);
+
+    void setTagFlags(const Entity entity, EntityTag tag);
+
+    void unsetTagFlags(const Entity entity, EntityTag tag);
+
+    [[nodiscard]] EntityTag getTag(const Entity entity) const;
 
 private:
-    [[nodiscard]] inline bool isValidEntity(const Entity entity) const;
+    [[nodiscard]] bool isValidEntity(const Entity entity) const;
 
 private:
     SparseSetMap _setMap;
     std::vector<ComponentMask> _entityMasks;
+    std::vector<EntityTag> _entityTags;
     std::vector<uint32> _availableEntities;
+
+    Entity _mainCamera = InvalidEntity;
 
     HierarchySparseSet _hierarchy;
 };
-
-[[nodiscard]] inline bool Scene::isValidEntity(const Entity entity) const
-{
-    return entity < _entityMasks.size() && (_entityMasks[entity] & SparseSetMap::InvalidEntityMask) == 0;
-}
 
 template <NotHierarchyComponent T> [[nodiscard]] inline T& Scene::get(const Entity entity)
 {
@@ -80,9 +90,11 @@ template <NotHierarchyComponent... Ts> inline Entity Scene::create(Ts&&... compo
         entity = _availableEntities.back();
         _availableEntities.pop_back();
         _entityMasks[entity] = 0;
+        _entityTags[entity] = EntityTags::Default;
     } else {
         entity = _entityMasks.size();
         _entityMasks.emplace_back(0);
+        _entityTags.emplace_back(EntityTags::Default);
     }
 
     add(entity, std::forward<Ts>(components)...);
@@ -97,12 +109,16 @@ template <NotHierarchyComponent... Ts> inline void Scene::add(const Entity entit
     _setMap.add(entity, std::forward<Ts>(components)...);
 
     _entityMasks[entity] |= mask;
+
+    if (ComponentMasks::checkComponents(_setMap.mask<CameraComponent>(), mask) && _mainCamera == InvalidEntity) {
+        _mainCamera = entity;
+    }
 }
 
 template <NotHierarchyComponent... Ts> [[nodiscard]] inline bool Scene::checkComponents(const Entity entity) const
 {
     NH3D_ASSERT(isValidEntity(entity), "Attempting to check components of an invalid entity");
-    return ComponentMaskUtils::checkComponents(_entityMasks[entity], _setMap.mask<Ts...>());
+    return ComponentMasks::checkComponents(_entityMasks[entity], _setMap.mask<Ts...>());
 }
 
 template <NotHierarchyComponent... Ts> inline void Scene::clearComponents(const Entity entity)
@@ -115,16 +131,10 @@ template <NotHierarchyComponent... Ts> inline void Scene::clearComponents(const 
     _entityMasks[entity] ^= _setMap.mask<Ts...>();
 }
 
-template <NotHierarchyComponent T, NotHierarchyComponent... Ts> [[nodiscard]] inline ComponentView<T, Ts...> Scene::makeView()
+template <NotHierarchyComponent T, NotHierarchyComponent... Ts>
+[[nodiscard]] inline ComponentView<T, Ts...> Scene::makeView(const EntityTag tagFilter)
 {
-    return _setMap.makeView<T, Ts...>(_entityMasks);
-}
-
-[[nodiscard]] inline bool Scene::isLeaf(const Entity entity) const
-{
-    NH3D_ASSERT(isValidEntity(entity), "Attempting to check leaf status of an invalid entity");
-
-    return _hierarchy.isLeaf(entity);
+    return _setMap.makeView<T, Ts...>(_entityMasks, _entityTags, tagFilter);
 }
 
 }
