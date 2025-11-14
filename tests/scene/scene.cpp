@@ -179,42 +179,4 @@ TEST(SceneTests, GetSetMainCamera)
     EXPECT_EQ(scene.getMainCamera(), e1);
 }
 
-TEST(SceneTests, SetUnsetCameraTagFlag)
-{
-    MockRHI rhi;
-    Scene scene { rhi };
-    const Entity e = scene.create(1);
-
-    EXPECT_DEATH(scene.setTagFlags(e, EntityTags::MainCamera), ".*FATAL.*");
-    EXPECT_DEATH(scene.unsetTagFlags(e, EntityTags::MainCamera), ".*FATAL.*");
-}
-
-TEST(SceneTests, SetUnsetMaxTagFlag)
-{
-    MockRHI rhi;
-    Scene scene { rhi };
-    const Entity e = scene.create(1);
-
-    EXPECT_DEATH(scene.setTagFlags(e, EntityTags::MAX), ".*FATAL.*");
-    EXPECT_DEATH(scene.unsetTagFlags(e, EntityTags::MAX), ".*FATAL.*");
-}
-
-TEST(SceneTests, SetUnsetGetTag)
-{
-    MockRHI rhi;
-    Scene scene { rhi };
-    const Entity e = scene.create(1);
-
-    EXPECT_EQ(scene.getTag(e), EntityTags::Default);
-
-    scene.setTagFlags(e, EntityTags::Enabled);
-    EXPECT_EQ(scene.getTag(e), EntityTags::Default);
-
-    scene.unsetTagFlags(e, EntityTags::Enabled);
-    EXPECT_EQ(scene.getTag(e), EntityTags::Default & ~EntityTags::Enabled);
-
-    scene.setTagFlags(e, EntityTags::Visible | EntityTags::CastShadows);
-    EXPECT_EQ(scene.getTag(e), EntityTags::Default & ~EntityTags::Enabled);
-}
-
 } // namespace NH3D::Test

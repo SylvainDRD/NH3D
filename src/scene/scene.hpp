@@ -41,8 +41,7 @@ public:
 
     template <NotHierarchyComponent... Ts> inline void clearComponents(const Entity entity);
 
-    template <NotHierarchyComponent T, NotHierarchyComponent... Ts>
-    [[nodiscard]] inline ComponentView<T, Ts...> makeView(const EntityTag tagFilter = 0);
+    template <NotHierarchyComponent T, NotHierarchyComponent... Ts> [[nodiscard]] inline ComponentView<T, Ts...> makeView();
 
     [[nodiscard]] bool isLeaf(const Entity entity) const;
 
@@ -50,11 +49,11 @@ public:
 
     void setMainCamera(const Entity entity);
 
-    void setTagFlags(const Entity entity, EntityTag tag);
+    void setVisibleFlag(const Entity entity, const bool flag);
 
-    void unsetTagFlags(const Entity entity, EntityTag tag);
+    [[nodiscard]] bool isVisible(const Entity entity);
 
-    [[nodiscard]] EntityTag getTag(const Entity entity) const;
+    [[nodiscard]] const void* getRawVisibleFlags();
 
 private:
     [[nodiscard]] bool isValidEntity(const Entity entity) const;
@@ -62,7 +61,6 @@ private:
 private:
     SparseSetMap _setMap;
     std::vector<ComponentMask> _entityMasks;
-    std::vector<EntityTag> _entityTags;
     std::vector<uint32> _availableEntities;
 
     Entity _mainCamera = InvalidEntity;
@@ -90,11 +88,9 @@ template <NotHierarchyComponent... Ts> inline Entity Scene::create(Ts&&... compo
         entity = _availableEntities.back();
         _availableEntities.pop_back();
         _entityMasks[entity] = 0;
-        _entityTags[entity] = EntityTags::Default;
     } else {
         entity = _entityMasks.size();
         _entityMasks.emplace_back(0);
-        _entityTags.emplace_back(EntityTags::Default);
     }
 
     add(entity, std::forward<Ts>(components)...);
@@ -131,10 +127,9 @@ template <NotHierarchyComponent... Ts> inline void Scene::clearComponents(const 
     _entityMasks[entity] ^= _setMap.mask<Ts...>();
 }
 
-template <NotHierarchyComponent T, NotHierarchyComponent... Ts>
-[[nodiscard]] inline ComponentView<T, Ts...> Scene::makeView(const EntityTag tagFilter)
+template <NotHierarchyComponent T, NotHierarchyComponent... Ts> [[nodiscard]] inline ComponentView<T, Ts...> Scene::makeView()
 {
-    return _setMap.makeView<T, Ts...>(_entityMasks, _entityTags, tagFilter);
+    return _setMap.makeView<T, Ts...>(_entityMasks);
 }
 
 }

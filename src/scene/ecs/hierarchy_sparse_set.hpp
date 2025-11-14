@@ -49,19 +49,19 @@ inline void HierarchySparseSet::add(const Entity entity, HierarchyComponent&& co
 {
     NH3D_ASSERT(entity != InvalidEntity, "Unexpected invalid entity");
 
-    const uint32 _bufferId = entity >> BufferBitSize;
+    const uint32 bufferId = entity >> BufferBitSize;
     const uint32 indexId = entity & (BufferSize - 1);
 
-    if (_bufferId >= _entityLUT.size()) {
-        _entityLUT.resize(_bufferId + 1);
+    if (bufferId >= _entityLUT.size()) {
+        _entityLUT.resize(bufferId + 1);
     }
 
-    if (_entityLUT[_bufferId] == nullptr) {
-        _entityLUT[_bufferId] = std::make_unique_for_overwrite<uint32[]>(BufferSize);
-        std::memset(_entityLUT[_bufferId].get(), InvalidIndex, BufferSize * sizeof(uint32));
+    if (_entityLUT[bufferId] == nullptr) {
+        _entityLUT[bufferId] = std::make_unique_for_overwrite<uint32[]>(BufferSize);
+        std::memset(_entityLUT[bufferId].get(), InvalidIndex, BufferSize * sizeof(uint32));
     }
 
-    uint32& index = _entityLUT[_bufferId][indexId];
+    uint32& index = _entityLUT[bufferId][indexId];
     NH3D_ASSERT(index == InvalidIndex, "Trying to overwrite an existing component");
 
     if (component.parent() == InvalidEntity) {
@@ -216,9 +216,9 @@ inline void HierarchySparseSet::setParent(const Entity entity, const Entity newP
 [[nodiscard]] inline bool HierarchySparseSet::isAllocated(const Entity entity) const
 {
     NH3D_ASSERT(entity != InvalidEntity, "Unexpected invalid entity");
-    const uint32 _bufferId = entity >> BufferBitSize;
+    const uint32 bufferId = entity >> BufferBitSize;
     const uint32 indexId = entity & (BufferSize - 1);
-    return _bufferId < _entityLUT.size() && _entityLUT[_bufferId] != nullptr && _entityLUT[_bufferId][indexId] != InvalidIndex;
+    return bufferId < _entityLUT.size() && _entityLUT[bufferId] != nullptr && _entityLUT[bufferId][indexId] != InvalidIndex;
 }
 
 [[nodiscard]] inline uint32 HierarchySparseSet::getSubtreeEndId(const uint32 entityId) const

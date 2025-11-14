@@ -10,9 +10,9 @@ std::pair<VkBuffer, BufferAllocationInfo> VulkanBuffer::create(
     // TODO: see if this works out in the future
     const VkBufferUsageFlags updatedUsageFlags = usageFlags | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
-    VkBufferCreateInfo bufferCreateInfo { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, .size = size, .usage = updatedUsageFlags };
+    const VkBufferCreateInfo bufferCreateInfo { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, .size = size, .usage = updatedUsageFlags };
 
-    VmaAllocationCreateInfo allocationCreateInfo { .flags = VMA_ALLOCATION_CREATE_MAPPED_BIT, .usage = memoryUsage };
+    const VmaAllocationCreateInfo allocationCreateInfo { .flags = VMA_ALLOCATION_CREATE_MAPPED_BIT, .usage = memoryUsage };
 
     VkBuffer buffer;
     VmaAllocation allocation;
@@ -25,7 +25,9 @@ std::pair<VkBuffer, BufferAllocationInfo> VulkanBuffer::create(
     if (initialData) {
         if (allocationInfo.pMappedData) {
             std::memcpy(allocationInfo.pMappedData, initialData, size);
-            vmaFlushAllocation(rhi.getAllocator(), allocation, 0, size);
+            if (memoryUsage != VMA_MEMORY_USAGE_CPU_ONLY) {
+                vmaFlushAllocation(rhi.getAllocator(), allocation, 0, size);
+            }
         } else {
             // TODO: reuse staging buffers for multiple uploads
             auto [stagingBuffer, stagingAllocation]

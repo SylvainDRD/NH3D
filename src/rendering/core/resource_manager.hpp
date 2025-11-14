@@ -19,7 +19,7 @@ public:
 
     ResourceManager() = delete;
 
-    ResourceManager(size_t preallocSize, size_t freelistSize);
+    ResourceManager(const size_t preallocSize, const size_t freelistSize);
 
     [[nodiscard]] inline size_t size() const;
 
@@ -37,7 +37,7 @@ private:
     std::vector<HandleType> _availableHandles;
 };
 
-template <typename T> [[nodiscard]] inline ResourceManager<T>::ResourceManager(size_t preallocSize, size_t freelistSize)
+template <typename T> [[nodiscard]] inline ResourceManager<T>::ResourceManager(const size_t preallocSize, const size_t freelistSize)
 {
     _hot.reserve(preallocSize);
     _cold.reserve(preallocSize);

@@ -3,34 +3,34 @@
 #include <rendering/vulkan/vulkan_rhi.hpp>
 #include <scene/ecs/components/render_component.hpp>
 #include <scene/scene.hpp>
+#include <vector>
 
 namespace NH3D {
 
 Engine::Engine()
     : _window {}
+    , _rhi { std::make_unique<VulkanRHI>(_window) }
+    , _mainScene { *_rhi.get() }
+    , _resourceMapper { std::make_unique<ResourceMapper>() }
 {
-    _rhi = std::make_unique<VulkanRHI>(_window);
 }
 
 Engine::~Engine() { }
 
-void Engine::run()
+IRHI& Engine::getRHI() const { return *_rhi; }
+
+Scene& Engine::getMainScene() const { return _mainScene; }
+
+ResourceMapper& Engine::getResourceMapper() const { return *_resourceMapper; }
+
+bool Engine::update()
 {
-    Scene scene { *_rhi.get() };
-
-    // Debug only
-    scene.create(RenderComponent { *_rhi.get(),
-        {
-            { .position = vec4 { -1.f, 1.f, 0.f, 1.f }, .normal = vec4 { 1.0f, 0.0f, 0.0f, 0.0f }, .uv = vec2 { 1.0f, 0.0f } },
-            { .position = vec4 { 1.f, 1.f, 0.f, 1.f }, .normal = vec4 { 0.0f, 1.0f, 0.0f, 0.0f }, .uv = vec2 { 0.0f, 0.0f } },
-            { .position = vec4 { 0.f, -1.f, 0.f, 1.f }, .normal = vec4 { 0.0f, 0.0f, 1.0f, 0.0f }, .uv = vec2 { 0.5f, 1.0f } },
-        },
-        std::vector<uint32_t> { 0, 1, 2 } });
-
-    while (!_window.windowClosing()) {
-        _rhi->render(scene);
+    if (!_window.windowClosing()) {
+        _rhi->render(_mainScene);
         _window.update();
+        return true;
     }
+    return false;
 }
 
 }

@@ -17,8 +17,7 @@ template <typename T, typename... Ts> class ComponentView {
 public:
     ComponentView() = delete;
 
-    ComponentView(const std::vector<ComponentMask>& entityMasks, const std::vector<EntityTag>& entityTags, TupleType sets,
-        const ComponentMask mask, const EntityTag tagFilter);
+    ComponentView(const std::vector<ComponentMask>& entityMasks, TupleType sets, const ComponentMask mask);
 
     class Iterator {
     public:
@@ -30,9 +29,7 @@ public:
 
             do {
                 ++_id;
-            } while (_id != entities.size() 
-                && (!ComponentMasks::checkComponents(_entityMasks[entities[_id]], _mask)
-                    || !EntityTags::checkTag(_entityTags[entities[_id]], _tagFilter)));
+            } while (_id != entities.size() && !ComponentMasks::checkComponents(_entityMasks[entities[_id]], _mask));
 
             return *this;
         }
@@ -50,29 +47,22 @@ public:
         }
 
     private:
-        Iterator(const std::vector<ComponentMask>& entityMasks, const std::vector<EntityTag>& entityTags, TupleType& sets,
-            const ComponentMask mask, const EntityTag tagFilter)
+        Iterator(const std::vector<ComponentMask>& entityMasks, TupleType& sets, const ComponentMask mask)
             : _entityMasks { entityMasks }
-            , _entityTags { entityTags }
             , _sets { sets }
             , _mask { mask }
-            , _tagFilter { tagFilter }
         {
             const auto& entities = std::get<SparseSet<std::remove_cvref_t<T>>&>(_sets).entities();
 
-            while (_id != entities.size()
-                && (!ComponentMasks::checkComponents(_entityMasks[entities[_id]], _mask)
-                    || !EntityTags::checkTag(_entityTags[entities[_id]], _tagFilter))) {
+            while (_id != entities.size() && !ComponentMasks::checkComponents(_entityMasks[entities[_id]], _mask)) {
                 ++_id;
             }
         }
 
     private:
         const std::vector<ComponentMask>& _entityMasks;
-        const std::vector<EntityTag>& _entityTags;
         TupleType& _sets;
         const ComponentMask _mask;
-        const EntityTag _tagFilter;
 
         uint32 _id = 0;
 
@@ -85,31 +75,26 @@ public:
 
 private:
     const std::vector<ComponentMask>& _entityMasks;
-    const std::vector<EntityTag>& _entityTags;
     TupleType _sets;
     const ComponentMask _mask;
-    const EntityTag _tagFilter;
 };
 
 template <typename T, typename... Ts>
-ComponentView<T, Ts...>::ComponentView(const std::vector<ComponentMask>& entityMasks, const std::vector<EntityTag>& entityTags,
-    TupleType sets, const ComponentMask mask, const EntityTag tagFilter)
+ComponentView<T, Ts...>::ComponentView(const std::vector<ComponentMask>& entityMasks, TupleType sets, const ComponentMask mask)
     : _entityMasks { entityMasks }
-    , _entityTags { entityTags }
     , _sets { sets }
     , _mask { mask }
-    , _tagFilter { tagFilter }
 {
 }
 
 template <typename T, typename... Ts> ComponentView<T, Ts...>::Iterator ComponentView<T, Ts...>::begin()
 {
-    return ComponentView<T, Ts...>::Iterator { _entityMasks, _entityTags, _sets, _mask, _tagFilter };
+    return ComponentView<T, Ts...>::Iterator { _entityMasks, _sets, _mask };
 }
 
 template <typename T, typename... Ts> ComponentView<T, Ts...>::Iterator ComponentView<T, Ts...>::end()
 {
-    auto it = ComponentView<T, Ts...>::Iterator { _entityMasks, _entityTags, _sets, _mask, _tagFilter };
+    auto it = ComponentView<T, Ts...>::Iterator { _entityMasks, _sets, _mask };
     it._id = std::get<SparseSet<std::remove_cvref_t<T>>&>(_sets).size();
 
     return it;

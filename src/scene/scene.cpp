@@ -100,37 +100,21 @@ void Scene::setMainCamera(const Entity entity)
     NH3D_ASSERT(isValidEntity(entity), "Attempting to set main camera to an invalid entity");
     NH3D_ASSERT(checkComponents<CameraComponent>(entity), "Attempting to set main camera to an entity without CameraComponent");
 
-    if (_mainCamera != InvalidEntity) {
-        _entityTags[_mainCamera] &= ~EntityTags::MainCamera;
-    }
-
     _mainCamera = entity;
-    _entityTags[entity] |= EntityTags::MainCamera;
 }
 
-void Scene::setTagFlags(const Entity entity, EntityTag tag)
+void Scene::setVisibleFlag(const Entity entity, const bool flag)
 {
-    NH3D_ASSERT(isValidEntity(entity), "Attempting to set tag flag of an invalid entity");
-    NH3D_ASSERT(!EntityTags::checkTag(tag, EntityTags::MAX), "Cannot set MAX tag flag");
-    NH3D_ASSERT(!EntityTags::checkTag(tag, EntityTags::MainCamera), "Cannot set MainCamera tag flag directly");
-
-    _entityTags[entity] |= tag;
+    NH3D_ASSERT(isValidEntity(entity), "Attempting to set visible flag of an invalid entity");
+    _setMap.setFlag<RenderComponent>(entity, flag);
 }
 
-void Scene::unsetTagFlags(const Entity entity, EntityTag tag)
+[[nodiscard]] bool Scene::isVisible(const Entity entity)
 {
-    NH3D_ASSERT(isValidEntity(entity), "Attempting to unset tag flag of an invalid entity");
-    NH3D_ASSERT(!EntityTags::checkTag(tag, EntityTags::MAX), "Cannot unset MAX tag flag");
-    NH3D_ASSERT(!EntityTags::checkTag(tag, EntityTags::MainCamera), "Cannot unset MainCamera tag flag directly");
-
-    _entityTags[entity] &= ~tag;
+    NH3D_ASSERT(isValidEntity(entity), "Attempting to get visible flag of an invalid entity");
+    return _setMap.getFlag<RenderComponent>(entity);
 }
 
-[[nodiscard]] EntityTag Scene::getTag(const Entity entity) const
-{
-    NH3D_ASSERT(isValidEntity(entity), "Attempting to get tag of an invalid entity");
-
-    return _entityTags[entity];
-}
+[[nodiscard]] const void* Scene::getRawVisibleFlags() { return _setMap.getRawFlags<RenderComponent>(); }
 
 }

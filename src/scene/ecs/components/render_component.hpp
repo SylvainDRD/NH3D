@@ -5,8 +5,9 @@
 #include <misc/utils.hpp>
 #include <rendering/core/bind_group.hpp>
 #include <rendering/core/buffer.hpp>
+#include <rendering/core/gpu_mesh.hpp>
 #include <rendering/core/handle.hpp>
-#include <rendering/core/rhi.hpp>
+#include <rendering/core/material.hpp>
 #include <rendering/core/shader.hpp>
 
 namespace NH3D {
@@ -18,25 +19,20 @@ struct VertexData {
     vec2 __padding; // Padding to make the size a multiple of 16 bytes
 };
 
-// Separated because potentially reused w/ other shaders/materials
-struct MeshData {
-    Handle<Buffer> vertexBuffer;
-    Handle<Buffer> indexBuffer;
-};
-
 struct RenderComponent {
 public:
-    RenderComponent(IRHI& rhi, const std::vector<VertexData>& vertexData, const std::vector<uint32>& indices);
+    RenderComponent(const GPUMesh& mesh);
 
     [[nodiscard]] Handle<Buffer> getVertexBuffer() const;
 
     [[nodiscard]] Handle<Buffer> getIndexBuffer() const;
 
 private:
-    MeshData _meshData;
+    GPUMesh _mesh;
 
-    Handle<BindGroup> _bindGroup; // TODO: material system
-    Handle<Shader> _shader; // TODO: material system
+    Material _material;
+
+    Handle<Shader> _shader;
 };
 
 }
