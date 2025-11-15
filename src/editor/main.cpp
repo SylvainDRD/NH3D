@@ -18,18 +18,18 @@ int main()
 
     const std::vector<VertexData> vertexData = {
         {
-            .position = vec4 { -1.f, 1.f, 0.f, 1.f },
-            .normal = vec4 { 1.0f, 0.0f, 0.0f, 0.0f },
+            .position = vec3 { -1.f, 1.f, 0.f },
+            .normal = vec3 { 1.0f, 0.0f, 0.0f },
             .uv = vec2 { 1.0f, 0.0f },
         },
         {
-            .position = vec4 { 1.f, 1.f, 0.f, 1.f },
-            .normal = vec4 { 0.0f, 1.0f, 0.0f, 0.0f },
+            .position = vec3 { 1.f, 1.f, 0.f },
+            .normal = vec3 { 0.0f, 1.0f, 0.0f },
             .uv = vec2 { 0.0f, 0.0f },
         },
         {
-            .position = vec4 { 0.f, -1.f, 0.f, 1.f },
-            .normal = vec4 { 0.0f, 0.0f, 1.0f, 0.0f },
+            .position = vec3 { 0.f, -1.f, 0.f },
+            .normal = vec3 { 0.0f, 0.0f, 1.0f },
             .uv = vec2 { 0.5f, 1.0f },
         },
     };

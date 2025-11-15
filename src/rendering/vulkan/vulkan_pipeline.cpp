@@ -19,13 +19,15 @@ void VulkanPipeline::release(const IRHI& rhi, VkPipeline& pipeline, VkPipelineLa
 }
 
 VkPipelineLayout VulkanPipeline::createPipelineLayout(
-    VkDevice device, const VkDescriptorSetLayout layout, const std::vector<VkPushConstantRange>& pushConstantRanges)
+    VkDevice device, const ArrayPtr<VkDescriptorSetLayout> descriptorSetsLayouts, const ArrayPtr<VkPushConstantRange> pushConstantRanges)
 {
-    VkPipelineLayoutCreateInfo layoutCreateInfo { .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = layout != nullptr ? 1u : 0u,
-        .pSetLayouts = &layout,
-        .pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size()),
-        .pPushConstantRanges = pushConstantRanges.data() };
+    const VkPipelineLayoutCreateInfo layoutCreateInfo {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .setLayoutCount = static_cast<uint32_t>(descriptorSetsLayouts.size),
+        .pSetLayouts = descriptorSetsLayouts.ptr,
+        .pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size),
+        .pPushConstantRanges = pushConstantRanges.ptr,
+    };
 
     VkPipelineLayout pipelineLayout;
     if (vkCreatePipelineLayout(device, &layoutCreateInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {

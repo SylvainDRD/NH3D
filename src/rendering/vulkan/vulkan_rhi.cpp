@@ -18,6 +18,14 @@
 
 namespace NH3D {
 
+// TODO: delete
+struct DrawRecord {
+    VkDeviceAddress vertexBuffer;
+    VkDeviceAddress indexBuffer;
+    Material material;
+    mat4x3 modelMatrix;
+};
+
 VulkanRHI::VulkanRHI(const Window& Window)
     : IRHI {}
     , _textureManager { 1000, 100 }
@@ -56,9 +64,9 @@ VulkanRHI::VulkanRHI(const Window& Window)
     vkGetSwapchainImagesKHR(_device, _swapchain, &swapchainImageCount, swapchainImages.data());
 
     for (int i = 0; i < swapchainImageCount; ++i) {
-        auto&& [imageViewData, metadata] = VulkanTexture::wrapSwapchainImage(std::cref(*this), swapchainImages[i], surfaceFormat,
+        auto&& [imageViewData, textureMetadata] = VulkanTexture::wrapSwapchainImage(std::cref(*this), swapchainImages[i], surfaceFormat,
             VkExtent3D { Window.getWidth(), Window.getHeight(), 1 }, VK_IMAGE_ASPECT_COLOR_BIT);
-        _swapchainTextures[i] = _textureManager.store(std::move(imageViewData), std::move(metadata));
+        _swapchainTextures[i] = _textureManager.store(std::move(imageViewData), std::move(textureMetadata));
     }
 
     _commandPool = createCommandPool(_device, queues.GraphicsQueueFamilyID);
@@ -84,22 +92,51 @@ VulkanRHI::VulkanRHI(const Window& Window)
             VK_IMAGE_ASPECT_COLOR_BIT, true);
     }
 
-    auto [descriptorSets, metadata] = VulkanBindGroup::create(
+    auto [computeDescriptorSets, computeMetadata] = VulkanBindGroup::create(
         _device, VK_SHADER_STAGE_COMPUTE_BIT, std::initializer_list<VkDescriptorType> { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE });
-    _computeBindGroup = _bindGroupManager.store(std::move(descriptorSets), std::move(metadata));
+    _computeBindGroup = _bindGroupManager.store(std::move(computeDescriptorSets), std::move(computeMetadata));
+
+    auto [drawRecordDescriptorSets, drawRecordMetadata] = VulkanBindGroup::create(
+        _device, VK_SHADER_STAGE_VERTEX_BIT, std::initializer_list<VkDescriptorType> { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER });
+    _drawRecordBindGroup = _bindGroupManager.store(std::move(drawRecordDescriptorSets), std::move(drawRecordMetadata));
+
+    // TODO: make GPU only
+    const VkDrawIndirectCommand drawIndirectCommand = {
+        .vertexCount = 3,
+        .instanceCount = 1,
+    };
+    auto [drawIndirectBuffer, drawIndirectAllocation] = VulkanBuffer::create(*this, sizeof(VkDrawIndirectCommand),
+        VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY, &drawIndirectCommand);
+    _drawIndirectBuffer = _bufferManager.store(std::move(drawIndirectBuffer), std::move(drawIndirectAllocation));
+
+    // TODO: make GPU only
+    auto [drawRecordBuffer, drawRecordAllocation]
+        = VulkanBuffer::create(*this, sizeof(DrawRecord) * 1, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, nullptr);
+    const VkDescriptorBufferInfo bufferInfo { .buffer = drawRecordBuffer, .offset = 0, .range = VK_WHOLE_SIZE };
+    for (uint i = 0; i < IRHI::MaxFramesInFlight; ++i) {
+        VulkanBindGroup::updateDescriptorSet(_device, drawRecordDescriptorSets.sets[i], bufferInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
+    }
+    _drawRecordBuffer = _bufferManager.store(std::move(drawRecordBuffer), std::move(drawRecordAllocation));
+
+    auto [textureDescriptorSets, textureMetadata] = VulkanBindGroup::create(
+        _device, VK_SHADER_STAGE_FRAGMENT_BIT, std::initializer_list<VkDescriptorType> { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER }, 1000);
+    _textureBindGroup = _bindGroupManager.store(std::move(textureDescriptorSets), std::move(textureMetadata));
 
     auto [computeShader, computeLayout]
-        = VulkanComputeShader::create(_device, metadata.layout, NH3D_DIR "src/rendering/shaders/gradient.comp.spv");
+        = VulkanComputeShader::create(_device, { &computeMetadata.layout, 1 }, NH3D_DIR "src/rendering/shaders/gradient.comp.spv");
     _computeShader = _computeShaderManager.store(std::move(computeShader), std::move(computeLayout));
 
-    VkPushConstantRange pushConstantRange { .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .offset = 0, .size = sizeof(uint64) };
+    const VkPushConstantRange pushConstantRange { .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .offset = 0, .size = sizeof(mat4) };
 
     // TODO: also watch out for tiny vector allocs, though it's probably fine since it's only at load time
-    auto [shader, layout] = VulkanShader::create(_device, nullptr,
-        VulkanShader::ShaderInfo { .vertexShaderPath = NH3D_DIR "src/rendering/shaders/triangle.vert.spv",
+    const VkDescriptorSetLayout layouts[] = { textureMetadata.layout, drawRecordMetadata.layout };
+    auto [shader, layout] = VulkanShader::create(_device, { layouts, 2 },
+        VulkanShader::ShaderInfo {
+            .vertexShaderPath = NH3D_DIR "src/rendering/shaders/triangle.vert.spv",
             .fragmentShaderPath = NH3D_DIR "src/rendering/shaders/triangle.frag.spv",
-            .colorAttachmentFormats = { renderTargetsFormat } },
-        std::vector<VkPushConstantRange> { pushConstantRange });
+            .colorAttachmentFormats = { renderTargetsFormat },
+        },
+        { &pushConstantRange, 1 });
     _graphicsShader = _shaderManager.store(std::move(shader), std::move(layout));
 }
 
@@ -210,17 +247,28 @@ void VulkanRHI::render(Scene& scene) const
     const auto& computeDescriptorSets = _bindGroupManager.get<DescriptorSets>(_computeBindGroup);
     VkDescriptorSet descriptorSet = VulkanBindGroup::getUpdatedDescriptorSet(_device, computeDescriptorSets, frameInFlightId);
 
-    // I think all this could be done just once this it never changes (for each frame descriptor and the push constants)²
-
-    // update push constants
+    // TODO: cleanup
     const RenderComponent& mesh = scene.get<RenderComponent>(Entity { 0 });
+    if (_frameId == 0) {
+        DrawRecord drawRecord {};
+        drawRecord.vertexBuffer = VulkanBuffer::getDeviceAddress(*this, _bufferManager.get<VkBuffer>(mesh.getVertexBuffer()));
+        drawRecord.indexBuffer = VulkanBuffer::getDeviceAddress(*this, _bufferManager.get<VkBuffer>(mesh.getIndexBuffer()));
+        drawRecord.material.albedo = vec3 { 1.0f, 0.0f, 0.0f };
+        drawRecord.modelMatrix = mat4x3(1.0f);
+
+        const auto& allocationInfo = _bufferManager.get<BufferAllocationInfo>(_drawRecordBuffer);
+        void* mappedAddress = VulkanBuffer::getMappedAddress(*this, allocationInfo);
+        std::memcpy(mappedAddress, &drawRecord, sizeof(DrawRecord));
+        VulkanBuffer::flush(*this, allocationInfo);
+    }
 
     auto graphicsPipeline = _shaderManager.get<VkPipeline>(_graphicsShader);
     auto graphicsLayout = _shaderManager.get<VkPipelineLayout>(_graphicsShader);
 
-    const VkDeviceAddress meshVertexBufferAddress
-        = VulkanBuffer::getDeviceAddress(*this, _bufferManager.get<VkBuffer>(mesh.getVertexBuffer()));
-    vkCmdPushConstants(commandBuffer, graphicsLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(VkDeviceAddress), &meshVertexBufferAddress);
+    // TODO: wrap push constant in pipeline + update view projection matrix
+    // const VkDeviceAddress meshVertexBufferAddress
+    //     = VulkanBuffer::getDeviceAddress(*this, _bufferManager.get<VkBuffer>(mesh.getVertexBuffer()));
+    // vkCmdPushConstants(commandBuffer, graphicsLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(VkDeviceAddress), &meshVertexBufferAddress);
 
     auto computePipeline = _computeShaderManager.get<VkPipeline>(_computeShader);
     auto computePipelineLayout = _computeShaderManager.get<VkPipelineLayout>(_computeShader);
@@ -229,17 +277,27 @@ void VulkanRHI::render(Scene& scene) const
     const VkDescriptorImageInfo imageInfo { .imageView = rtImageViewData.view, .imageLayout = VK_IMAGE_LAYOUT_GENERAL };
 
     VulkanBindGroup::updateDescriptorSet(_device, descriptorSet, imageInfo, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-    VulkanBindGroup::bind(commandBuffer, descriptorSet, VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout);
+    VulkanBindGroup::bind(commandBuffer, { &descriptorSet, 1 }, VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout);
 
     const vec3i kernelSize { std::ceil(rtMetadata.extent.width / 8.f), std::ceil(rtMetadata.extent.height / 8.f), 1 };
     VulkanComputeShader::dispatch(commandBuffer, computePipeline, kernelSize);
 
     VulkanTexture::changeLayoutBarrier(commandBuffer, rtImageViewData.image, rtMetadata.layout, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
-    // TODO: watch for tiny vector allocations
-    VulkanShader::draw(commandBuffer, graphicsPipeline, { rtMetadata.extent.width, rtMetadata.extent.height },
-        { VkRenderingAttachmentInfo {
-            .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO, .imageView = rtImageViewData.view, .imageLayout = rtMetadata.layout } });
+    const VkDescriptorSet graphicsDescriptorSets[] = {
+        VulkanBindGroup::getUpdatedDescriptorSet(_device, _bindGroupManager.get<DescriptorSets>(_textureBindGroup), frameInFlightId),
+        VulkanBindGroup::getUpdatedDescriptorSet(_device, _bindGroupManager.get<DescriptorSets>(_drawRecordBindGroup), frameInFlightId),
+    };
+    VulkanBindGroup::bind(
+        commandBuffer, { graphicsDescriptorSets, std::size(graphicsDescriptorSets) }, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsLayout);
+    const VkRenderingAttachmentInfo colorAttachmentInfo {
+        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+        .imageView = rtImageViewData.view,
+        .imageLayout = rtMetadata.layout,
+    };
+    const VkBuffer drawIndirectBuffer = _bufferManager.get<VkBuffer>(_drawIndirectBuffer);
+    VulkanShader::draw(commandBuffer, graphicsPipeline, drawIndirectBuffer, { rtMetadata.extent.width, rtMetadata.extent.height },
+        { &colorAttachmentInfo, 1 });
 
     VulkanTexture::changeLayoutBarrier(commandBuffer, rtImageViewData.image, rtMetadata.layout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
@@ -413,7 +471,9 @@ VkDevice VulkanRHI::createLogicalDevice(VkPhysicalDevice gpu, PhysicalDeviceQueu
     const float priority = 1.f;
     std::vector<VkDeviceQueueCreateInfo> queuesCreateInfo {};
     VkDeviceQueueCreateInfo queueCreateInfo {
-        .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO, .queueCount = 1, .pQueuePriorities = &priority
+        .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+        .queueCount = 1,
+        .pQueuePriorities = &priority,
     };
     for (uint32_t queueID : queueIndices) {
         queueCreateInfo.queueFamilyIndex = queueID;
@@ -422,29 +482,40 @@ VkDevice VulkanRHI::createLogicalDevice(VkPhysicalDevice gpu, PhysicalDeviceQueu
     }
 
     VkPhysicalDeviceFeatures features {};
+    VkPhysicalDeviceVulkan11Features features11 {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
+        .shaderDrawParameters = VK_TRUE,
+    };
     VkPhysicalDeviceVulkan12Features features12 {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+        .pNext = &features11,
         .descriptorIndexing = VK_TRUE,
         .descriptorBindingSampledImageUpdateAfterBind = VK_TRUE,
-        .descriptorBindingStorageImageUpdateAfterBind = VK_TRUE,
-        .bufferDeviceAddress = VK_TRUE
+        // .descriptorBindingStorageImageUpdateAfterBind = VK_TRUE, won't be needed I'm pretty sure
+        .descriptorBindingVariableDescriptorCount = VK_TRUE,
+        .scalarBlockLayout = VK_TRUE,
+        .bufferDeviceAddress = VK_TRUE,
         // descriptorBindingUniformBufferUpdateAfterBind seems to be poorly supported, see
         // https://vulkan.gpuinfo.org/listfeaturescore12.php
     };
-    VkPhysicalDeviceVulkan13Features features13 { .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+    VkPhysicalDeviceVulkan13Features features13 {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
         .pNext = &features12,
         .synchronization2 = VK_TRUE,
-        .dynamicRendering = VK_TRUE };
+        .dynamicRendering = VK_TRUE,
+    };
 
     const char* swapchainExt = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
 
-    VkDeviceCreateInfo deviceCreateInfo { .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+    VkDeviceCreateInfo deviceCreateInfo {
+        .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
         .pNext = &features13,
         .queueCreateInfoCount = static_cast<uint32_t>(queuesCreateInfo.size()),
         .pQueueCreateInfos = queuesCreateInfo.data(),
         .enabledExtensionCount = 1,
         .ppEnabledExtensionNames = &swapchainExt,
-        .pEnabledFeatures = &features };
+        .pEnabledFeatures = &features,
+    };
 
     VkDevice device;
     if (vkCreateDevice(gpu, &deviceCreateInfo, nullptr, &device) != VK_SUCCESS) {
@@ -483,7 +554,8 @@ std::pair<VkSwapchainKHR, VkFormat> VulkanRHI::createSwapchain(VkDevice device, 
         NH3D_ABORT_VK("Couldn't find a supported surface format");
     }
 
-    VkSwapchainCreateInfoKHR swapchainCreateInfo { .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+    VkSwapchainCreateInfoKHR swapchainCreateInfo {
+        .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
         .surface = surface,
         .minImageCount = surfaceCapabilities.maxImageCount > 0 && surfaceCapabilities.minImageCount + 1 > surfaceCapabilities.maxImageCount
             ? surfaceCapabilities.maxImageCount
@@ -497,7 +569,8 @@ std::pair<VkSwapchainKHR, VkFormat> VulkanRHI::createSwapchain(VkDevice device, 
         .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
         .presentMode = VK_PRESENT_MODE_FIFO_KHR, // TODO: allow uncapped framerate
         .clipped = VK_TRUE,
-        .oldSwapchain = previousSwapchain };
+        .oldSwapchain = previousSwapchain,
+    };
 
     if (queues.GraphicsQueueFamilyID != queues.PresentQueueFamilyID) {
         swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
@@ -520,9 +593,11 @@ std::pair<VkSwapchainKHR, VkFormat> VulkanRHI::createSwapchain(VkDevice device, 
 
 VkCommandPool VulkanRHI::createCommandPool(VkDevice device, uint32_t queueFamilyIndex) const
 {
-    VkCommandPoolCreateInfo commandPoolCreateInfo { .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+    VkCommandPoolCreateInfo commandPoolCreateInfo {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
         .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-        .queueFamilyIndex = queueFamilyIndex };
+        .queueFamilyIndex = queueFamilyIndex,
+    };
 
     VkCommandPool commandPool;
     if (vkCreateCommandPool(device, &commandPoolCreateInfo, nullptr, &commandPool) != VK_SUCCESS) {
@@ -534,10 +609,12 @@ VkCommandPool VulkanRHI::createCommandPool(VkDevice device, uint32_t queueFamily
 
 void VulkanRHI::allocateCommandBuffers(VkDevice device, VkCommandPool commandPool, uint32_t bufferCount, VkCommandBuffer* buffers) const
 {
-    VkCommandBufferAllocateInfo cbAllocInfo { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+    VkCommandBufferAllocateInfo cbAllocInfo {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
         .commandPool = commandPool,
         .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        .commandBufferCount = bufferCount };
+        .commandBufferCount = bufferCount,
+    };
 
     if (vkAllocateCommandBuffers(device, &cbAllocInfo, buffers) != VK_SUCCESS) {
         NH3D_ABORT_VK("Vulkan command buffers allocation failed");
@@ -560,8 +637,10 @@ VkSemaphore VulkanRHI::createSemaphore(VkDevice device) const
 
 VkFence VulkanRHI::createFence(VkDevice device, bool signaled) const
 {
-    VkFenceCreateInfo fenceCreateInfo { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-        .flags = signaled ? VK_FENCE_CREATE_SIGNALED_BIT : VkFenceCreateFlags {} };
+    VkFenceCreateInfo fenceCreateInfo {
+        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+        .flags = signaled ? VK_FENCE_CREATE_SIGNALED_BIT : VkFenceCreateFlags {},
+    };
 
     VkFence fence;
     if (vkCreateFence(device, &fenceCreateInfo, nullptr, &fence) != VK_SUCCESS) {
@@ -574,7 +653,9 @@ VkFence VulkanRHI::createFence(VkDevice device, bool signaled) const
 void VulkanRHI::beginCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferUsageFlags flags, bool resetCommandBuffer) const
 {
     VkCommandBufferBeginInfo cbBeginInfo {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, .flags = flags, .pInheritanceInfo = nullptr
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .flags = flags,
+        .pInheritanceInfo = nullptr,
     };
 
     if (resetCommandBuffer) {
@@ -587,7 +668,11 @@ void VulkanRHI::beginCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBuffe
 VkSemaphoreSubmitInfo VulkanRHI::makeSemaphoreSubmitInfo(VkSemaphore semaphore, VkPipelineStageFlags2 stageMask) const
 {
     return {
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO, .semaphore = semaphore, .value = 1, .stageMask = stageMask, .deviceIndex = 0
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+        .semaphore = semaphore,
+        .value = 1,
+        .stageMask = stageMask,
+        .deviceIndex = 0,
     };
 }
 
@@ -595,16 +680,20 @@ void VulkanRHI::submitCommandBuffer(VkQueue queue, const VkSemaphoreSubmitInfo& 
     VkCommandBuffer commandBuffer, VkFence fence) const
 {
     VkCommandBufferSubmitInfo cbSubmitInfo {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO, .commandBuffer = commandBuffer, .deviceMask = 0
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+        .commandBuffer = commandBuffer,
+        .deviceMask = 0,
     };
 
-    VkSubmitInfo2 submitInfo { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+    VkSubmitInfo2 submitInfo {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
         .waitSemaphoreInfoCount = waitSemaphore.semaphore ? 1u : 0u,
         .pWaitSemaphoreInfos = &waitSemaphore,
         .commandBufferInfoCount = commandBuffer ? 1u : 0u,
         .pCommandBufferInfos = &cbSubmitInfo,
         .signalSemaphoreInfoCount = signalSemaphore.semaphore ? 1u : 0u,
-        .pSignalSemaphoreInfos = &signalSemaphore };
+        .pSignalSemaphoreInfos = &signalSemaphore,
+    };
 
     vkQueueSubmit2(queue, 1, &submitInfo, fence);
 }

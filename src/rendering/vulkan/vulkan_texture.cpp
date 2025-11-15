@@ -111,7 +111,7 @@ void VulkanTexture::changeLayoutBarrier(
             .layerCount = VK_REMAINING_ARRAY_LAYERS,
         } };
     layout = newLayout;
-
+    
     VkDependencyInfo depInfo { .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO, .imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &barrier };
 
     vkCmdPipelineBarrier2(commandBuffer, &depInfo);

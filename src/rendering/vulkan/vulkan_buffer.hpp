@@ -35,7 +35,9 @@ struct VulkanBuffer {
 
     [[nodiscard]] static VkDeviceAddress getDeviceAddress(const VulkanRHI& rhi, const VkBuffer buffer);
 
-    // TODO: mapping & co
+    static void flush(const VulkanRHI& rhi, const BufferAllocationInfo& allocation);
+
+    [[nodiscard]] static void *getMappedAddress(const VulkanRHI& rhi, const BufferAllocationInfo& allocation);
 };
 
 }

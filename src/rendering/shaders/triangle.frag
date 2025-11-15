@@ -1,13 +1,13 @@
 #version 460
+#extension GL_EXT_nonuniform_qualifier : require
 
-//shader input
+layout (set = 0, binding = 0) uniform sampler2D textures[];
+
 layout (location = 0) in vec3 inColor;
 
-//output write
 layout (location = 0) out vec4 outFragColor;
 
 void main() 
 {
-	//return red
 	outFragColor = vec4(inColor, 1.0f);
 }

@@ -11,24 +11,24 @@ namespace NH3D {
 struct VulkanShader : public VulkanPipeline {
     using ResourceType = Shader;
 
-struct ShaderInfo {
-    std::filesystem::path vertexShaderPath;
-    std::filesystem::path fragmentShaderPath;
-    std::vector<VkFormat> colorAttachmentFormats;
-    VkFormat depthAttachmentFormat;
-    VkFormat stencilAttachmentFormat;
-};
+    struct ShaderInfo {
+        std::filesystem::path vertexShaderPath;
+        std::filesystem::path fragmentShaderPath;
+        std::vector<VkFormat> colorAttachmentFormats;
+        VkFormat depthAttachmentFormat;
+        VkFormat stencilAttachmentFormat;
+    };
 
     /// "Constructor"
-    [[nodiscard]] static std::pair<VkPipeline, VkPipelineLayout> create(VkDevice device, const VkDescriptorSetLayout layout,
-        const ShaderInfo& shaderInfo, const std::vector<VkPushConstantRange>& pushConstantRanges = {});
+    [[nodiscard]] static std::pair<VkPipeline, VkPipelineLayout> create(VkDevice device, const ArrayPtr<VkDescriptorSetLayout> layouts,
+        const ShaderInfo& shaderInfo, const ArrayPtr<VkPushConstantRange> pushConstantRanges = { nullptr, 0 });
 
     // "Destructor": used generically by the ResourceManager, must be API agnostic, non-const ref for invalidation
     static void release(const IRHI& rhi, VkPipeline& pipeline, VkPipelineLayout& pipelineLayout);
 
     static bool valid(const VkPipeline pipeline, const VkPipelineLayout layout);
-    static void draw(VkCommandBuffer commandBuffer, const VkPipeline pipeline, const VkExtent2D extent,
-        const std::vector<VkRenderingAttachmentInfo>& colorAttachments, const VkRenderingAttachmentInfo depthAttachment = {},
+    static void draw(VkCommandBuffer commandBuffer, const VkPipeline pipeline, const VkBuffer drawIndirectBuffer, const VkExtent2D extent,
+        const ArrayPtr<VkRenderingAttachmentInfo> colorAttachments, const VkRenderingAttachmentInfo depthAttachment = {},
         const VkRenderingAttachmentInfo stencilAttachment = {});
 };
 

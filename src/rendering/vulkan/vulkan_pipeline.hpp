@@ -19,8 +19,8 @@ public:
     static void release(const IRHI& rhi, VkPipeline& pipeline, VkPipelineLayout& pipelineLayout);
 
 protected:
-    static VkPipelineLayout createPipelineLayout(
-        VkDevice device, const VkDescriptorSetLayout layout, const std::vector<VkPushConstantRange>& pushConstantRanges);
+    static VkPipelineLayout createPipelineLayout(VkDevice device, const ArrayPtr<VkDescriptorSetLayout> descriptorSetsLayouts,
+        const ArrayPtr<VkPushConstantRange> pushConstantRanges);
 
     static VkShaderModule loadShaderModule(VkDevice device, const std::filesystem::path& path);
 };

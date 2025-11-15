@@ -45,7 +45,7 @@ struct VulkanBindGroup {
     [[nodiscard]] static VkDescriptorSet getUpdatedDescriptorSet(
         const VkDevice device, const DescriptorSets& descriptorSets, const uint32_t frameInFlightId);
 
-    static void bind(VkCommandBuffer commandBuffer, const VkDescriptorSet descriptorSet, const VkPipelineBindPoint bindPoint,
+    static void bind(VkCommandBuffer commandBuffer, const ArrayPtr<VkDescriptorSet> descriptorSets, const VkPipelineBindPoint bindPoint,
         const VkPipelineLayout pipelineLayout);
 
     template <typename T>

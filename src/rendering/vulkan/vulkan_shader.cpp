@@ -2,10 +2,10 @@
 
 namespace NH3D {
 
-[[nodiscard]] std::pair<VkPipeline, VkPipelineLayout> VulkanShader::create(VkDevice device, const VkDescriptorSetLayout layout,
-    const ShaderInfo& shaderInfo, const std::vector<VkPushConstantRange>& pushConstantRanges)
+[[nodiscard]] std::pair<VkPipeline, VkPipelineLayout> VulkanShader::create(VkDevice device, const ArrayPtr<VkDescriptorSetLayout> layouts,
+    const ShaderInfo& shaderInfo, const ArrayPtr<VkPushConstantRange> pushConstantRanges)
 {
-    const VkPipelineLayout pipelineLayout = createPipelineLayout(device, layout, pushConstantRanges);
+    const VkPipelineLayout pipelineLayout = createPipelineLayout(device, layouts, pushConstantRanges);
 
     VkPipelineVertexInputStateCreateInfo vertexCI { .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
 
@@ -106,21 +106,18 @@ void VulkanShader::release(const IRHI& rhi, VkPipeline& pipeline, VkPipelineLayo
     VulkanPipeline::release(rhi, pipeline, pipelineLayout);
 }
 
-bool VulkanShader::valid(const VkPipeline pipeline, const VkPipelineLayout layout)
-{
-    return pipeline != nullptr && layout != nullptr;
-}
+bool VulkanShader::valid(const VkPipeline pipeline, const VkPipelineLayout layout) { return pipeline != nullptr && layout != nullptr; }
 
-void VulkanShader::draw(VkCommandBuffer commandBuffer, const VkPipeline pipeline, const VkExtent2D extent,
-    const std::vector<VkRenderingAttachmentInfo>& attachments, const VkRenderingAttachmentInfo depthAttachment,
+void VulkanShader::draw(VkCommandBuffer commandBuffer, const VkPipeline pipeline, const VkBuffer drawIndirectBuffer, const VkExtent2D extent,
+    const ArrayPtr<VkRenderingAttachmentInfo> colorAttachments, const VkRenderingAttachmentInfo depthAttachment,
     const VkRenderingAttachmentInfo stencilAttachment)
 {
-    VkRenderingInfo renderingInfo {
+    const VkRenderingInfo renderingInfo {
         .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
         .renderArea = VkRect2D { {}, extent },
         .layerCount = 1,
-        .colorAttachmentCount = static_cast<uint32_t>(attachments.size()),
-        .pColorAttachments = attachments.data(),
+        .colorAttachmentCount = static_cast<uint32_t>(colorAttachments.size),
+        .pColorAttachments = colorAttachments.ptr,
         .pDepthAttachment = depthAttachment.imageView != nullptr ? &depthAttachment : nullptr,
         .pStencilAttachment = stencilAttachment.imageView != nullptr ? &stencilAttachment : nullptr,
     };
@@ -128,18 +125,18 @@ void VulkanShader::draw(VkCommandBuffer commandBuffer, const VkPipeline pipeline
     vkCmdBeginRendering(commandBuffer, &renderingInfo);
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-    VkViewport viewport
+    const VkViewport viewport
         = { .x = 0, .y = 0, .width = float(extent.width), .height = float(extent.height), .minDepth = 0.f, .maxDepth = 1.f };
 
     vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
-    VkRect2D scissor = {
+    const VkRect2D scissor = {
         .extent = extent,
     };
 
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-    vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+    vkCmdDrawIndirect(commandBuffer, drawIndirectBuffer, 0, 1, sizeof(VkDrawIndirectCommand));
 
     vkCmdEndRendering(commandBuffer);
 }

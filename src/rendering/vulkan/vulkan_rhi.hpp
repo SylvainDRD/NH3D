@@ -130,8 +130,12 @@ private:
     Handle<Shader> _graphicsShader;
     Handle<ComputeShader> _computeShader;
     Handle<BindGroup> _computeBindGroup;
+    Handle<BindGroup> _drawRecordBindGroup;
+    Handle<Buffer> _drawIndirectBuffer;
+    Handle<Buffer> _drawRecordBuffer;
+    Handle<BindGroup> _textureBindGroup;
 
-    mutable uint32_t _frameId = 1;
+    mutable uint32_t _frameId = 0;
 };
 
 }

@@ -29,24 +29,29 @@ namespace NH3D {
 
         // If the last binding has more than one descriptor, use a variable count binding
         if (bindingId == bindingTypes.size() - 1 && finalBindingCount > 1) {
-            bindingFlags[bindingId] = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
             NH3D_ASSERT(descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                 "Currently expect only combined image samplers to have variable descriptor count");
+
+            bindingFlags[bindingId] = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
+            descriptorBindings[bindingId].descriptorCount = finalBindingCount;
         }
 
         ++bindingId;
     }
 
-    const VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlag { .sType
-        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
+    const VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlag {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
         .bindingCount = static_cast<uint32_t>(bindingFlags.size()),
-        .pBindingFlags = bindingFlags.data() };
+        .pBindingFlags = bindingFlags.data(),
+    };
 
-    const VkDescriptorSetLayoutCreateInfo layoutCreateInfo { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+    const VkDescriptorSetLayoutCreateInfo layoutCreateInfo {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
         .pNext = &bindingFlag,
         .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT,
         .bindingCount = static_cast<uint32_t>(descriptorBindings.size()),
-        .pBindings = descriptorBindings.data() };
+        .pBindings = descriptorBindings.data(),
+    };
 
     VkDescriptorSetLayout layout;
     if (vkCreateDescriptorSetLayout(device, &layoutCreateInfo, nullptr, &layout) != VK_SUCCESS) {
@@ -60,6 +65,7 @@ namespace NH3D {
     for (auto [descriptorType, count] : descriptorTypeCounts) {
         poolSizes.emplace_back(VkDescriptorPoolSize { descriptorType, IRHI::MaxFramesInFlight * count });
     }
+    poolSizes.back().descriptorCount *= finalBindingCount;
 
     VkDescriptorPoolCreateInfo poolCreateInfo { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
         .flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT,
@@ -77,18 +83,21 @@ namespace NH3D {
     layouts.fill(layout);
 
     DescriptorSets descriptorSets {};
-    VkDescriptorSetAllocateInfo allocInfo { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+    VkDescriptorSetAllocateInfo allocInfo {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
         .descriptorPool = pool,
         .descriptorSetCount = IRHI::MaxFramesInFlight,
-        .pSetLayouts = layouts.data() };
+        .pSetLayouts = layouts.data(),
+    };
 
     if (finalBindingCount > 1) {
         const std::array<uint32, IRHI::MaxFramesInFlight> bindingSizes { finalBindingCount, finalBindingCount };
 
-        VkDescriptorSetVariableDescriptorCountAllocateInfo varDescCountInfo { .sType
-            = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO,
+        VkDescriptorSetVariableDescriptorCountAllocateInfo varDescCountInfo {
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO,
             .descriptorSetCount = bindingSizes.size(),
-            .pDescriptorCounts = bindingSizes.data() };
+            .pDescriptorCounts = bindingSizes.data(),
+        };
         allocInfo.pNext = &varDescCountInfo;
     }
 
@@ -126,10 +135,10 @@ bool VulkanBindGroup::valid(const DescriptorSets& descriptorSets, const BindGrou
     return descriptorSets.sets[frameInFlightId];
 }
 
-void VulkanBindGroup::bind(VkCommandBuffer commandBuffer, const VkDescriptorSet descriptorSet, const VkPipelineBindPoint bindPoint,
-    const VkPipelineLayout pipelineLayout)
+void VulkanBindGroup::bind(VkCommandBuffer commandBuffer, const ArrayPtr<VkDescriptorSet> descriptorSets,
+    const VkPipelineBindPoint bindPoint, const VkPipelineLayout pipelineLayout)
 {
-    vkCmdBindDescriptorSets(commandBuffer, bindPoint, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+    vkCmdBindDescriptorSets(commandBuffer, bindPoint, pipelineLayout, 0, descriptorSets.size, descriptorSets.ptr, 0, nullptr);
 }
 
 }

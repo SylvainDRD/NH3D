@@ -67,4 +67,14 @@ bool VulkanBuffer::valid(const VkBuffer buffer, const BufferAllocationInfo& allo
     return vkGetBufferDeviceAddress(rhi.getVkDevice(), &deviceAddressInfo);
 }
 
+void VulkanBuffer::flush(const VulkanRHI& rhi, const BufferAllocationInfo& allocation)
+{
+    vmaFlushAllocation(rhi.getAllocator(), allocation.allocation, 0, allocation.allocationInfo.size);
 }
+
+[[nodiscard]] void* VulkanBuffer::getMappedAddress(const VulkanRHI& rhi, const BufferAllocationInfo& allocation)
+{
+    return allocation.allocationInfo.pMappedData;
+}
+
+} // namespace NH3D

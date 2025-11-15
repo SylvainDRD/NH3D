@@ -2,10 +2,10 @@
 
 namespace NH3D {
 
-[[nodiscard]] std::pair<VkPipeline, VkPipelineLayout> VulkanComputeShader::create(const VkDevice device, const VkDescriptorSetLayout layout,
-    const std::filesystem::path& computeShaderPath, const std::vector<VkPushConstantRange>& pushConstantRanges)
+[[nodiscard]] std::pair<VkPipeline, VkPipelineLayout> VulkanComputeShader::create(const VkDevice device, const ArrayPtr<VkDescriptorSetLayout> descriptorSetsLayouts,
+    const std::filesystem::path& computeShaderPath, const ArrayPtr<VkPushConstantRange> pushConstantRanges)
 {
-    const VkPipelineLayout pipelineLayout = createPipelineLayout(device, layout, pushConstantRanges);
+    const VkPipelineLayout pipelineLayout = createPipelineLayout(device, descriptorSetsLayouts, pushConstantRanges);
 
     const VkShaderModule shaderModule = loadShaderModule(device, computeShaderPath);
 
