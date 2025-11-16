@@ -57,8 +57,8 @@ struct VulkanTexture {
     /// Helper functions
     static void insertBarrier(VkCommandBuffer commandBuffer, const VkImage image, const VkImageLayout layout);
 
-    static void changeLayoutBarrier(
-        VkCommandBuffer commandBuffer, const VkImage image, VkImageLayout& layout, const VkImageLayout newLayout);
+    static void changeLayoutBarrier(VkCommandBuffer commandBuffer, const VkImage image, VkImageLayout& layout,
+        const VkImageLayout newLayout, const uint32_t baseMipLevel = 0, const uint32_t mipLevels = VK_REMAINING_MIP_LEVELS);
 
     static void clear(VkCommandBuffer commandBuffer, VkImage image, const color4 color);
 
