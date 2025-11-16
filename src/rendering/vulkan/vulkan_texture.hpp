@@ -20,6 +20,7 @@ struct ImageView {
 struct TextureMetadata {
     VkFormat format;
     VkExtent3D extent;
+    VkSampler sampler;
     VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
     VmaAllocation allocation = nullptr;
 };
@@ -37,7 +38,8 @@ struct VulkanTexture {
         const VkImageUsageFlags usage;
         const VkImageAspectFlags aspect;
         const ArrayWrapper<byte> initialData;
-        const bool generateMipMaps;
+        const bool generateMipMaps : 1;
+        const bool createSampler : 1;
     };
 
     /// "Constructors / Destructors"

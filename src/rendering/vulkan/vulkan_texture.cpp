@@ -65,7 +65,7 @@ namespace NH3D {
                 .bufferImageHeight = 0,
                 .imageSubresource = { 
                     .aspectMask = info.aspect, 
-                    .mipLevel = 0, 
+                    .mipLevel = 0,
                     .baseArrayLayer = 0, 
                     .layerCount = 1, 
                 },
@@ -80,7 +80,34 @@ namespace NH3D {
         VulkanBuffer::release(rhi, stagingBuffer, stagingAllocation);
     }
 
-    return { ImageView { image, view }, TextureMetadata { info.format, info.extent, layout, allocation } };
+    VkSampler sampler = nullptr;
+    if (info.createSampler) {
+        const VkSamplerCreateInfo samplerCreateInfo {
+            .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+            .magFilter = VK_FILTER_LINEAR,
+            .minFilter = VK_FILTER_LINEAR,
+            .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+            .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+            .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+        };
+        if (vkCreateSampler(rhi.getVkDevice(), &samplerCreateInfo, nullptr, &sampler) != VK_SUCCESS) {
+            NH3D_ABORT_VK("Failed to create Vulkan sampler");
+        }
+    }
+
+    return {
+        ImageView {
+            image,
+            view,
+        },
+        TextureMetadata {
+            .format = info.format,
+            .extent = info.extent,
+            .sampler = sampler,
+            .layout = layout,
+            .allocation = allocation,
+        },
+    };
 }
 
 [[nodiscard]] std::pair<ImageView, TextureMetadata> VulkanTexture::wrapSwapchainImage(
@@ -98,12 +125,29 @@ namespace NH3D {
         NH3D_ABORT_VK("Vulkan image view creation failed");
     }
 
-    return { ImageView { image, view }, TextureMetadata { format, extent, VK_IMAGE_LAYOUT_UNDEFINED, nullptr } };
+    return {
+        ImageView {
+            image,
+            view,
+        },
+        TextureMetadata {
+            .format = format,
+            .extent = extent,
+            .sampler = nullptr,
+            .layout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .allocation = nullptr,
+        },
+    };
 }
 
 void VulkanTexture::release(const IRHI& rhi, ImageView& imageViewData, TextureMetadata& metadata)
 {
     const VulkanRHI& vrhi = static_cast<const VulkanRHI&>(rhi);
+    if (metadata.sampler) {
+        vkDestroySampler(vrhi.getVkDevice(), metadata.sampler, nullptr);
+        metadata.sampler = nullptr;
+    }
+
     if (imageViewData.view) {
         vkDestroyImageView(vrhi.getVkDevice(), imageViewData.view, nullptr);
         imageViewData.view = nullptr;
