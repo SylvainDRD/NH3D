@@ -39,11 +39,11 @@ int main()
         .vertexBuffer = rhi.createBuffer({ .size = vertexData.size() * sizeof(VertexData),
             .usage = BufferUsageFlagBits::STORAGE_BUFFER_BIT | BufferUsageFlagBits::DST_TRANSFER_BIT,
             .memory = BufferMemoryUsage::GPU_ONLY,
-            .initialData = reinterpret_cast<const byte*>(vertexData.data()) }),
+            .initialData = { reinterpret_cast<const byte*>(vertexData.data()), vertexData.size() * sizeof(VertexData) } }),
         .indexBuffer = rhi.createBuffer({ .size = indices.size() * sizeof(uint32),
             .usage = BufferUsageFlagBits::INDEX_BUFFER_BIT | BufferUsageFlagBits::DST_TRANSFER_BIT,
             .memory = BufferMemoryUsage::GPU_ONLY,
-            .initialData = reinterpret_cast<const byte*>(indices.data()) }),
+            .initialData = { reinterpret_cast<const byte*>(indices.data()), indices.size() * sizeof(uint32) } }),
     };
 
     engine.getResourceMapper().storeMesh("basic triangle", meshData);

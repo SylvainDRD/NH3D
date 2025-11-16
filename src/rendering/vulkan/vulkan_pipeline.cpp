@@ -19,7 +19,7 @@ void VulkanPipeline::release(const IRHI& rhi, VkPipeline& pipeline, VkPipelineLa
 }
 
 VkPipelineLayout VulkanPipeline::createPipelineLayout(
-    VkDevice device, const ArrayPtr<VkDescriptorSetLayout> descriptorSetsLayouts, const ArrayPtr<VkPushConstantRange> pushConstantRanges)
+    VkDevice device, const ArrayWrapper<VkDescriptorSetLayout> descriptorSetsLayouts, const ArrayWrapper<VkPushConstantRange> pushConstantRanges)
 {
     const VkPipelineLayoutCreateInfo layoutCreateInfo {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,

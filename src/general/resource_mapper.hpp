@@ -27,6 +27,7 @@ public:
     [[nodiscard]] Handle<Shader> getShader(const std::string& name) const;
 
 private:
+    // Only stores handles for move resilience
     std::unordered_map<std::string, GPUMesh> _meshMap;
     std::unordered_map<std::string, Handle<Texture>> _textureMap;
     std::unordered_map<std::string, Handle<Shader>> _shaderMap;

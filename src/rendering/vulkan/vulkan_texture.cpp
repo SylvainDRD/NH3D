@@ -5,22 +5,27 @@
 
 namespace NH3D {
 
-[[nodiscard]] std::pair<ImageView, TextureMetadata> VulkanTexture::create(const VulkanRHI& rhi, const VkFormat format,
-    const VkExtent3D extent, const VkImageUsageFlags usage, const VkImageAspectFlags aspect, const bool generateMipMaps)
+// TODO: mip maps
+[[nodiscard]] std::pair<ImageView, TextureMetadata> VulkanTexture::create(const VulkanRHI& rhi, const CreateInfo& info)
 {
-    VkImageCreateInfo imageCreateInfo { .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-        .imageType = extent.depth == 1 ? VK_IMAGE_TYPE_2D : VK_IMAGE_TYPE_3D,
-        .format = format,
-        .extent = extent,
+    VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    const VkImageCreateInfo imageCreateInfo {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+        .imageType = info.extent.depth == 1 ? VK_IMAGE_TYPE_2D : VK_IMAGE_TYPE_3D,
+        .format = info.format,
+        .extent = info.extent,
         .mipLevels = 1, // TODO
         .arrayLayers = 1, // TODO: use that for 3D textures?
         .samples = VK_SAMPLE_COUNT_1_BIT,
         .tiling = VK_IMAGE_TILING_OPTIMAL,
-        .usage = usage,
-        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED };
+        .usage = info.usage,
+        .initialLayout = layout,
+    };
 
-    VmaAllocationCreateInfo allocCreateInfo { .usage = VMA_MEMORY_USAGE_GPU_ONLY,
-        .requiredFlags = VkMemoryPropertyFlags { VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT } };
+    const VmaAllocationCreateInfo allocCreateInfo {
+        .usage = VMA_MEMORY_USAGE_GPU_ONLY,
+        .requiredFlags = VkMemoryPropertyFlags { VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT },
+    };
 
     VkImage image;
     VmaAllocation allocation;
@@ -28,18 +33,54 @@ namespace NH3D {
         NH3D_ABORT_VK("VMA image creation failed");
     }
 
-    VkImageViewCreateInfo viewCreateInfo { .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+    const VkImageViewCreateInfo viewCreateInfo { .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
         .image = image,
-        .viewType = extent.depth == 1 ? VK_IMAGE_VIEW_TYPE_2D : VK_IMAGE_VIEW_TYPE_3D,
-        .format = format,
-        .subresourceRange = { .aspectMask = aspect, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1 } };
+        .viewType = info.extent.depth == 1 ? VK_IMAGE_VIEW_TYPE_2D : VK_IMAGE_VIEW_TYPE_3D,
+        .format = info.format,
+        .subresourceRange = { .aspectMask = info.aspect, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1, }, };
 
     VkImageView view;
     if (vkCreateImageView(rhi.getVkDevice(), &viewCreateInfo, nullptr, &view) != VK_SUCCESS) {
         NH3D_ABORT_VK("Failed to create Vulkan image view");
     }
 
-    return { ImageView { image, view }, TextureMetadata { format, extent, VK_IMAGE_LAYOUT_UNDEFINED, allocation } };
+    if (info.initialData.ptr != nullptr && info.initialData.size > 0) {
+        auto [stagingBuffer, stagingAllocation] = VulkanBuffer::create(rhi,
+            {   
+                .size = info.initialData.size,
+                .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                .memoryUsage = VMA_MEMORY_USAGE_CPU_ONLY,
+                .initialData = { 
+                    info.initialData.ptr, 
+                    info.initialData.size,
+                },
+            });
+
+        rhi.executeImmediateCommandBuffer([&](VkCommandBuffer commandBuffer) {
+            VulkanTexture::changeLayoutBarrier(commandBuffer, image, layout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+            const VkBufferImageCopy copyRegion {
+                .bufferOffset = 0,
+                .bufferRowLength = 0,
+                .bufferImageHeight = 0,
+                .imageSubresource = { 
+                    .aspectMask = info.aspect, 
+                    .mipLevel = 0, 
+                    .baseArrayLayer = 0, 
+                    .layerCount = 1, 
+                },
+                .imageOffset = { 0, 0, 0 },
+                .imageExtent = info.extent,
+            };
+            vkCmdCopyBufferToImage(commandBuffer, stagingBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
+
+            VulkanTexture::insertBarrier(commandBuffer, image, VK_IMAGE_LAYOUT_GENERAL);
+        });
+
+        VulkanBuffer::release(rhi, stagingBuffer, stagingAllocation);
+    }
+
+    return { ImageView { image, view }, TextureMetadata { info.format, info.extent, layout, allocation } };
 }
 
 [[nodiscard]] std::pair<ImageView, TextureMetadata> VulkanTexture::wrapSwapchainImage(
@@ -48,7 +89,7 @@ namespace NH3D {
     NH3D_ASSERT(extent.depth == 1, "Swapchain images must be 2D");
     VkImageViewCreateInfo viewCreateInfo { .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
         .image = image,
-        .viewType = VK_IMAGE_VIEW_TYPE_2D ,
+        .viewType = VK_IMAGE_VIEW_TYPE_2D,
         .format = format,
         .subresourceRange = { .aspectMask = aspect, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1 } };
 
@@ -111,7 +152,7 @@ void VulkanTexture::changeLayoutBarrier(
             .layerCount = VK_REMAINING_ARRAY_LAYERS,
         } };
     layout = newLayout;
-    
+
     VkDependencyInfo depInfo { .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO, .imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &barrier };
 
     vkCmdPipelineBarrier2(commandBuffer, &depInfo);

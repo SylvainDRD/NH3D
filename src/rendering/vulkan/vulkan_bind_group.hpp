@@ -32,9 +32,14 @@ struct VulkanBindGroup {
 
     using ColdType = BindGroupMetadata;
 
+    struct CreateInfo {
+        const VkShaderStageFlags stageFlags;
+        const ArrayWrapper<VkDescriptorType> bindingTypes;
+        const uint32 finalBindingCount = 1;
+    };
+
     /// "Constructor / Destructor": finalBindingCount is used to determine if we are using variable descriptor count
-    [[nodiscard]] static std::pair<DescriptorSets, BindGroupMetadata> create(VkDevice device, const VkShaderStageFlags stageFlags,
-        const std::initializer_list<VkDescriptorType>& bindingTypes, const uint32 finalBindingCount = 1);
+    [[nodiscard]] static std::pair<DescriptorSets, BindGroupMetadata> create(VkDevice device, const CreateInfo& info);
 
     // Used generically by the ResourceManager, must be API agnostic, non-const ref for invalidation
     static void release(const IRHI& rhi, DescriptorSets& descriptorSets, BindGroupMetadata& metadata);
@@ -45,7 +50,7 @@ struct VulkanBindGroup {
     [[nodiscard]] static VkDescriptorSet getUpdatedDescriptorSet(
         const VkDevice device, const DescriptorSets& descriptorSets, const uint32_t frameInFlightId);
 
-    static void bind(VkCommandBuffer commandBuffer, const ArrayPtr<VkDescriptorSet> descriptorSets, const VkPipelineBindPoint bindPoint,
+    static void bind(VkCommandBuffer commandBuffer, const ArrayWrapper<VkDescriptorSet> descriptorSets, const VkPipelineBindPoint bindPoint,
         const VkPipelineLayout pipelineLayout);
 
     template <typename T>

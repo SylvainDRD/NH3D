@@ -2,10 +2,9 @@
 
 namespace NH3D {
 
-[[nodiscard]] std::pair<VkPipeline, VkPipelineLayout> VulkanShader::create(VkDevice device, const ArrayPtr<VkDescriptorSetLayout> layouts,
-    const ShaderInfo& shaderInfo, const ArrayPtr<VkPushConstantRange> pushConstantRanges)
+[[nodiscard]] std::pair<VkPipeline, VkPipelineLayout> VulkanShader::create(VkDevice device, const ShaderInfo& shaderInfo)
 {
-    const VkPipelineLayout pipelineLayout = createPipelineLayout(device, layouts, pushConstantRanges);
+    const VkPipelineLayout pipelineLayout = createPipelineLayout(device, shaderInfo.descriptorSetsLayouts, shaderInfo.pushConstantRanges);
 
     VkPipelineVertexInputStateCreateInfo vertexCI { .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
 
@@ -108,35 +107,39 @@ void VulkanShader::release(const IRHI& rhi, VkPipeline& pipeline, VkPipelineLayo
 
 bool VulkanShader::valid(const VkPipeline pipeline, const VkPipelineLayout layout) { return pipeline != nullptr && layout != nullptr; }
 
-void VulkanShader::draw(VkCommandBuffer commandBuffer, const VkPipeline pipeline, const VkBuffer drawIndirectBuffer, const VkExtent2D extent,
-    const ArrayPtr<VkRenderingAttachmentInfo> colorAttachments, const VkRenderingAttachmentInfo depthAttachment,
-    const VkRenderingAttachmentInfo stencilAttachment)
+void VulkanShader::draw(VkCommandBuffer commandBuffer, const VkPipeline pipeline, const DrawParameters& params)
 {
     const VkRenderingInfo renderingInfo {
         .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-        .renderArea = VkRect2D { {}, extent },
+        .renderArea = VkRect2D { {}, params.extent },
         .layerCount = 1,
-        .colorAttachmentCount = static_cast<uint32_t>(colorAttachments.size),
-        .pColorAttachments = colorAttachments.ptr,
-        .pDepthAttachment = depthAttachment.imageView != nullptr ? &depthAttachment : nullptr,
-        .pStencilAttachment = stencilAttachment.imageView != nullptr ? &stencilAttachment : nullptr,
+        .colorAttachmentCount = static_cast<uint32_t>(params.colorAttachments.size),
+        .pColorAttachments = params.colorAttachments.ptr,
+        .pDepthAttachment = params.depthAttachment.imageView != nullptr ? &params.depthAttachment : nullptr,
+        .pStencilAttachment = params.stencilAttachment.imageView != nullptr ? &params.stencilAttachment : nullptr,
     };
 
     vkCmdBeginRendering(commandBuffer, &renderingInfo);
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-    const VkViewport viewport
-        = { .x = 0, .y = 0, .width = float(extent.width), .height = float(extent.height), .minDepth = 0.f, .maxDepth = 1.f };
+    const VkViewport viewport = {
+        .x = 0,
+        .y = 0,
+        .width = float(params.extent.width),
+        .height = float(params.extent.height),
+        .minDepth = 0.f,
+        .maxDepth = 1.f,
+    };
 
     vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
     const VkRect2D scissor = {
-        .extent = extent,
+        .extent = params.extent,
     };
 
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-    vkCmdDrawIndirect(commandBuffer, drawIndirectBuffer, 0, 1, sizeof(VkDrawIndirectCommand));
+    vkCmdDrawIndirect(commandBuffer, params.drawIndirectBuffer, 0, 1, sizeof(VkDrawIndirectCommand));
 
     vkCmdEndRendering(commandBuffer);
 }

@@ -86,18 +86,29 @@ VulkanRHI::VulkanRHI(const Window& Window)
         _presentSemaphores[i] = createSemaphore(_device);
         _frameFences[i] = createFence(_device, true);
 
-        _renderTargets[i] = createTexture(renderTargetsFormat, { Window.getWidth(), Window.getHeight(), 1 },
-            static_cast<VkImageUsageFlags>(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT
-                | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT),
-            VK_IMAGE_ASPECT_COLOR_BIT, true);
+        _renderTargets[i] = createTexture({
+            .format = renderTargetsFormat,
+            .extent = { Window.getWidth(), Window.getHeight(), 1 },
+            .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
+                | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+            .aspect = VK_IMAGE_ASPECT_COLOR_BIT,
+        });
     }
 
-    auto [computeDescriptorSets, computeMetadata] = VulkanBindGroup::create(
-        _device, VK_SHADER_STAGE_COMPUTE_BIT, std::initializer_list<VkDescriptorType> { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE });
+    const VkDescriptorType storageImageType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    auto [computeDescriptorSets, computeMetadata] = VulkanBindGroup::create(_device,
+        {
+            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+            .bindingTypes = { &storageImageType, 1 },
+        });
     _computeBindGroup = _bindGroupManager.store(std::move(computeDescriptorSets), std::move(computeMetadata));
 
-    auto [drawRecordDescriptorSets, drawRecordMetadata] = VulkanBindGroup::create(
-        _device, VK_SHADER_STAGE_VERTEX_BIT, std::initializer_list<VkDescriptorType> { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER });
+    const VkDescriptorType storageBufferType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    auto [drawRecordDescriptorSets, drawRecordMetadata] = VulkanBindGroup::create(_device,
+        {
+            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+            .bindingTypes = { &storageBufferType, 1 },
+        });
     _drawRecordBindGroup = _bindGroupManager.store(std::move(drawRecordDescriptorSets), std::move(drawRecordMetadata));
 
     // TODO: make GPU only
@@ -105,38 +116,56 @@ VulkanRHI::VulkanRHI(const Window& Window)
         .vertexCount = 3,
         .instanceCount = 1,
     };
-    auto [drawIndirectBuffer, drawIndirectAllocation] = VulkanBuffer::create(*this, sizeof(VkDrawIndirectCommand),
-        VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY, &drawIndirectCommand);
+    auto [drawIndirectBuffer, drawIndirectAllocation] = VulkanBuffer::create(*this,
+        {
+            .size = sizeof(VkDrawIndirectCommand),
+            .usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
+            .initialData = { reinterpret_cast<const byte*>(&drawIndirectCommand), sizeof(drawIndirectCommand) },
+        });
     _drawIndirectBuffer = _bufferManager.store(std::move(drawIndirectBuffer), std::move(drawIndirectAllocation));
 
     // TODO: make GPU only
-    auto [drawRecordBuffer, drawRecordAllocation]
-        = VulkanBuffer::create(*this, sizeof(DrawRecord) * 1, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, nullptr);
+    auto [drawRecordBuffer, drawRecordAllocation] = VulkanBuffer::create(*this,
+        {
+            .size = sizeof(DrawRecord) * 1,
+            .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            .memoryUsage = VMA_MEMORY_USAGE_CPU_TO_GPU,
+        });
     const VkDescriptorBufferInfo bufferInfo { .buffer = drawRecordBuffer, .offset = 0, .range = VK_WHOLE_SIZE };
     for (uint i = 0; i < IRHI::MaxFramesInFlight; ++i) {
         VulkanBindGroup::updateDescriptorSet(_device, drawRecordDescriptorSets.sets[i], bufferInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
     }
     _drawRecordBuffer = _bufferManager.store(std::move(drawRecordBuffer), std::move(drawRecordAllocation));
 
-    auto [textureDescriptorSets, textureMetadata] = VulkanBindGroup::create(
-        _device, VK_SHADER_STAGE_FRAGMENT_BIT, std::initializer_list<VkDescriptorType> { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER }, 1000);
+    const VkDescriptorType textureBindingType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    auto [textureDescriptorSets, textureMetadata] = VulkanBindGroup::create(_device,
+        {
+            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .bindingTypes = { &textureBindingType, 1 },
+            .finalBindingCount = 1000,
+        });
     _textureBindGroup = _bindGroupManager.store(std::move(textureDescriptorSets), std::move(textureMetadata));
 
-    auto [computeShader, computeLayout]
-        = VulkanComputeShader::create(_device, { &computeMetadata.layout, 1 }, NH3D_DIR "src/rendering/shaders/gradient.comp.spv");
+    auto [computeShader, computeLayout] = VulkanComputeShader::create(_device,
+        {
+            .computeShaderPath = NH3D_DIR "src/rendering/shaders/gradient.comp.spv",
+            .descriptorSetsLayouts = { &computeMetadata.layout, 1 },
+        });
     _computeShader = _computeShaderManager.store(std::move(computeShader), std::move(computeLayout));
 
     const VkPushConstantRange pushConstantRange { .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .offset = 0, .size = sizeof(mat4) };
 
     // TODO: also watch out for tiny vector allocs, though it's probably fine since it's only at load time
     const VkDescriptorSetLayout layouts[] = { textureMetadata.layout, drawRecordMetadata.layout };
-    auto [shader, layout] = VulkanShader::create(_device, { layouts, 2 },
-        VulkanShader::ShaderInfo {
+    auto [shader, layout] = VulkanShader::create(_device,
+        {
             .vertexShaderPath = NH3D_DIR "src/rendering/shaders/triangle.vert.spv",
             .fragmentShaderPath = NH3D_DIR "src/rendering/shaders/triangle.frag.spv",
             .colorAttachmentFormats = { renderTargetsFormat },
-        },
-        { &pushConstantRange, 1 });
+            .descriptorSetsLayouts = { layouts, 2 },
+            .pushConstantRanges = { &pushConstantRange, 1 },
+        });
     _graphicsShader = _shaderManager.store(std::move(shader), std::move(layout));
 }
 
@@ -194,16 +223,22 @@ void VulkanRHI::executeImmediateCommandBuffer(const std::function<void(VkCommand
     vkResetCommandBuffer(_immediateCommandBuffer, 0);
 }
 
+// TODO: pass data
 Handle<Texture> VulkanRHI::createTexture(const Texture::CreateInfo& info)
 {
-    return createTexture(MapTextureFormat(info.format), { info.size.x, info.size.y, info.size.z }, MapTextureUsageFlags(info.usage),
-        MapTextureAspectFlags(info.aspect), info.generateMipMaps);
+    return createTexture({
+        .format = MapTextureFormat(info.format),
+        .extent = { info.size.x, info.size.y, info.size.z },
+        .usage = MapTextureUsageFlags(info.usage),
+        .aspect = MapTextureAspectFlags(info.aspect),
+        .initialData = info.initialData,
+        .generateMipMaps = info.generateMipMaps,
+    });
 }
 
-Handle<Texture> VulkanRHI::createTexture(
-    VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, VkImageAspectFlags aspect, bool generateMipMaps)
+Handle<Texture> VulkanRHI::createTexture(const VulkanTexture::CreateInfo& info)
 {
-    auto&& [imageViewData, metadata] = VulkanTexture::create(*this, format, extent, usage, aspect, generateMipMaps);
+    auto&& [imageViewData, metadata] = VulkanTexture::create(*this, info);
 
     return _textureManager.store(std::move(imageViewData), std::move(metadata));
 }
@@ -212,8 +247,13 @@ void VulkanRHI::destroyTexture(const Handle<Texture> handle) { _textureManager.r
 
 Handle<Buffer> VulkanRHI::createBuffer(const Buffer::CreateInfo& info)
 {
-    auto&& [buffer, allocation]
-        = VulkanBuffer::create(*this, info.size, MapBufferUsageFlags(info.usage), MapBufferMemoryUsage(info.memory), info.initialData);
+    auto&& [buffer, allocation] = VulkanBuffer::create(*this,
+        {
+            .size = info.size,
+            .usage = MapBufferUsageFlags(info.usage),
+            .memoryUsage = MapBufferMemoryUsage(info.memory),
+            .initialData = info.initialData,
+        });
 
     return _bufferManager.store(std::move(buffer), std::move(allocation));
 }
@@ -296,8 +336,12 @@ void VulkanRHI::render(Scene& scene) const
         .imageLayout = rtMetadata.layout,
     };
     const VkBuffer drawIndirectBuffer = _bufferManager.get<VkBuffer>(_drawIndirectBuffer);
-    VulkanShader::draw(commandBuffer, graphicsPipeline, drawIndirectBuffer, { rtMetadata.extent.width, rtMetadata.extent.height },
-        { &colorAttachmentInfo, 1 });
+    VulkanShader::draw(commandBuffer, graphicsPipeline,
+        {
+            .drawIndirectBuffer = drawIndirectBuffer,
+            .extent = { rtMetadata.extent.width, rtMetadata.extent.height },
+            .colorAttachments = { &colorAttachmentInfo, 1 },
+        });
 
     VulkanTexture::changeLayoutBarrier(commandBuffer, rtImageViewData.image, rtMetadata.layout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
@@ -379,7 +423,7 @@ VkInstance VulkanRHI::createVkInstance(std::vector<const char*>&& requiredWindow
     return instance;
 }
 
-VkDebugUtilsMessengerEXT VulkanRHI::createDebugMessenger(VkInstance instance) const
+VkDebugUtilsMessengerEXT VulkanRHI::createDebugMessenger(const VkInstance instance) const
 {
     PFN_vkCreateDebugUtilsMessengerEXT createDebugMessenger
         = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));

@@ -24,8 +24,14 @@ struct VulkanBuffer {
 
     using ColdType = BufferAllocationInfo;
 
-    static std::pair<VkBuffer, BufferAllocationInfo> create(const VulkanRHI& rhi, const size_t size, const VkBufferUsageFlags usageFlags,
-        const VmaMemoryUsage memoryUsage, const void* initialData);
+    struct CreateInfo {
+        const size_t size;
+        const VkBufferUsageFlags usage;
+        const VmaMemoryUsage memoryUsage;
+        const ArrayWrapper<byte> initialData;
+    };
+
+    static std::pair<VkBuffer, BufferAllocationInfo> create(const VulkanRHI& rhi, const CreateInfo& info);
 
     // Used generically by the ResourceManager, must be API agnostic, non-const ref for invalidation
     static void release(const IRHI& rhi, VkBuffer& buffer, BufferAllocationInfo& allocation);

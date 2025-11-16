@@ -59,12 +59,11 @@ private:
         bool isValid() const { return GraphicsQueueFamilyID != NH3D_MAX_T(uint32_t) && PresentQueueFamilyID != NH3D_MAX_T(uint32_t); }
     };
 
-    Handle<Texture> createTexture(
-        VkFormat format, VkExtent3D extent, VkImageUsageFlags usage, VkImageAspectFlags aspect, bool generateMipMaps);
+    Handle<Texture> createTexture(const VulkanTexture::CreateInfo& info);
 
     VkInstance createVkInstance(std::vector<const char*>&& requiredWindowExtensions) const;
 
-    VkDebugUtilsMessengerEXT createDebugMessenger(VkInstance instance) const;
+    VkDebugUtilsMessengerEXT createDebugMessenger(const VkInstance instance) const;
 
     std::pair<VkPhysicalDevice, PhysicalDeviceQueueFamilyID> selectPhysicalDevice(VkInstance instance, VkSurfaceKHR surface) const;
 

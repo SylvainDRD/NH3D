@@ -12,24 +12,31 @@ struct VulkanShader : public VulkanPipeline {
     using ResourceType = Shader;
 
     struct ShaderInfo {
-        std::filesystem::path vertexShaderPath;
-        std::filesystem::path fragmentShaderPath;
-        std::vector<VkFormat> colorAttachmentFormats;
+        const std::filesystem::path& vertexShaderPath;
+        const std::filesystem::path& fragmentShaderPath;
+        const std::vector<VkFormat>& colorAttachmentFormats;
         VkFormat depthAttachmentFormat;
         VkFormat stencilAttachmentFormat;
+        ArrayWrapper<VkDescriptorSetLayout> descriptorSetsLayouts;
+        ArrayWrapper<VkPushConstantRange> pushConstantRanges;
     };
 
     /// "Constructor"
-    [[nodiscard]] static std::pair<VkPipeline, VkPipelineLayout> create(VkDevice device, const ArrayPtr<VkDescriptorSetLayout> layouts,
-        const ShaderInfo& shaderInfo, const ArrayPtr<VkPushConstantRange> pushConstantRanges = { nullptr, 0 });
+    [[nodiscard]] static std::pair<VkPipeline, VkPipelineLayout> create(VkDevice device, const ShaderInfo& shaderInfo);
 
     // "Destructor": used generically by the ResourceManager, must be API agnostic, non-const ref for invalidation
     static void release(const IRHI& rhi, VkPipeline& pipeline, VkPipelineLayout& pipelineLayout);
 
     static bool valid(const VkPipeline pipeline, const VkPipelineLayout layout);
-    static void draw(VkCommandBuffer commandBuffer, const VkPipeline pipeline, const VkBuffer drawIndirectBuffer, const VkExtent2D extent,
-        const ArrayPtr<VkRenderingAttachmentInfo> colorAttachments, const VkRenderingAttachmentInfo depthAttachment = {},
-        const VkRenderingAttachmentInfo stencilAttachment = {});
+
+    struct DrawParameters {
+        const VkBuffer drawIndirectBuffer;
+        const VkExtent2D extent;
+        const ArrayWrapper<VkRenderingAttachmentInfo> colorAttachments;
+        const VkRenderingAttachmentInfo depthAttachment;
+        const VkRenderingAttachmentInfo stencilAttachment;
+    };
+    static void draw(const VkCommandBuffer commandBuffer, const VkPipeline pipeline, const DrawParameters& params);
 };
 
 }

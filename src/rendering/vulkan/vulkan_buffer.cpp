@@ -4,15 +4,18 @@
 
 namespace NH3D {
 
-std::pair<VkBuffer, BufferAllocationInfo> VulkanBuffer::create(
-    const VulkanRHI& rhi, const size_t size, const VkBufferUsageFlags usageFlags, const VmaMemoryUsage memoryUsage, const void* initialData)
+std::pair<VkBuffer, BufferAllocationInfo> VulkanBuffer::create(const VulkanRHI& rhi, const CreateInfo& info)
 {
     // TODO: see if this works out in the future
-    const VkBufferUsageFlags updatedUsageFlags = usageFlags | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+    const VkBufferUsageFlags updatedUsageFlags = info.usage | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
-    const VkBufferCreateInfo bufferCreateInfo { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, .size = size, .usage = updatedUsageFlags };
+    const VkBufferCreateInfo bufferCreateInfo {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .size = info.size,
+        .usage = updatedUsageFlags,
+    };
 
-    const VmaAllocationCreateInfo allocationCreateInfo { .flags = VMA_ALLOCATION_CREATE_MAPPED_BIT, .usage = memoryUsage };
+    const VmaAllocationCreateInfo allocationCreateInfo { .flags = VMA_ALLOCATION_CREATE_MAPPED_BIT, .usage = info.memoryUsage };
 
     VkBuffer buffer;
     VmaAllocation allocation;
@@ -22,20 +25,29 @@ std::pair<VkBuffer, BufferAllocationInfo> VulkanBuffer::create(
         NH3D_ABORT_VK("Vulkan buffer creation failed");
     }
 
-    if (initialData) {
-        if (allocationInfo.pMappedData) {
-            std::memcpy(allocationInfo.pMappedData, initialData, size);
-            if (memoryUsage != VMA_MEMORY_USAGE_CPU_ONLY) {
-                vmaFlushAllocation(rhi.getAllocator(), allocation, 0, size);
+    if (info.initialData.ptr != nullptr && info.initialData.size > 0) {
+        if (allocationInfo.pMappedData != nullptr) {
+            if (info.initialData.size > info.size) {
+                NH3D_WARN("Initial data size is larger than buffer size, truncating data copy.");
+            }
+
+            std::memcpy(allocationInfo.pMappedData, info.initialData.ptr, std::min(info.initialData.size, info.size));
+            if (info.memoryUsage != VMA_MEMORY_USAGE_CPU_ONLY) {
+                vmaFlushAllocation(rhi.getAllocator(), allocation, 0, info.size);
             }
         } else {
             // TODO: reuse staging buffers for multiple uploads
-            auto [stagingBuffer, stagingAllocation]
-                = VulkanBuffer::create(rhi, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY, initialData);
+            auto [stagingBuffer, stagingAllocation] = VulkanBuffer::create(rhi,
+                {
+                    .size = info.size,
+                    .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                    .memoryUsage = VMA_MEMORY_USAGE_CPU_ONLY,
+                    .initialData = info.initialData,
+                });
 
-            rhi.executeImmediateCommandBuffer([size, stagingBuffer, buffer](VkCommandBuffer cmdBuffer) {
+            rhi.executeImmediateCommandBuffer([&info, stagingBuffer, buffer](VkCommandBuffer cmdBuffer) {
                 // Copy from staging buffer to the actual buffer
-                VkBufferCopy copyRegion { .size = size };
+                VkBufferCopy copyRegion { .size = info.size };
                 vkCmdCopyBuffer(cmdBuffer, stagingBuffer, buffer, 1, &copyRegion);
             });
 

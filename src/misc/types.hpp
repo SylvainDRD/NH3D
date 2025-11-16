@@ -33,9 +33,12 @@ using uint32 = uint32_t;
 using uint64 = uint64_t;
 
 // Utility type to pass a stack-allocated array pointer and size without needing a vector or both parameters separately
-template <typename T> struct ArrayPtr {
+template <typename T>
+concept NonVoid = !std::is_void_v<T>;
+
+template <NonVoid T> struct ArrayWrapper {
     const T* ptr;
-    const size_t size;
+    const size_t size; // element count
 };
 
 }

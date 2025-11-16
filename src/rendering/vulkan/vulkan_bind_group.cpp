@@ -4,39 +4,37 @@
 
 namespace NH3D {
 
-[[nodiscard]] std::pair<DescriptorSets, BindGroupMetadata> VulkanBindGroup::create(const VkDevice device,
-    const VkShaderStageFlags stageFlags, const std::initializer_list<VkDescriptorType>& bindingTypes, const uint32 finalBindingCount)
+[[nodiscard]] std::pair<DescriptorSets, BindGroupMetadata> VulkanBindGroup::create(const VkDevice device, const CreateInfo& info)
 {
-    NH3D_ASSERT(bindingTypes.size() != 0, "Binding types list cannot be empty");
+    NH3D_ASSERT(info.bindingTypes.size != 0, "Binding types list cannot be empty");
 
     static std::vector<VkDescriptorSetLayoutBinding> descriptorBindings {};
-    descriptorBindings.resize(bindingTypes.size());
+    descriptorBindings.resize(info.bindingTypes.size);
 
     static std::unordered_map<VkDescriptorType, uint32_t> descriptorTypeCounts {};
-    descriptorTypeCounts.reserve(bindingTypes.size());
+    descriptorTypeCounts.reserve(info.bindingTypes.size);
     descriptorTypeCounts.clear();
 
     static std::vector<VkDescriptorBindingFlags> bindingFlags {};
-    bindingFlags.resize(bindingTypes.size());
+    bindingFlags.resize(info.bindingTypes.size);
     std::memset(bindingFlags.data(), 0, bindingFlags.size() * sizeof(VkDescriptorBindingFlags));
 
-    uint32 bindingId = 0;
-    for (VkDescriptorType descriptorType : bindingTypes) {
-        descriptorBindings[bindingId] = VkDescriptorSetLayoutBinding {
-            .binding = bindingId, .descriptorType = descriptorType, .descriptorCount = 1, .stageFlags = stageFlags
+    for (uint32 i = 0; i < info.bindingTypes.size; ++i) {
+        const VkDescriptorType descriptorType = info.bindingTypes.ptr[i];
+
+        descriptorBindings[i] = VkDescriptorSetLayoutBinding {
+            .binding = i, .descriptorType = descriptorType, .descriptorCount = 1, .stageFlags = info.stageFlags
         };
         ++descriptorTypeCounts[descriptorType];
 
         // If the last binding has more than one descriptor, use a variable count binding
-        if (bindingId == bindingTypes.size() - 1 && finalBindingCount > 1) {
+        if (i == info.bindingTypes.size - 1 && info.finalBindingCount > 1) {
             NH3D_ASSERT(descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                 "Currently expect only combined image samplers to have variable descriptor count");
 
-            bindingFlags[bindingId] = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
-            descriptorBindings[bindingId].descriptorCount = finalBindingCount;
+            bindingFlags[i] = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
+            descriptorBindings[i].descriptorCount = info.finalBindingCount;
         }
-
-        ++bindingId;
     }
 
     const VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlag {
@@ -65,7 +63,7 @@ namespace NH3D {
     for (auto [descriptorType, count] : descriptorTypeCounts) {
         poolSizes.emplace_back(VkDescriptorPoolSize { descriptorType, IRHI::MaxFramesInFlight * count });
     }
-    poolSizes.back().descriptorCount *= finalBindingCount;
+    poolSizes.back().descriptorCount *= info.finalBindingCount;
 
     VkDescriptorPoolCreateInfo poolCreateInfo { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
         .flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT,
@@ -90,8 +88,8 @@ namespace NH3D {
         .pSetLayouts = layouts.data(),
     };
 
-    if (finalBindingCount > 1) {
-        const std::array<uint32, IRHI::MaxFramesInFlight> bindingSizes { finalBindingCount, finalBindingCount };
+    if (info.finalBindingCount > 1) {
+        const std::array<uint32, IRHI::MaxFramesInFlight> bindingSizes { info.finalBindingCount, info.finalBindingCount };
 
         VkDescriptorSetVariableDescriptorCountAllocateInfo varDescCountInfo {
             .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO,
@@ -135,7 +133,7 @@ bool VulkanBindGroup::valid(const DescriptorSets& descriptorSets, const BindGrou
     return descriptorSets.sets[frameInFlightId];
 }
 
-void VulkanBindGroup::bind(VkCommandBuffer commandBuffer, const ArrayPtr<VkDescriptorSet> descriptorSets,
+void VulkanBindGroup::bind(VkCommandBuffer commandBuffer, const ArrayWrapper<VkDescriptorSet> descriptorSets,
     const VkPipelineBindPoint bindPoint, const VkPipelineLayout pipelineLayout)
 {
     vkCmdBindDescriptorSets(commandBuffer, bindPoint, pipelineLayout, 0, descriptorSets.size, descriptorSets.ptr, 0, nullptr);
