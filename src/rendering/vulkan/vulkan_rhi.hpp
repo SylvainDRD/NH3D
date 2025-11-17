@@ -92,6 +92,8 @@ private:
 
     VmaAllocator createVMAAllocator(const VkInstance instance, const VkPhysicalDevice gpu, const VkDevice device) const;
 
+    VkSampler createSampler(const VkDevice device) const;
+
 private:
     VkInstance _instance;
 #if NH3D_DEBUG
@@ -122,6 +124,7 @@ private:
     std::array<VkSemaphore, MaxFramesInFlight> _presentSemaphores;
     std::vector<VkSemaphore> _renderSemaphores;
 
+    VkSampler _linearSampler;
     mutable ResourceManager<VulkanTexture> _textureManager;
     mutable ResourceManager<VulkanBuffer> _bufferManager;
     mutable ResourceManager<VulkanShader> _shaderManager;

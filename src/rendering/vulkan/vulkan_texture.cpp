@@ -129,23 +129,8 @@ uint32 channelCount(const VkFormat format)
         VulkanBuffer::release(rhi, stagingBuffer, stagingAllocation);
     }
 
-    VkSampler sampler = nullptr;
-    if (info.createSampler) {
-        const VkSamplerCreateInfo samplerCreateInfo {
-            .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-            .magFilter = VK_FILTER_LINEAR,
-            .minFilter = VK_FILTER_LINEAR,
-            .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
-            .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-            .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-        };
-        if (vkCreateSampler(rhi.getVkDevice(), &samplerCreateInfo, nullptr, &sampler) != VK_SUCCESS) {
-            NH3D_ABORT_VK("Failed to create Vulkan sampler");
-        }
-    }
-
     if (info.generateMipMaps) {
-        if (!info.createSampler || (info.initialData.ptr == nullptr || info.initialData.size == 0)) {
+        if (info.initialData.ptr == nullptr || info.initialData.size == 0) {
             NH3D_WARN("MipMap generation without sampler or data is weird");
         }
         if (info.extent.depth != 1 || (info.usage & VK_IMAGE_USAGE_SAMPLED_BIT) == 0) {
@@ -211,7 +196,6 @@ uint32 channelCount(const VkFormat format)
         TextureMetadata {
             .format = info.format,
             .extent = info.extent,
-            .sampler = sampler,
             .layout = layout,
             .allocation = allocation,
         },
@@ -241,7 +225,6 @@ uint32 channelCount(const VkFormat format)
         TextureMetadata {
             .format = format,
             .extent = extent,
-            .sampler = nullptr,
             .layout = VK_IMAGE_LAYOUT_UNDEFINED,
             .allocation = nullptr,
         },
@@ -251,10 +234,6 @@ uint32 channelCount(const VkFormat format)
 void VulkanTexture::release(const IRHI& rhi, ImageView& imageViewData, TextureMetadata& metadata)
 {
     const VulkanRHI& vrhi = static_cast<const VulkanRHI&>(rhi);
-    if (metadata.sampler) {
-        vkDestroySampler(vrhi.getVkDevice(), metadata.sampler, nullptr);
-        metadata.sampler = nullptr;
-    }
 
     if (imageViewData.view) {
         vkDestroyImageView(vrhi.getVkDevice(), imageViewData.view, nullptr);

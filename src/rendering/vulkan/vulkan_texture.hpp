@@ -20,7 +20,6 @@ struct ImageView {
 struct TextureMetadata {
     VkFormat format;
     VkExtent3D extent;
-    VkSampler sampler;
     VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
     VmaAllocation allocation = nullptr;
 };

@@ -29,7 +29,7 @@ namespace NH3D {
 
         // If the last binding has more than one descriptor, use a variable count binding
         if (i == info.bindingTypes.size - 1 && info.finalBindingCount > 1) {
-            NH3D_ASSERT(descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            NH3D_ASSERT(descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE || descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                 "Currently expect only combined image samplers to have variable descriptor count");
 
             bindingFlags[i] = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
@@ -62,14 +62,19 @@ namespace NH3D {
 
     for (auto [descriptorType, count] : descriptorTypeCounts) {
         poolSizes.emplace_back(VkDescriptorPoolSize { descriptorType, IRHI::MaxFramesInFlight * count });
-    }
-    poolSizes.back().descriptorCount *= info.finalBindingCount;
 
-    VkDescriptorPoolCreateInfo poolCreateInfo { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        if (info.finalBindingCount > 1 && descriptorType == info.bindingTypes.ptr[info.bindingTypes.size - 1]) {
+            poolSizes.back().descriptorCount *= info.finalBindingCount;
+        }
+    }
+
+    VkDescriptorPoolCreateInfo poolCreateInfo {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
         .flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT,
         .maxSets = IRHI::MaxFramesInFlight,
         .poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
-        .pPoolSizes = poolSizes.data() };
+        .pPoolSizes = poolSizes.data(),
+    };
 
     VkDescriptorPool pool;
     if (vkCreateDescriptorPool(device, &poolCreateInfo, nullptr, &pool) != VK_SUCCESS) {
@@ -80,7 +85,6 @@ namespace NH3D {
     std::array<VkDescriptorSetLayout, IRHI::MaxFramesInFlight> layouts;
     layouts.fill(layout);
 
-    DescriptorSets descriptorSets {};
     VkDescriptorSetAllocateInfo allocInfo {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
         .descriptorPool = pool,
@@ -91,7 +95,7 @@ namespace NH3D {
     if (info.finalBindingCount > 1) {
         const std::array<uint32, IRHI::MaxFramesInFlight> bindingSizes { info.finalBindingCount, info.finalBindingCount };
 
-        VkDescriptorSetVariableDescriptorCountAllocateInfo varDescCountInfo {
+        const VkDescriptorSetVariableDescriptorCountAllocateInfo varDescCountInfo {
             .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO,
             .descriptorSetCount = bindingSizes.size(),
             .pDescriptorCounts = bindingSizes.data(),
@@ -99,6 +103,7 @@ namespace NH3D {
         allocInfo.pNext = &varDescCountInfo;
     }
 
+    DescriptorSets descriptorSets {};
     if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.sets.data()) != VK_SUCCESS) {
         NH3D_ABORT_VK("Failed to allocate Vulkan descriptor sets");
     }

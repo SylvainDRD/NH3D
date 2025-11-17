@@ -1,7 +1,8 @@
 #version 460
 #extension GL_EXT_nonuniform_qualifier : require
 
-layout (set = 0, binding = 0) uniform sampler2D textures[];
+layout (set = 0, binding = 0) uniform sampler2D linearSampler;
+layout (set = 0, binding = 1) uniform texture2D textures[];
 
 layout (location = 0) in vec3 inColor;
 

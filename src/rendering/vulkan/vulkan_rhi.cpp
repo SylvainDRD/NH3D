@@ -139,13 +139,23 @@ VulkanRHI::VulkanRHI(const Window& Window)
     }
     _drawRecordBuffer = _bufferManager.store(std::move(drawRecordBuffer), std::move(drawRecordAllocation));
 
-    const VkDescriptorType textureBindingType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    const VkDescriptorType textureBindingTypes[] = { VK_DESCRIPTOR_TYPE_SAMPLER, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE };
     auto [textureDescriptorSets, textureMetadata] = VulkanBindGroup::create(_device,
         {
             .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .bindingTypes = { &textureBindingType, 1 },
+            .bindingTypes = { textureBindingTypes, std::size(textureBindingTypes) },
             .finalBindingCount = 1000,
         });
+    _linearSampler = createSampler(_device);
+    for (uint32 i = 0; i < IRHI::MaxFramesInFlight; ++i) {
+        VulkanBindGroup::updateDescriptorSet(_device, textureDescriptorSets.sets[i],
+            VkDescriptorImageInfo {
+                .sampler = _linearSampler,
+                .imageView = VK_NULL_HANDLE,
+                .imageLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            },
+            VK_DESCRIPTOR_TYPE_SAMPLER, 0);
+    }
     _textureBindGroup = _bindGroupManager.store(std::move(textureDescriptorSets), std::move(textureMetadata));
 
     auto [computeShader, computeLayout] = VulkanComputeShader::create(_device,
@@ -174,6 +184,7 @@ VulkanRHI::~VulkanRHI()
 {
     vkDeviceWaitIdle(_device);
 
+    vkDestroySampler(_device, _linearSampler, nullptr);
     _textureManager.clear(*this);
     _bufferManager.clear(*this);
     _shaderManager.clear(*this);
@@ -767,4 +778,24 @@ VmaAllocator VulkanRHI::createVMAAllocator(const VkInstance instance, const VkPh
 
     return allocator;
 }
+
+VkSampler VulkanRHI::createSampler(const VkDevice device) const
+{
+    VkSampler sampler;
+    const VkSamplerCreateInfo samplerCreateInfo {
+        .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+        .magFilter = VK_FILTER_LINEAR,
+        .minFilter = VK_FILTER_LINEAR,
+        .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+        .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+        .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+    };
+
+    if (vkCreateSampler(_device, &samplerCreateInfo, nullptr, &sampler) != VK_SUCCESS) {
+        NH3D_ABORT_VK("Failed to create Vulkan sampler");
+    }
+
+    return sampler;
+}
+
 }
