@@ -390,12 +390,14 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vulkanValidationCallback(VkDebugUtilsMessa
 
 VkInstance VulkanRHI::createVkInstance(std::vector<const char*>&& requiredWindowExtensions) const
 {
-    VkApplicationInfo appInfo { .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+    const VkApplicationInfo appInfo {
+        .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
         .pApplicationName = NH3D_NAME,
         .applicationVersion = VK_MAKE_VERSION(NH3D_VERSION_MAJOR, NH3D_VERSION_MINOR, NH3D_VERSION_PATCH),
         .pEngineName = NH3D_NAME,
         .engineVersion = VK_MAKE_VERSION(NH3D_VERSION_MAJOR, NH3D_VERSION_MINOR, NH3D_VERSION_PATCH),
-        .apiVersion = VK_API_VERSION_1_3 };
+        .apiVersion = VK_API_VERSION_1_3,
+    };
 
     std::vector<const char*> requiredExtensions = std::move(requiredWindowExtensions);
 #if NH3D_DEBUG
@@ -404,7 +406,8 @@ VkInstance VulkanRHI::createVkInstance(std::vector<const char*>&& requiredWindow
     const char* validationLayerName = "VK_LAYER_KHRONOS_validation";
 #endif
 
-    VkInstanceCreateInfo vkInstanceCreateInfo { .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+    const VkInstanceCreateInfo vkInstanceCreateInfo {
+        .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
         .pNext = nullptr,
         .pApplicationInfo = &appInfo,
 #if NH3D_DEBUG
@@ -412,10 +415,10 @@ VkInstance VulkanRHI::createVkInstance(std::vector<const char*>&& requiredWindow
         .ppEnabledLayerNames = &validationLayerName,
 #endif
         .enabledExtensionCount = static_cast<uint32_t>(requiredExtensions.size()),
-        .ppEnabledExtensionNames = requiredExtensions.data() };
+        .ppEnabledExtensionNames = requiredExtensions.data(),
+    };
 
     VkInstance instance;
-
     if (vkCreateInstance(&vkInstanceCreateInfo, nullptr, &instance) != VK_SUCCESS) {
         NH3D_ABORT_VK("Failed to create Vulkan instance");
     }
@@ -429,11 +432,13 @@ VkDebugUtilsMessengerEXT VulkanRHI::createDebugMessenger(const VkInstance instan
     PFN_vkCreateDebugUtilsMessengerEXT createDebugMessenger
         = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
 
-    VkDebugUtilsMessengerCreateInfoEXT messengerCreateInfo { .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+    const VkDebugUtilsMessengerCreateInfoEXT messengerCreateInfo {
+        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
         .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
         .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT
             | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT,
-        .pfnUserCallback = vulkanValidationCallback };
+        .pfnUserCallback = vulkanValidationCallback,
+    };
 
     VkDebugUtilsMessengerEXT debugMessenger;
     if (createDebugMessenger(instance, &messengerCreateInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
@@ -445,7 +450,7 @@ VkDebugUtilsMessengerEXT VulkanRHI::createDebugMessenger(const VkInstance instan
 }
 
 std::pair<VkPhysicalDevice, VulkanRHI::PhysicalDeviceQueueFamilyID> VulkanRHI::selectPhysicalDevice(
-    VkInstance instance, VkSurfaceKHR surface) const
+    const VkInstance instance, const VkSurfaceKHR surface) const
 {
     uint32_t physicalDeviceCount;
     vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, nullptr);
@@ -509,7 +514,7 @@ std::pair<VkPhysicalDevice, VulkanRHI::PhysicalDeviceQueueFamilyID> VulkanRHI::s
     return { availableGpus[deviceId], queues };
 }
 
-VkDevice VulkanRHI::createLogicalDevice(VkPhysicalDevice gpu, PhysicalDeviceQueueFamilyID queues) const
+VkDevice VulkanRHI::createLogicalDevice(const VkPhysicalDevice gpu, const PhysicalDeviceQueueFamilyID queues) const
 {
     std::unordered_set<uint32_t> queueIndices { queues.GraphicsQueueFamilyID, queues.PresentQueueFamilyID };
 
@@ -552,7 +557,7 @@ VkDevice VulkanRHI::createLogicalDevice(VkPhysicalDevice gpu, PhysicalDeviceQueu
 
     const char* swapchainExt = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
 
-    VkDeviceCreateInfo deviceCreateInfo {
+    const VkDeviceCreateInfo deviceCreateInfo {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
         .pNext = &features13,
         .queueCreateInfoCount = static_cast<uint32_t>(queuesCreateInfo.size()),
@@ -572,8 +577,9 @@ VkDevice VulkanRHI::createLogicalDevice(VkPhysicalDevice gpu, PhysicalDeviceQueu
     return device;
 }
 
-std::pair<VkSwapchainKHR, VkFormat> VulkanRHI::createSwapchain(VkDevice device, VkPhysicalDevice gpu, VkSurfaceKHR surface,
-    PhysicalDeviceQueueFamilyID queues, VkExtent2D extent, VkSwapchainKHR previousSwapchain) const
+std::pair<VkSwapchainKHR, VkFormat> VulkanRHI::createSwapchain(const VkDevice device, const VkPhysicalDevice gpu,
+    const VkSurfaceKHR surface, const PhysicalDeviceQueueFamilyID queues, const VkExtent2D extent,
+    const VkSwapchainKHR previousSwapchain) const
 {
     VkSurfaceCapabilitiesKHR surfaceCapabilities;
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu, surface, &surfaceCapabilities);
@@ -584,7 +590,7 @@ std::pair<VkSwapchainKHR, VkFormat> VulkanRHI::createSwapchain(VkDevice device, 
     std::vector<VkSurfaceFormatKHR> surfaceFormats { formatsCount };
     vkGetPhysicalDeviceSurfaceFormatsKHR(gpu, surface, &formatsCount, surfaceFormats.data());
 
-    VkFormat preferredFormats[] = { VK_FORMAT_R8G8B8A8_SRGB, VK_FORMAT_B8G8R8A8_SRGB };
+    const VkFormat preferredFormats[] = { VK_FORMAT_R8G8B8A8_SRGB, VK_FORMAT_B8G8R8A8_SRGB };
 
     uint32_t formatId = 0;
     for (; formatId < sizeof(preferredFormats); ++formatId) {
@@ -628,7 +634,6 @@ std::pair<VkSwapchainKHR, VkFormat> VulkanRHI::createSwapchain(VkDevice device, 
     }
 
     VkSwapchainKHR swapchain;
-
     if (vkCreateSwapchainKHR(device, &swapchainCreateInfo, nullptr, &swapchain) != VK_SUCCESS) {
         NH3D_ABORT_VK("Vulkan swapchain creation failed");
     }
@@ -636,9 +641,9 @@ std::pair<VkSwapchainKHR, VkFormat> VulkanRHI::createSwapchain(VkDevice device, 
     return { swapchain, preferredFormats[formatId] };
 }
 
-VkCommandPool VulkanRHI::createCommandPool(VkDevice device, uint32_t queueFamilyIndex) const
+VkCommandPool VulkanRHI::createCommandPool(const VkDevice device, const uint32_t queueFamilyIndex) const
 {
-    VkCommandPoolCreateInfo commandPoolCreateInfo {
+    const VkCommandPoolCreateInfo commandPoolCreateInfo {
         .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
         .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
         .queueFamilyIndex = queueFamilyIndex,
@@ -652,9 +657,10 @@ VkCommandPool VulkanRHI::createCommandPool(VkDevice device, uint32_t queueFamily
     return commandPool;
 }
 
-void VulkanRHI::allocateCommandBuffers(VkDevice device, VkCommandPool commandPool, uint32_t bufferCount, VkCommandBuffer* buffers) const
+void VulkanRHI::allocateCommandBuffers(
+    const VkDevice device, const VkCommandPool commandPool, const uint32_t bufferCount, VkCommandBuffer* buffers) const
 {
-    VkCommandBufferAllocateInfo cbAllocInfo {
+    const VkCommandBufferAllocateInfo cbAllocInfo {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
         .commandPool = commandPool,
         .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
@@ -666,9 +672,9 @@ void VulkanRHI::allocateCommandBuffers(VkDevice device, VkCommandPool commandPoo
     }
 }
 
-VkSemaphore VulkanRHI::createSemaphore(VkDevice device) const
+VkSemaphore VulkanRHI::createSemaphore(const VkDevice device) const
 {
-    VkSemaphoreCreateInfo semCreateInfo {
+    const VkSemaphoreCreateInfo semCreateInfo {
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
     };
 
@@ -680,9 +686,9 @@ VkSemaphore VulkanRHI::createSemaphore(VkDevice device) const
     return semaphore;
 }
 
-VkFence VulkanRHI::createFence(VkDevice device, bool signaled) const
+VkFence VulkanRHI::createFence(const VkDevice device, const bool signaled) const
 {
-    VkFenceCreateInfo fenceCreateInfo {
+    const VkFenceCreateInfo fenceCreateInfo {
         .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
         .flags = signaled ? VK_FENCE_CREATE_SIGNALED_BIT : VkFenceCreateFlags {},
     };
@@ -695,9 +701,10 @@ VkFence VulkanRHI::createFence(VkDevice device, bool signaled) const
     return fence;
 }
 
-void VulkanRHI::beginCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferUsageFlags flags, bool resetCommandBuffer) const
+void VulkanRHI::beginCommandBuffer(
+    const VkCommandBuffer commandBuffer, const VkCommandBufferUsageFlags flags, const bool resetCommandBuffer) const
 {
-    VkCommandBufferBeginInfo cbBeginInfo {
+    const VkCommandBufferBeginInfo cbBeginInfo {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
         .flags = flags,
         .pInheritanceInfo = nullptr,
@@ -710,7 +717,7 @@ void VulkanRHI::beginCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBuffe
     vkBeginCommandBuffer(commandBuffer, &cbBeginInfo);
 }
 
-VkSemaphoreSubmitInfo VulkanRHI::makeSemaphoreSubmitInfo(VkSemaphore semaphore, VkPipelineStageFlags2 stageMask) const
+VkSemaphoreSubmitInfo VulkanRHI::makeSemaphoreSubmitInfo(const VkSemaphore semaphore, const VkPipelineStageFlags2 stageMask) const
 {
     return {
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
@@ -721,16 +728,16 @@ VkSemaphoreSubmitInfo VulkanRHI::makeSemaphoreSubmitInfo(VkSemaphore semaphore, 
     };
 }
 
-void VulkanRHI::submitCommandBuffer(VkQueue queue, const VkSemaphoreSubmitInfo& waitSemaphore, const VkSemaphoreSubmitInfo& signalSemaphore,
-    VkCommandBuffer commandBuffer, VkFence fence) const
+void VulkanRHI::submitCommandBuffer(const VkQueue queue, const VkSemaphoreSubmitInfo& waitSemaphore,
+    const VkSemaphoreSubmitInfo& signalSemaphore, const VkCommandBuffer commandBuffer, const VkFence fence) const
 {
-    VkCommandBufferSubmitInfo cbSubmitInfo {
+    const VkCommandBufferSubmitInfo cbSubmitInfo {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
         .commandBuffer = commandBuffer,
         .deviceMask = 0,
     };
 
-    VkSubmitInfo2 submitInfo {
+    const VkSubmitInfo2 submitInfo {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
         .waitSemaphoreInfoCount = waitSemaphore.semaphore ? 1u : 0u,
         .pWaitSemaphoreInfos = &waitSemaphore,
@@ -743,9 +750,9 @@ void VulkanRHI::submitCommandBuffer(VkQueue queue, const VkSemaphoreSubmitInfo& 
     vkQueueSubmit2(queue, 1, &submitInfo, fence);
 }
 
-VmaAllocator VulkanRHI::createVMAAllocator(VkInstance instance, VkPhysicalDevice gpu, VkDevice device) const
+VmaAllocator VulkanRHI::createVMAAllocator(const VkInstance instance, const VkPhysicalDevice gpu, const VkDevice device) const
 {
-    VmaAllocatorCreateInfo allocatorCreateInfo {
+    const VmaAllocatorCreateInfo allocatorCreateInfo {
         .flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT,
         .physicalDevice = gpu,
         .device = device,

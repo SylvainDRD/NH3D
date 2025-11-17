@@ -65,29 +65,32 @@ private:
 
     VkDebugUtilsMessengerEXT createDebugMessenger(const VkInstance instance) const;
 
-    std::pair<VkPhysicalDevice, PhysicalDeviceQueueFamilyID> selectPhysicalDevice(VkInstance instance, VkSurfaceKHR surface) const;
+    std::pair<VkPhysicalDevice, PhysicalDeviceQueueFamilyID> selectPhysicalDevice(
+        const VkInstance instance, const VkSurfaceKHR surface) const;
 
-    VkDevice createLogicalDevice(VkPhysicalDevice gpu, PhysicalDeviceQueueFamilyID queues) const;
+    VkDevice createLogicalDevice(const VkPhysicalDevice gpu, const PhysicalDeviceQueueFamilyID queues) const;
 
-    std::pair<VkSwapchainKHR, VkFormat> createSwapchain(VkDevice device, VkPhysicalDevice gpu, VkSurfaceKHR surface,
-        PhysicalDeviceQueueFamilyID queues, VkExtent2D extent, VkSwapchainKHR previousSwapchain = nullptr) const;
+    std::pair<VkSwapchainKHR, VkFormat> createSwapchain(const VkDevice device, const VkPhysicalDevice gpu, const VkSurfaceKHR surface,
+        const PhysicalDeviceQueueFamilyID queues, const VkExtent2D extent, const VkSwapchainKHR previousSwapchain = nullptr) const;
 
-    VkCommandPool createCommandPool(VkDevice device, uint32_t queueFamilyIndex) const;
+    VkCommandPool createCommandPool(const VkDevice device, const uint32_t queueFamilyIndex) const;
 
-    void allocateCommandBuffers(VkDevice device, VkCommandPool commandPool, uint32_t bufferCount, VkCommandBuffer* buffers) const;
+    void allocateCommandBuffers(
+        const VkDevice device, const VkCommandPool commandPool, const uint32_t bufferCount, VkCommandBuffer* buffers) const;
 
-    VkSemaphore createSemaphore(VkDevice device) const;
+    VkSemaphore createSemaphore(const VkDevice device) const;
 
-    VkFence createFence(VkDevice device, bool signaled) const;
+    VkFence createFence(const VkDevice device, const bool signaled) const;
 
-    void beginCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferUsageFlags flags, bool resetCommandBuffer = true) const;
+    void beginCommandBuffer(
+        const VkCommandBuffer commandBuffer, const VkCommandBufferUsageFlags flags, const bool resetCommandBuffer = true) const;
 
-    VkSemaphoreSubmitInfo makeSemaphoreSubmitInfo(VkSemaphore semaphore, VkPipelineStageFlags2 stageMask) const;
+    VkSemaphoreSubmitInfo makeSemaphoreSubmitInfo(const VkSemaphore semaphore, const VkPipelineStageFlags2 stageMask) const;
 
-    void submitCommandBuffer(VkQueue queue, const VkSemaphoreSubmitInfo& waitSemaphore, const VkSemaphoreSubmitInfo& signalSemaphore,
-        VkCommandBuffer commandBuffer, VkFence fence) const;
+    void submitCommandBuffer(const VkQueue queue, const VkSemaphoreSubmitInfo& waitSemaphore, const VkSemaphoreSubmitInfo& signalSemaphore,
+        const VkCommandBuffer commandBuffer, const VkFence fence) const;
 
-    VmaAllocator createVMAAllocator(VkInstance instance, VkPhysicalDevice gpu, VkDevice device) const;
+    VmaAllocator createVMAAllocator(const VkInstance instance, const VkPhysicalDevice gpu, const VkDevice device) const;
 
 private:
     VkInstance _instance;

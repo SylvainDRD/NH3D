@@ -5,6 +5,47 @@
 
 namespace NH3D {
 
+uint32 channelCount(const VkFormat format)
+{
+    switch (format) {
+    case VK_FORMAT_R8_UNORM:
+    case VK_FORMAT_R8_SNORM:
+    case VK_FORMAT_R8_USCALED:
+    case VK_FORMAT_R8_SSCALED:
+    case VK_FORMAT_R8_UINT:
+    case VK_FORMAT_R8_SINT:
+    case VK_FORMAT_R8_SRGB:
+        return 1;
+    case VK_FORMAT_R8G8_UNORM:
+    case VK_FORMAT_R8G8_SNORM:
+    case VK_FORMAT_R8G8_USCALED:
+    case VK_FORMAT_R8G8_SSCALED:
+    case VK_FORMAT_R8G8_UINT:
+    case VK_FORMAT_R8G8_SINT:
+    case VK_FORMAT_R8G8_SRGB:
+        return 2;
+    case VK_FORMAT_R8G8B8_UNORM:
+    case VK_FORMAT_R8G8B8_SNORM:
+    case VK_FORMAT_R8G8B8_USCALED:
+    case VK_FORMAT_R8G8B8_SSCALED:
+    case VK_FORMAT_R8G8B8_UINT:
+    case VK_FORMAT_R8G8B8_SINT:
+    case VK_FORMAT_R8G8B8_SRGB:
+        return 3;
+    case VK_FORMAT_R8G8B8A8_UNORM:
+    case VK_FORMAT_R8G8B8A8_SNORM:
+    case VK_FORMAT_R8G8B8A8_USCALED:
+    case VK_FORMAT_R8G8B8A8_SSCALED:
+    case VK_FORMAT_R8G8B8A8_UINT:
+    case VK_FORMAT_R8G8B8A8_SINT:
+    case VK_FORMAT_R8G8B8A8_SRGB:
+        return 4;
+    default:
+        NH3D_ABORT("Unsupported format for channel count retrieval");
+        return 0;
+    }
+}
+
 [[nodiscard]] std::pair<ImageView, TextureMetadata> VulkanTexture::create(const VulkanRHI& rhi, const CreateInfo& info)
 {
     VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -51,7 +92,8 @@ namespace NH3D {
     }
 
     // TODO: handle initial data/texture size mismatch
-    if (info.initialData.ptr != nullptr) {
+    if (info.initialData.ptr != nullptr
+        && info.initialData.size == info.extent.width * info.extent.height * info.extent.depth * channelCount(info.format)) {
         auto [stagingBuffer, stagingAllocation] = VulkanBuffer::create(rhi,
             {   
                 .size = info.initialData.size,
