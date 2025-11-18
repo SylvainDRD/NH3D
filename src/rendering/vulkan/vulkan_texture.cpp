@@ -104,9 +104,11 @@ uint32 channelCount(const VkFormat format)
                     info.initialData.size,
                 },
             });
-
+        // TODO: I'm writing bytes but what if the format is not 8-bit based? Might need to adjust that
         rhi.executeImmediateCommandBuffer([&](VkCommandBuffer commandBuffer) {
-            VulkanTexture::changeLayoutBarrier(commandBuffer, image, layout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+            VulkanTexture::insertMemoryBarrier(commandBuffer, image, VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_NONE,
+                VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                VK_IMAGE_LAYOUT_UNDEFINED, 0, 1);
 
             const VkBufferImageCopy copyRegion {
                 .bufferOffset = 0,
@@ -123,24 +125,15 @@ uint32 channelCount(const VkFormat format)
             };
             vkCmdCopyBufferToImage(commandBuffer, stagingBuffer.buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
 
-            VulkanTexture::changeLayoutBarrier(commandBuffer, image, layout, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 1);
-        });
+            if (info.generateMipMaps) {
 
-        VulkanBuffer::release(rhi, stagingBuffer, stagingAllocation);
-    }
+                VulkanTexture::insertMemoryBarrier(commandBuffer, image, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                    VK_ACCESS_2_SHADER_READ_BIT, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 1);
 
-    if (info.generateMipMaps) {
-        if (info.initialData.ptr == nullptr || info.initialData.size == 0) {
-            NH3D_WARN("MipMap generation without sampler or data is weird");
-        }
-        if (info.extent.depth != 1 || (info.usage & VK_IMAGE_USAGE_SAMPLED_BIT) == 0) {
-            NH3D_ABORT("Mipmapping requires 2D sampled images");
-        }
-
-        rhi.executeImmediateCommandBuffer([&](VkCommandBuffer commandBuffer) {
-            VkImageLayout previousMipLayout = layout;
-            for (uint32 i = 1; i < imageCreateInfo.mipLevels; ++i) {
-                const VkImageBlit blit {
+                VkImageLayout previousMipLayout = layout;
+                for (uint32 i = 1; i < imageCreateInfo.mipLevels; ++i) {
+                    const VkImageBlit blit {
                     .srcSubresource = { .aspectMask = info.aspect, .mipLevel = i - 1, .baseArrayLayer = 0, .layerCount = 1, },
                     .srcOffsets = { { 0, 0, 0 },
                         { 
@@ -155,38 +148,35 @@ uint32 channelCount(const VkFormat format)
                             static_cast<int>(info.extent.depth), }, },
                 };
 
-                // Prepare previous mip level for reading & next mip level for writing
-                VkImageLayout currentMipLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-                VulkanTexture::changeLayoutBarrier(commandBuffer, image, previousMipLayout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, i - 1, 1);
-                VulkanTexture::changeLayoutBarrier(commandBuffer, image, currentMipLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, i, 1);
+                    // Prepare previous mip level for reading & next mip level for writing
+                    VkImageLayout currentMipLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+                    VulkanTexture::insertMemoryBarrier(commandBuffer, image, VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                        VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, previousMipLayout, i - 1, 1);
+                    VulkanTexture::insertMemoryBarrier(commandBuffer, image, VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_NONE,
+                        VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                        currentMipLayout, i, 1);
 
-                vkCmdBlitImage(commandBuffer, image, previousMipLayout, image, currentMipLayout, 1, &blit, VK_FILTER_LINEAR);
+                    vkCmdBlitImage(commandBuffer, image, previousMipLayout, image, currentMipLayout, 1, &blit, VK_FILTER_LINEAR);
 
-                // Transition previous mip level to SHADER_READ_ONLY_OPTIMAL
-                VulkanTexture::changeLayoutBarrier(
-                    commandBuffer, image, previousMipLayout, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, i - 1, 1);
-                previousMipLayout = currentMipLayout;
+                    // Transition previous mip level to SHADER_READ_ONLY_OPTIMAL
+                    VulkanTexture::insertMemoryBarrier(commandBuffer, image, VK_ACCESS_2_TRANSFER_READ_BIT,
+                        VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT,
+                        VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, previousMipLayout, i - 1, 1);
+                    previousMipLayout = currentMipLayout;
+                }
+                VulkanTexture::insertMemoryBarrier(commandBuffer, image, VK_ACCESS_2_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                    VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, previousMipLayout, imageCreateInfo.mipLevels - 1, 1);
+            } else {
+                VulkanTexture::insertMemoryBarrier(commandBuffer, image, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                    VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 1);
             }
-            VulkanTexture::changeLayoutBarrier(
-                commandBuffer, image, previousMipLayout, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, imageCreateInfo.mipLevels - 1, 1);
-
-            layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         });
-    }
 
-    rhi.executeImmediateCommandBuffer([&](VkCommandBuffer commandBuffer) {
-        if (info.usage & VK_IMAGE_USAGE_SAMPLED_BIT && layout != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
-            VulkanTexture::changeLayoutBarrier(commandBuffer, image, layout, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        } else if (info.usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT && layout != VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL) {
-            VulkanTexture::changeLayoutBarrier(commandBuffer, image, layout, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-        } else if (info.usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT && layout != VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
-            VulkanTexture::changeLayoutBarrier(commandBuffer, image, layout, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-        } else if (info.usage & VK_IMAGE_USAGE_STORAGE_BIT && layout != VK_IMAGE_LAYOUT_GENERAL) {
-            VulkanTexture::changeLayoutBarrier(commandBuffer, image, layout, VK_IMAGE_LAYOUT_GENERAL);
-        } else if (layout != VK_IMAGE_LAYOUT_GENERAL) {
-            VulkanTexture::changeLayoutBarrier(commandBuffer, image, layout, VK_IMAGE_LAYOUT_GENERAL);
-        }
-    });
+        VulkanBuffer::release(rhi, stagingBuffer, stagingAllocation);
+    }
 
     return {
         ImageView {
@@ -196,7 +186,6 @@ uint32 channelCount(const VkFormat format)
         TextureMetadata {
             .format = info.format,
             .extent = info.extent,
-            .layout = layout,
             .allocation = allocation,
         },
     };
@@ -225,7 +214,6 @@ uint32 channelCount(const VkFormat format)
         TextureMetadata {
             .format = format,
             .extent = extent,
-            .layout = VK_IMAGE_LAYOUT_UNDEFINED,
             .allocation = nullptr,
         },
     };
@@ -259,21 +247,16 @@ bool VulkanTexture::valid(const ImageView& imageViewData, const TextureMetadata&
     return imageViewData.image != nullptr && imageViewData.view != nullptr;
 }
 
-void VulkanTexture::insertBarrier(VkCommandBuffer commandBuffer, const VkImage image, const VkImageLayout layout)
-{
-    VkImageLayout updatedLayout = layout;
-    changeLayoutBarrier(commandBuffer, image, updatedLayout, layout);
-}
-
-void VulkanTexture::changeLayoutBarrier(VkCommandBuffer commandBuffer, const VkImage image, VkImageLayout& layout,
-    const VkImageLayout newLayout, const uint32_t baseMipLevel, const uint32_t mipLevels)
+void VulkanTexture::insertMemoryBarrier(VkCommandBuffer commandBuffer, const VkImage image, const VkAccessFlags2 srcAccessMask,
+    const VkPipelineStageFlags2 srcStageMask, const VkAccessFlags2 dstAccessMask, const VkPipelineStageFlags2 dstStageMask,
+    const VkImageLayout newLayout, const VkImageLayout oldLayout, const uint32_t baseMipLevel, const uint32_t mipLevels)
 {
     const VkImageMemoryBarrier2 barrier { .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-        .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, // TODO: improve
-        .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT, // TODO: improve
-        .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, // TODO: improve
-        .dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT, // TODO: improve
-        .oldLayout = layout,
+        .srcStageMask = srcStageMask,
+        .srcAccessMask = srcAccessMask,
+        .dstStageMask = dstStageMask,
+        .dstAccessMask = dstAccessMask,
+        .oldLayout = oldLayout,
         .newLayout = newLayout,
         .image = image,
         .subresourceRange = {
@@ -283,7 +266,6 @@ void VulkanTexture::changeLayoutBarrier(VkCommandBuffer commandBuffer, const VkI
             .levelCount = mipLevels,
             .layerCount = VK_REMAINING_ARRAY_LAYERS,
         }, };
-    layout = newLayout;
 
     const VkDependencyInfo depInfo {
         .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
@@ -294,12 +276,14 @@ void VulkanTexture::changeLayoutBarrier(VkCommandBuffer commandBuffer, const VkI
     vkCmdPipelineBarrier2(commandBuffer, &depInfo);
 }
 
-void VulkanTexture::clear(VkCommandBuffer commandBuffer, VkImage image, const color4 color)
+void VulkanTexture::clear(VkCommandBuffer commandBuffer, VkImage image, const color4 color, const VkImageLayout layout)
 {
     const VkImageSubresourceRange imageRange = VkImageSubresourceRange {
-        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .levelCount = VK_REMAINING_MIP_LEVELS, .layerCount = VK_REMAINING_ARRAY_LAYERS
+        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        .levelCount = VK_REMAINING_MIP_LEVELS,
+        .layerCount = VK_REMAINING_ARRAY_LAYERS,
     };
-    vkCmdClearColorImage(commandBuffer, image, VK_IMAGE_LAYOUT_GENERAL, reinterpret_cast<const VkClearColorValue*>(&color), 1, &imageRange);
+    vkCmdClearColorImage(commandBuffer, image, layout, reinterpret_cast<const VkClearColorValue*>(&color), 1, &imageRange);
 }
 
 void VulkanTexture::blit(

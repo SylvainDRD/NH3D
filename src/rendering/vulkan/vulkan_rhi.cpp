@@ -565,12 +565,18 @@ void VulkanRHI::render(Scene& scene) const
 
         const auto& rtImageViewData = _textureManager.get<ImageView>(_renderTargets[frameInFlightId]);
         auto& rtMetadata = _textureManager.get<TextureMetadata>(_renderTargets[frameInFlightId]);
-        VulkanTexture::changeLayoutBarrier(commandBuffer, rtImageViewData.image, rtMetadata.layout, VK_IMAGE_LAYOUT_GENERAL);
+        VulkanTexture::insertMemoryBarrier(commandBuffer, rtImageViewData.image, VK_ACCESS_2_TRANSFER_READ_BIT,
+            VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        VulkanTexture::clear(commandBuffer, rtImageViewData.image, color4 { 0.0f, 0.0f, 0.0f, 1.0f }, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        VulkanTexture::insertMemoryBarrier(commandBuffer, rtImageViewData.image, VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
         const VkRenderingAttachmentInfo colorAttachmentInfo {
             .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
             .imageView = rtImageViewData.view,
-            .imageLayout = rtMetadata.layout,
+            .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         };
 
         // TODO: projection matrix from camera into push constant
@@ -582,12 +588,16 @@ void VulkanRHI::render(Scene& scene) const
                 .colorAttachments = { &colorAttachmentInfo, 1 },
             });
 
-        VulkanTexture::changeLayoutBarrier(commandBuffer, rtImageViewData.image, rtMetadata.layout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-        VulkanTexture::changeLayoutBarrier(commandBuffer, scImageViewData.image, scMetadata.layout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        VulkanTexture::insertMemoryBarrier(commandBuffer, rtImageViewData.image, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_2_BLIT_BIT,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        VulkanTexture::insertMemoryBarrier(commandBuffer, scImageViewData.image, VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_NONE,
+            VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_BLIT_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
         VulkanTexture::blit(commandBuffer, rtImageViewData.image, rtMetadata.extent, scImageViewData.image, scMetadata.extent);
     }
 
-    VulkanTexture::changeLayoutBarrier(commandBuffer, scImageViewData.image, scMetadata.layout, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+    VulkanTexture::insertMemoryBarrier(commandBuffer, scImageViewData.image, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_BLIT_BIT,
+        VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_NONE, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     vkEndCommandBuffer(commandBuffer);
     submitCommandBuffer(_graphicsQueue,

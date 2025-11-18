@@ -20,7 +20,6 @@ struct ImageView {
 struct TextureMetadata {
     VkFormat format;
     VkExtent3D extent;
-    VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
     VmaAllocation allocation = nullptr;
 };
 
@@ -54,12 +53,12 @@ struct VulkanTexture {
     static bool valid(const ImageView& imageViewData, const TextureMetadata& metadata);
 
     /// Helper functions
-    static void insertBarrier(VkCommandBuffer commandBuffer, const VkImage image, const VkImageLayout layout);
+    static void insertMemoryBarrier(VkCommandBuffer commandBuffer, const VkImage image, const VkAccessFlags2 srcAccessMask,
+        const VkPipelineStageFlags2 srcStageMask, const VkAccessFlags2 dstAccessMask, const VkPipelineStageFlags2 dstStageMask,
+        const VkImageLayout newLayout, const VkImageLayout oldLayout = VK_IMAGE_LAYOUT_UNDEFINED, const uint32_t baseMipLevel = 0,
+        const uint32_t mipLevels = VK_REMAINING_MIP_LEVELS);
 
-    static void changeLayoutBarrier(VkCommandBuffer commandBuffer, const VkImage image, VkImageLayout& layout,
-        const VkImageLayout newLayout, const uint32_t baseMipLevel = 0, const uint32_t mipLevels = VK_REMAINING_MIP_LEVELS);
-
-    static void clear(VkCommandBuffer commandBuffer, VkImage image, const color4 color);
+    static void clear(VkCommandBuffer commandBuffer, VkImage image, const color4 color, const VkImageLayout layout);
 
     static void blit(
         VkCommandBuffer commandBuffer, const VkImage srcImage, const VkExtent3D srcExtent, VkImage dstImage, const VkExtent3D dstExtent);
