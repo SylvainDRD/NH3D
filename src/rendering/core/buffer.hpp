@@ -7,7 +7,7 @@ namespace NH3D {
 
 struct Buffer {
     struct CreateInfo {
-        size_t size; // in bytes
+        uint32 size; // in bytes
         BufferUsageFlags usage;
         BufferMemoryUsage memory;
         const ArrayWrapper<byte> initialData; // optional

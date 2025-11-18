@@ -4,6 +4,7 @@
 #include <rendering/core/gpu_mesh.hpp>
 #include <rendering/core/rhi.hpp>
 #include <scene/ecs/components/render_component.hpp>
+#include <scene/ecs/components/transform_component.hpp>
 #include <scene/scene.hpp>
 #include <vector>
 
@@ -36,20 +37,21 @@ int main()
     const std::vector<uint32> indices = { 0, 1, 2 };
 
     GPUMesh meshData {
-        .vertexBuffer = rhi.createBuffer({ .size = vertexData.size() * sizeof(VertexData),
+        .vertexBuffer = rhi.createBuffer({ .size = static_cast<uint32>(vertexData.size() * sizeof(VertexData)),
             .usage = BufferUsageFlagBits::STORAGE_BUFFER_BIT | BufferUsageFlagBits::DST_TRANSFER_BIT,
             .memory = BufferMemoryUsage::GPU_ONLY,
-            .initialData = { reinterpret_cast<const byte*>(vertexData.data()), vertexData.size() * sizeof(VertexData) } }),
-        .indexBuffer = rhi.createBuffer({ .size = indices.size() * sizeof(uint32),
+            .initialData
+            = { reinterpret_cast<const byte*>(vertexData.data()), static_cast<uint32>(vertexData.size() * sizeof(VertexData)) } }),
+        .indexBuffer = rhi.createBuffer({ .size = static_cast<uint32>(indices.size() * sizeof(uint32)),
             .usage = BufferUsageFlagBits::INDEX_BUFFER_BIT | BufferUsageFlagBits::DST_TRANSFER_BIT,
             .memory = BufferMemoryUsage::GPU_ONLY,
-            .initialData = { reinterpret_cast<const byte*>(indices.data()), indices.size() * sizeof(uint32) } }),
+            .initialData = { reinterpret_cast<const byte*>(indices.data()), static_cast<uint32>(indices.size() * sizeof(uint32)) } }),
     };
 
     engine.getResourceMapper().storeMesh("basic triangle", meshData);
 
     // Debug only
-    scene.create(RenderComponent { meshData });
+    scene.create(RenderComponent { meshData, Material { .albedo = color3 { 1.0f, 0.0f, 0.0f } } }, TransformComponent { /* TODO */ });
 
     while (engine.update())
         ;

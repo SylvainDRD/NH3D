@@ -25,6 +25,8 @@ public:
 
     Scene(IRHI& rhi, const std::filesystem::path& filePath);
 
+    [[nodiscard]] uint32 size() const;
+
     void remove(const Entity entity);
 
     void setParent(const Entity entity, const Entity parent);

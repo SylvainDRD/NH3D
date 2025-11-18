@@ -1,0 +1,111 @@
+#version 460
+#extension GL_EXT_buffer_reference : require
+#extension GL_EXT_scalar_block_layout : require
+
+#include "structs.inc"
+
+layout (local_size_x = 64) in;
+
+struct TransformData {
+    vec4 rotation;
+    vec3 translation;
+    vec3 scale;
+};
+
+struct AABB {
+    vec3 min;
+    vec3 max;
+};
+
+// It's fine to put buffer here because I'm not expecting much instancing (if any)
+struct MeshData {
+    VertexBuffer vertexBuffer;
+    IndexBuffer indexBuffer;
+    Material material;
+    AABB localBoundingBox;
+};
+
+struct RenderData {
+    VertexBuffer vertexBuffer;
+    IndexBuffer indexBuffer;
+    uint indexCount;
+    Material material;
+    AABB localBoundingBox;
+};
+
+layout(set = 0, binding = 0, scalar) readonly buffer RenderDataBuffer {
+    RenderData objects[];
+} renderData;
+
+layout(set = 0, binding = 1, scalar) readonly uniform VisibleFlags {
+    uint flags[4096]; // 16384 bytes, guaranteed min size of uniform buffer in Vulkan
+} visibleFlags;
+
+layout(set = 1, binding = 0, scalar) readonly uniform CullingParameters {
+    mat4 viewMatrix;
+    vec4 frustumPlanes[6];
+    uint objectCount;
+} cullingParams;
+
+layout(set = 1, binding = 1, scalar) readonly buffer TransformBuffer {
+    TransformData transforms[];
+} transformBuffer;
+
+layout(set = 1, binding = 2, scalar) buffer DrawCounter {
+    uint count;
+} drawCounter;
+
+struct VkDrawIndirectCommand {
+    uint vertexCount;
+    uint instanceCount;
+    uint firstVertex;
+    uint firstInstance;
+};
+
+layout(set = 2, binding = 0, scalar) buffer DrawIndirectCommandBuffer {
+    VkDrawIndirectCommand commands[];
+} drawIndirectCommands;
+
+layout(set = 3, binding = 0, scalar) buffer DrawRecordBuffer {
+    DrawRecord drawRecords[];
+} drawRecordBuffer;
+
+bool isVisibleFlagSet(uint index) {
+    uint dataIndex = index >> 5;
+    uint bitIndex = index & 31;
+    return (visibleFlags.flags[dataIndex] & (1 << bitIndex)) != 0;
+}
+
+void main() 
+{
+    uint index = gl_GlobalInvocationID.x;
+
+    if (index >= cullingParams.objectCount) {
+        return;
+    }
+    
+    // TODO: actual culling against frustum, this just dumps transforms that are marked visible
+    if (!isVisibleFlagSet(index)) {
+        return;
+    }
+
+    RenderData obj = renderData.objects[index];
+
+    // TODO: compute transform and rotate AABB
+    mat4x3 transform = mat4x3(1.0); 
+
+    bool culled = false;
+
+    if (!culled) {
+        uint drawIndex = atomicAdd(drawCounter.count, 1); // To be reset by CPU before dispatch
+
+        drawIndirectCommands.commands[drawIndex].vertexCount = obj.indexCount;
+        drawIndirectCommands.commands[drawIndex].instanceCount = 1;
+        drawIndirectCommands.commands[drawIndex].firstVertex = 0;
+        drawIndirectCommands.commands[drawIndex].firstInstance = 0;
+        drawRecordBuffer.drawRecords[drawIndex].vertexBuffer = obj.vertexBuffer;
+        drawRecordBuffer.drawRecords[drawIndex].indexBuffer = obj.indexBuffer;
+        drawRecordBuffer.drawRecords[drawIndex].material = obj.material;
+        drawRecordBuffer.drawRecords[drawIndex].modelMatrix = transform; // TODO: compute transform
+    }
+}

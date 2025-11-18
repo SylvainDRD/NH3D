@@ -121,7 +121,7 @@ uint32 channelCount(const VkFormat format)
                 .imageOffset = { 0, 0, 0 },
                 .imageExtent = info.extent,
             };
-            vkCmdCopyBufferToImage(commandBuffer, stagingBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
+            vkCmdCopyBufferToImage(commandBuffer, stagingBuffer.buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
 
             VulkanTexture::changeLayoutBarrier(commandBuffer, image, layout, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 1);
         });
@@ -268,7 +268,7 @@ void VulkanTexture::insertBarrier(VkCommandBuffer commandBuffer, const VkImage i
 void VulkanTexture::changeLayoutBarrier(VkCommandBuffer commandBuffer, const VkImage image, VkImageLayout& layout,
     const VkImageLayout newLayout, const uint32_t baseMipLevel, const uint32_t mipLevels)
 {
-    VkImageMemoryBarrier2 barrier { .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+    const VkImageMemoryBarrier2 barrier { .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
         .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, // TODO: improve
         .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT, // TODO: improve
         .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, // TODO: improve
@@ -285,7 +285,7 @@ void VulkanTexture::changeLayoutBarrier(VkCommandBuffer commandBuffer, const VkI
         }, };
     layout = newLayout;
 
-    VkDependencyInfo depInfo {
+    const VkDependencyInfo depInfo {
         .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
         .imageMemoryBarrierCount = 1,
         .pImageMemoryBarriers = &barrier,
@@ -296,7 +296,7 @@ void VulkanTexture::changeLayoutBarrier(VkCommandBuffer commandBuffer, const VkI
 
 void VulkanTexture::clear(VkCommandBuffer commandBuffer, VkImage image, const color4 color)
 {
-    VkImageSubresourceRange imageRange = VkImageSubresourceRange {
+    const VkImageSubresourceRange imageRange = VkImageSubresourceRange {
         .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .levelCount = VK_REMAINING_MIP_LEVELS, .layerCount = VK_REMAINING_ARRAY_LAYERS
     };
     vkCmdClearColorImage(commandBuffer, image, VK_IMAGE_LAYOUT_GENERAL, reinterpret_cast<const VkClearColorValue*>(&color), 1, &imageRange);
@@ -305,7 +305,7 @@ void VulkanTexture::clear(VkCommandBuffer commandBuffer, VkImage image, const co
 void VulkanTexture::blit(
     VkCommandBuffer commandBuffer, const VkImage srcImage, const VkExtent3D srcExtent, VkImage dstImage, const VkExtent3D dstExtent)
 {
-    VkImageBlit imageBlit {
+    const VkImageBlit imageBlit {
         .srcSubresource = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1 },
         .srcOffsets = { { 0, 0, 0 }, { static_cast<int32_t>(srcExtent.width), static_cast<int32_t>(srcExtent.height), 1 } },
         .dstSubresource = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1 },

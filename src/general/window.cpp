@@ -10,6 +10,7 @@ Window::Window()
     : _width { 1600 }
     , _height { 800 }
 {
+    glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
     if (!glfwInit()) {
         NH3D_ABORT("GLFW init failed");
     }

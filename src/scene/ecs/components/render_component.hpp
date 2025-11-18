@@ -20,18 +20,22 @@ struct VertexData {
 
 struct RenderComponent {
 public:
-    RenderComponent(const GPUMesh& mesh);
+    RenderComponent(const GPUMesh& mesh, const Material& material);
 
     [[nodiscard]] Handle<Buffer> getVertexBuffer() const;
 
     [[nodiscard]] Handle<Buffer> getIndexBuffer() const;
+
+    [[nodiscard]] const Material& getMaterial() const;
 
 private:
     GPUMesh _mesh;
 
     Material _material;
 
-    Handle<Shader> _shader;
+    // TODO: static SparseSet ref to set dirty flag?
+
+    // Handle<Shader> _shader;
 };
 
 }

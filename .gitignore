@@ -34,5 +34,6 @@
 # Build & edtior directories
 .vs/
 .vscode/
+.zed/
 build
 .cache/

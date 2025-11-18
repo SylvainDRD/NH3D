@@ -11,39 +11,49 @@ namespace NH3D {
 
 class VulkanRHI;
 
-    struct BufferAllocationInfo {
-        VmaAllocation allocation;
-        VmaAllocationInfo allocationInfo; // TODO: check if required
-    };
+struct GPUBuffer {
+    VkBuffer buffer;
+    uint32 size; // in bytes
+};
+
+struct BufferAllocationInfo {
+    VmaAllocation allocation;
+    VmaAllocationInfo allocationInfo; // TODO: check if required
+};
 
 // TODO: manage memory property
 struct VulkanBuffer {
     using ResourceType = Buffer;
 
-    using HotType = VkBuffer;
+    using HotType = GPUBuffer;
 
     using ColdType = BufferAllocationInfo;
 
     struct CreateInfo {
-        const size_t size;
+        const uint32 size;
         const VkBufferUsageFlags usage;
         const VmaMemoryUsage memoryUsage;
         const ArrayWrapper<byte> initialData;
     };
 
-    static std::pair<VkBuffer, BufferAllocationInfo> create(const VulkanRHI& rhi, const CreateInfo& info);
+    static std::pair<GPUBuffer, BufferAllocationInfo> create(const VulkanRHI& rhi, const CreateInfo& info);
 
     // Used generically by the ResourceManager, must be API agnostic, non-const ref for invalidation
-    static void release(const IRHI& rhi, VkBuffer& buffer, BufferAllocationInfo& allocation);
+    static void release(const IRHI& rhi, GPUBuffer& buffer, BufferAllocationInfo& allocation);
 
     // Used generically by the ResourceManager, must be API agnostic
-    static bool valid(const VkBuffer buffer, const BufferAllocationInfo& allocation);
+    static bool valid(const GPUBuffer buffer, const BufferAllocationInfo& allocation);
 
     [[nodiscard]] static VkDeviceAddress getDeviceAddress(const VulkanRHI& rhi, const VkBuffer buffer);
 
     static void flush(const VulkanRHI& rhi, const BufferAllocationInfo& allocation);
 
-    [[nodiscard]] static void *getMappedAddress(const VulkanRHI& rhi, const BufferAllocationInfo& allocation);
+    [[nodiscard]] static void* getMappedAddress(const VulkanRHI& rhi, const BufferAllocationInfo& allocation);
+
+    static void copyBuffer(VkCommandBuffer commandBuffer, const VkBuffer srcBuffer, const VkBuffer dstBuffer, const size_t size);
+
+    static void insertMemoryBarrier(VkCommandBuffer commandBuffer, const VkBuffer buffer, const VkAccessFlags2 srcAccessMask,
+        const VkPipelineStageFlags2 srcStageMask, const VkAccessFlags2 dstAccessMask, const VkPipelineStageFlags2 dstStageMask);
 };
 
 }

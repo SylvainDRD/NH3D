@@ -38,7 +38,12 @@ concept NonVoid = !std::is_void_v<T>;
 
 template <NonVoid T> struct ArrayWrapper {
     const T* ptr;
-    const size_t size; // element count
+    const uint32 size; // element count
+};
+
+struct AABB {
+    vec3 min;
+    vec3 max;
 };
 
 }

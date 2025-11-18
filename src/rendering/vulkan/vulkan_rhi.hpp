@@ -37,8 +37,6 @@ public:
 
     inline VmaAllocator getAllocator() const { return _allocator; }
 
-    inline VkCommandBuffer getCommandBuffer() const { return _commandBuffers[_frameId % MaxFramesInFlight]; }
-
     void executeImmediateCommandBuffer(const std::function<void(VkCommandBuffer)>& recordFunction) const;
 
     virtual Handle<Texture> createTexture(const Texture::CreateInfo& info) override;
@@ -58,6 +56,8 @@ private:
 
         bool isValid() const { return GraphicsQueueFamilyID != NH3D_MAX_T(uint32_t) && PresentQueueFamilyID != NH3D_MAX_T(uint32_t); }
     };
+
+    VkCommandBuffer getCommandBuffer() const;
 
     Handle<Texture> createTexture(const VulkanTexture::CreateInfo& info);
 
@@ -132,12 +132,24 @@ private:
     mutable ResourceManager<VulkanBindGroup> _bindGroupManager;
 
     // TODO: replace by a proper render loop
-    Handle<Shader> _graphicsShader;
-    Handle<ComputeShader> _computeShader;
-    Handle<BindGroup> _computeBindGroup;
+    Handle<ComputeShader> _frustumCullingCS;
+    // Vertices/Indices/Material/AABB + visible flags
+    Handle<BindGroup> _cullingRenderDataBindGroup;
+    Handle<Buffer> _cullingRenderDataBuffer;
+    Handle<Buffer> _cullingRenderDataStagingBuffer;
+    Handle<Buffer> _cullingVisibleFlagBuffer;
+    Handle<Buffer> _cullingVisibleFlagStagingBuffer;
+    Handle<BindGroup> _cullingFrameDataBindGroup;
+    Handle<Buffer> _cullingParametersBuffer; // Update via vkCmdUpdateBuffer
+    Handle<Buffer> _cullingTransformBuffer;
+    Handle<Buffer> _cullingTransformStagingBuffer;
+    Handle<Buffer> _cullingDrawCounterBuffer; // vkCmdFillBuffer
+    Handle<Shader> _gbufferShader;
+    Handle<BindGroup> _drawIndirectCommandBindGroup;
+    // Struct buffer passed to VS
     Handle<BindGroup> _drawRecordBindGroup;
-    Handle<Buffer> _drawIndirectBuffer;
-    Handle<Buffer> _drawRecordBuffer;
+    Handle<Buffer> _drawIndirectBuffer; // GPU written
+    Handle<Buffer> _drawRecordBuffer; // GPU written
     Handle<BindGroup> _textureBindGroup;
 
     mutable uint32_t _frameId = 0;
