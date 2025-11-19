@@ -92,7 +92,8 @@ namespace NH3D {
         .pSetLayouts = layouts.data(),
     };
 
-    const std::array<uint32, IRHI::MaxFramesInFlight> bindingSizes { info.finalBindingCount, info.finalBindingCount };
+    std::array<uint32, IRHI::MaxFramesInFlight> bindingSizes;
+    bindingSizes.fill(info.finalBindingCount);
     const VkDescriptorSetVariableDescriptorCountAllocateInfo varDescCountInfo {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO,
         .descriptorSetCount = bindingSizes.size(),
