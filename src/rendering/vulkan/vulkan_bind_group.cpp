@@ -92,14 +92,13 @@ namespace NH3D {
         .pSetLayouts = layouts.data(),
     };
 
+    const std::array<uint32, IRHI::MaxFramesInFlight> bindingSizes { info.finalBindingCount, info.finalBindingCount };
+    const VkDescriptorSetVariableDescriptorCountAllocateInfo varDescCountInfo {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO,
+        .descriptorSetCount = bindingSizes.size(),
+        .pDescriptorCounts = bindingSizes.data(),
+    };
     if (info.finalBindingCount > 1) {
-        const std::array<uint32, IRHI::MaxFramesInFlight> bindingSizes { info.finalBindingCount, info.finalBindingCount };
-
-        const VkDescriptorSetVariableDescriptorCountAllocateInfo varDescCountInfo {
-            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO,
-            .descriptorSetCount = bindingSizes.size(),
-            .pDescriptorCounts = bindingSizes.data(),
-        };
         allocInfo.pNext = &varDescCountInfo;
     }
 

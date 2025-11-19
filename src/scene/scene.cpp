@@ -27,44 +27,36 @@ Scene::Scene(IRHI& rhi, const std::filesystem::path& filePath)
     // TODO: pre-allocate a loading struct with strings for errors & warnings/tinygltf::Model/vectors for mesh data pre-allocated
 }
 
-namespace _private {
+std::pair<std::vector<VertexData>, std::vector<uint32_t>> loadGLBMeshData(const std::filesystem::path& glbPath)
+{
     using namespace tinygltf;
 
-    std::pair<std::vector<VertexData>, std::vector<uint32_t>> loadGLBMeshData(const std::filesystem::path& glbPath)
-    {
-        using namespace tinygltf;
+    TinyGLTF loader;
 
-        TinyGLTF loader;
+    Model model;
+    std::string error;
+    std::string warning;
 
-        Model model;
-        std::string error;
-        std::string warning;
+    bool result = loader.LoadASCIIFromFile(&model, &error, &warning, glbPath.string());
 
-        bool result = loader.LoadASCIIFromFile(&model, &error, &warning, glbPath.string());
-
-        if (!warning.empty()) {
-            NH3D_WARN("tinyGLTF import warning: " << warning);
-        }
-
-        if (!error.empty()) {
-            NH3D_ERROR("tinyGLTF import error: " << error);
-        }
-
-        if (!result) {
-            NH3D_ERROR("Failed to import GLB/GLTF file from " << glbPath);
-        }
-
-        // TODO
-
-        return {};
+    if (!warning.empty()) {
+        NH3D_WARN("tinyGLTF import warning: " << warning);
     }
 
+    if (!error.empty()) {
+        NH3D_ERROR("tinyGLTF import error: " << error);
+    }
+
+    if (!result) {
+        NH3D_ERROR("Failed to import GLB/GLTF file from " << glbPath);
+    }
+
+    // TODO
+
+    return {};
 }
 
-[[nodiscard]] uint32 Scene::size() const
-{
-    return static_cast<uint32>(_entityMasks.size() - _availableEntities.size());
-}
+[[nodiscard]] uint32 Scene::size() const { return static_cast<uint32>(_entityMasks.size() - _availableEntities.size()); }
 
 [[nodiscard]] bool Scene::isValidEntity(const Entity entity) const
 {

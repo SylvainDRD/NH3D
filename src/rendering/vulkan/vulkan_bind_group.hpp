@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <initializer_list>
 #include <misc/utils.hpp>
 #include <rendering/core/bind_group.hpp>
 #include <rendering/core/rhi.hpp>

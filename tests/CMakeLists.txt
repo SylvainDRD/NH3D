@@ -6,7 +6,7 @@ add_subdirectory(${DEPENDENCIES_PATH}/googletest ${CMAKE_BINARY_DIR}/gtest)
 
 include(GoogleTest)
 
-function (declare_test path) 
+function (declare_test path)
     get_filename_component(TEST_NAME ${path} NAME_WE)
     add_executable(${TEST_NAME} ${path})
 
@@ -14,7 +14,7 @@ function (declare_test path)
     target_include_directories(${TEST_NAME} PRIVATE ${NH3D_INCLUDES} ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(${TEST_NAME} PRIVATE ${NH3D_LIB} ${NH3D_LIBRARIES} GTest::gtest_main)
     # Force assertions enabled even in release mode
-	target_compile_definitions(${TEST_NAME} PRIVATE NH3D_FORCE_ASSERTS) 
+    target_compile_definitions(${TEST_NAME} PRIVATE NH3D_FORCE_ASSERTS)
     add_dependencies(${TEST_NAME} ${NH3D_DEPENDENCIES})
     gtest_discover_tests(${TEST_NAME})
 endfunction()

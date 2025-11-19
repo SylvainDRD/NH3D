@@ -77,13 +77,13 @@ uint32 channelCount(const VkFormat format)
         .image = image,
         .viewType = info.extent.depth == 1 ? VK_IMAGE_VIEW_TYPE_2D : VK_IMAGE_VIEW_TYPE_3D,
         .format = info.format,
-        .subresourceRange = { 
-            .aspectMask = info.aspect, 
-            .baseMipLevel = 0, 
-            .levelCount = imageCreateInfo.mipLevels, 
-            .baseArrayLayer = 0, 
-            .layerCount = 1, 
-        }, 
+        .subresourceRange = {
+            .aspectMask = info.aspect,
+            .baseMipLevel = 0,
+            .levelCount = imageCreateInfo.mipLevels,
+            .baseArrayLayer = 0,
+            .layerCount = 1,
+        },
     };
 
     VkImageView view;
@@ -91,16 +91,16 @@ uint32 channelCount(const VkFormat format)
         NH3D_ABORT_VK("Failed to create Vulkan image view");
     }
 
-    // TODO: handle initial data/texture size mismatch
+    // TODO: handle initial data/texture size mismatch for other formats? (see below)
     if (info.initialData.ptr != nullptr
         && info.initialData.size == info.extent.width * info.extent.height * info.extent.depth * channelCount(info.format)) {
         auto [stagingBuffer, stagingAllocation] = VulkanBuffer::create(rhi,
-            {   
+            {
                 .size = info.initialData.size,
                 .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                 .memoryUsage = VMA_MEMORY_USAGE_CPU_ONLY,
-                .initialData = { 
-                    info.initialData.ptr, 
+                .initialData = {
+                    info.initialData.ptr,
                     info.initialData.size,
                 },
             });
@@ -114,11 +114,11 @@ uint32 channelCount(const VkFormat format)
                 .bufferOffset = 0,
                 .bufferRowLength = 0,
                 .bufferImageHeight = 0,
-                .imageSubresource = { 
-                    .aspectMask = info.aspect, 
+                .imageSubresource = {
+                    .aspectMask = info.aspect,
                     .mipLevel = 0,
-                    .baseArrayLayer = 0, 
-                    .layerCount = 1, 
+                    .baseArrayLayer = 0,
+                    .layerCount = 1,
                 },
                 .imageOffset = { 0, 0, 0 },
                 .imageExtent = info.extent,
@@ -126,7 +126,6 @@ uint32 channelCount(const VkFormat format)
             vkCmdCopyBufferToImage(commandBuffer, stagingBuffer.buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
 
             if (info.generateMipMaps) {
-
                 VulkanTexture::insertMemoryBarrier(commandBuffer, image, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT,
                     VK_ACCESS_2_SHADER_READ_BIT, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 1);
@@ -136,13 +135,13 @@ uint32 channelCount(const VkFormat format)
                     const VkImageBlit blit {
                     .srcSubresource = { .aspectMask = info.aspect, .mipLevel = i - 1, .baseArrayLayer = 0, .layerCount = 1, },
                     .srcOffsets = { { 0, 0, 0 },
-                        { 
+                        {
                             std::max(1, static_cast<int>(info.extent.width) >> (i - 1)),
                             std::max(1, static_cast<int>(info.extent.height) >> (i - 1)),
                             static_cast<int>(info.extent.depth), }, },
                     .dstSubresource = { .aspectMask = info.aspect, .mipLevel = i, .baseArrayLayer = 0, .layerCount = 1, },
                     .dstOffsets = { { 0, 0, 0 },
-                        { 
+                        {
                             std::max(1, static_cast<int>(info.extent.width) >> i),
                             std::max(1, static_cast<int>(info.extent.height) >> i),
                             static_cast<int>(info.extent.depth), }, },

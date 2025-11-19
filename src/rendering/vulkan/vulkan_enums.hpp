@@ -105,7 +105,10 @@ namespace NH3D {
         return VK_FORMAT_R32G32B32A32_SINT;
     case TextureFormat::NH3D_TEXTURE_FORMAT_MAX:
         NH3D_ABORT("Invalid texture format");
+        return VK_FORMAT_UNDEFINED; // Suppress warning
     }
+    NH3D_ABORT("Invalid texture format");
+    return VK_FORMAT_UNDEFINED; // Suppress warning
 }
 
 [[nodiscard]] inline VkImageUsageFlags MapTextureUsageFlags(TextureUsageFlags flag)
@@ -208,7 +211,10 @@ namespace NH3D {
         return VMA_MEMORY_USAGE_GPU_TO_CPU;
     case BufferMemoryUsage::NH3D_BUFFER_MEMORY_USAGE_MAX:
         NH3D_ABORT("Invalid BufferMemoryUsage value");
+        return VMA_MEMORY_USAGE_AUTO; // Suppress warning
     }
+    NH3D_ABORT("Invalid BufferMemoryUsage value");
+    return VMA_MEMORY_USAGE_AUTO; // Suppress warning
 }
 
 }
