@@ -1,9 +1,10 @@
 #include "vulkan_rhi.hpp"
+#include "rendering/vulkan/vulkan_bind_group.hpp"
+#include "rendering/vulkan/vulkan_compute_shader.hpp"
 #include <cmath>
 #include <cstdint>
 #include <general/window.hpp>
 #include <initializer_list>
-#include <memory>
 #include <misc/types.hpp>
 #include <misc/utils.hpp>
 #include <rendering/core/buffer.hpp>
@@ -88,18 +89,42 @@ VulkanRHI::VulkanRHI(const Window& Window)
         _renderSemaphores[i] = createSemaphore(_device);
     }
 
-    const VkFormat renderTargetsFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+    // Octahedron normal projection
+    const VkFormat normalRTFormat = VK_FORMAT_A2B10G10R10_UNORM_PACK32;
+    // Fairly low precision acceptable for cartoonish rendering
+    const VkFormat albedoRTFormat = VK_FORMAT_B10G11R11_UFLOAT_PACK32;
+    // const VkFormat albedoRTFormat = VK_FORMAT_R32_UINT; <---- To be used to prevent oversampling
+
     for (uint32_t i = 0; i < MaxFramesInFlight; ++i) {
         _presentSemaphores[i] = createSemaphore(_device);
         _frameFences[i] = createFence(_device, true);
 
-        _renderTargets[i] = createTexture({
-            .format = renderTargetsFormat,
+        _gbufferRTs[i].normalRT = createTexture({
+            .format = normalRTFormat,
             .extent = { Window.getWidth(), Window.getHeight(), 1 },
-            .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
-                | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+            .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
             .aspect = VK_IMAGE_ASPECT_COLOR_BIT,
-            .createSampler = true, // TODO: evaluate that, but I suspect post processing will sample from it and render to the swapchain
+        });
+
+        _gbufferRTs[i].albedoRT = createTexture({
+            .format = albedoRTFormat,
+            .extent = { Window.getWidth(), Window.getHeight(), 1 },
+            .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+            .aspect = VK_IMAGE_ASPECT_COLOR_BIT,
+        });
+
+        _gbufferRTs[i].depthRT = createTexture({
+            .format = VK_FORMAT_D32_SFLOAT,
+            .extent = { Window.getWidth(), Window.getHeight(), 1 },
+            .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            .aspect = VK_IMAGE_ASPECT_DEPTH_BIT,
+        });
+
+        _finalRTs[i] = createTexture({
+            .format = VK_FORMAT_R16G16B16A16_SFLOAT, // Alpha?
+            .extent = { Window.getWidth(), Window.getHeight(), 1 },
+            .usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+            .aspect = VK_IMAGE_ASPECT_COLOR_BIT,
         });
     }
 
@@ -289,7 +314,9 @@ VulkanRHI::VulkanRHI(const Window& Window)
             .bindingTypes = { textureBindingTypes, std::size(textureBindingTypes) },
             .finalBindingCount = 1000,
         });
-    _linearSampler = createSampler(_device);
+
+    _linearSampler = createSampler(_device, false);
+    _nearestSampler = createSampler(_device, true);
     for (int i = 0; i < IRHI::MaxFramesInFlight; ++i) {
         VulkanBindGroup::updateDescriptorSet(_device, textureDescriptorSets.sets[i],
             VkDescriptorImageInfo {
@@ -299,10 +326,63 @@ VulkanRHI::VulkanRHI(const Window& Window)
             },
             VK_DESCRIPTOR_TYPE_SAMPLER, 0);
     }
-    _textureBindGroup = _bindGroupManager.store(std::move(textureDescriptorSets), std::move(textureMetadata));
+    _albedoTextureBindGroup = _bindGroupManager.store(std::move(textureDescriptorSets), std::move(textureMetadata));
 
-    const VkDescriptorSetLayout cullingLayouts[]
-        = { objectDataMetadata.layout, frameDataMetadata.layout, drawIndirectMetadata.layout, drawRecordMetadata.layout };
+    const VkDescriptorType deferredShadingBindingTypes[] = {
+        VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, // Normal RT
+        VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, // Albedo RT
+        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, // Depth RT
+        VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, // Final output RT
+    };
+    auto [deferredShadingDescriptorSets, deferredShadingMetadata] = VulkanBindGroup::create(_device,
+        {
+            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+            .bindingTypes = { deferredShadingBindingTypes, std::size(deferredShadingBindingTypes) },
+        });
+    _deferredShadingBindGroup = _bindGroupManager.store(std::move(deferredShadingDescriptorSets), std::move(deferredShadingMetadata));
+
+    for (int i = 0; i < IRHI::MaxFramesInFlight; ++i) {
+        const auto& normalRTImageViewData = _textureManager.get<ImageView>(_gbufferRTs[i].normalRT);
+        const auto& albedoRTImageViewData = _textureManager.get<ImageView>(_gbufferRTs[i].albedoRT);
+        const auto& depthRTImageViewData = _textureManager.get<ImageView>(_gbufferRTs[i].depthRT);
+        const auto& finalRTImageViewData = _textureManager.get<ImageView>(_finalRTs[i]);
+
+        VulkanBindGroup::updateDescriptorSet(_device, deferredShadingDescriptorSets.sets[i],
+            VkDescriptorImageInfo {
+                .sampler = VK_NULL_HANDLE,
+                .imageView = normalRTImageViewData.view,
+                .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+            },
+            VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 0);
+        VulkanBindGroup::updateDescriptorSet(_device, deferredShadingDescriptorSets.sets[i],
+            VkDescriptorImageInfo {
+                .sampler = VK_NULL_HANDLE,
+                .imageView = albedoRTImageViewData.view,
+                .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+            },
+            VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1);
+        VulkanBindGroup::updateDescriptorSet(_device, deferredShadingDescriptorSets.sets[i],
+            VkDescriptorImageInfo {
+                .sampler = _nearestSampler,
+                .imageView = depthRTImageViewData.view,
+                .imageLayout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL,
+            },
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2);
+        VulkanBindGroup::updateDescriptorSet(_device, deferredShadingDescriptorSets.sets[i],
+            VkDescriptorImageInfo {
+                .sampler = VK_NULL_HANDLE,
+                .imageView = finalRTImageViewData.view,
+                .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+            },
+            VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3);
+    }
+
+    const VkDescriptorSetLayout cullingLayouts[] = {
+        objectDataMetadata.layout,
+        frameDataMetadata.layout,
+        drawIndirectMetadata.layout,
+        drawRecordMetadata.layout,
+    };
     auto [cullingComputeShader, cullingComputeLayout] = VulkanComputeShader::create(_device,
         {
             .computeShaderPath = NH3D_DIR "src/rendering/shaders/culling.comp.spv",
@@ -312,16 +392,40 @@ VulkanRHI::VulkanRHI(const Window& Window)
 
     const VkPushConstantRange pushConstantRange { .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .offset = 0, .size = sizeof(mat4) };
 
-    const VkDescriptorSetLayout layouts[] = { textureMetadata.layout, drawRecordMetadata.layout };
-    auto [shader, layout] = VulkanShader::create(_device,
+    const VulkanShader::ColorAttachmentInfo colorAttachmentInfos[] = {
         {
-            .vertexShaderPath = NH3D_DIR "src/rendering/shaders/default.vert.spv",
-            .fragmentShaderPath = NH3D_DIR "src/rendering/shaders/default.frag.spv",
-            .colorAttachmentFormats = { renderTargetsFormat },
-            .descriptorSetsLayouts = { layouts, 2 },
+            .format = normalRTFormat,
+            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT,
+            .blendEnable = false,
+        },
+        {
+            .format = albedoRTFormat,
+            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT,
+            .blendEnable = false,
+        },
+    };
+
+    const VkDescriptorSetLayout gbufferLayouts[] = { textureMetadata.layout, drawRecordMetadata.layout };
+    auto [gbufferShader, gbufferPipelineLayout] = VulkanShader::create(_device,
+        {
+            .vertexShaderPath = NH3D_DIR "src/rendering/shaders/default_gbuffer_deferred.vert.spv",
+            .fragmentShaderPath = NH3D_DIR "src/rendering/shaders/default_gbuffer_deferred.frag.spv",
+            .colorAttachmentFormats = { colorAttachmentInfos, std::size(colorAttachmentInfos) },
+            .depthAttachmentFormat = VK_FORMAT_D32_SFLOAT,
+            .descriptorSetsLayouts = { gbufferLayouts, std::size(gbufferLayouts) },
             .pushConstantRanges = { &pushConstantRange, 1 },
         });
-    _gbufferShader = _shaderManager.store(std::move(shader), std::move(layout));
+    _gbufferShader = _shaderManager.store(std::move(gbufferShader), std::move(gbufferPipelineLayout));
+
+    const VkDescriptorSetLayout deferredShadingLayouts[] = {
+        deferredShadingMetadata.layout,
+    };
+    auto [deferredShadingShader, deferredShadingPipelineLayout] = VulkanComputeShader::create(_device,
+        {
+            .computeShaderPath = NH3D_DIR "src/rendering/shaders/deferred_shading.comp.spv",
+            .descriptorSetsLayouts = { deferredShadingLayouts, std::size(deferredShadingLayouts) },
+        });
+    _deferredShadingCS = _computeShaderManager.store(std::move(deferredShadingShader), std::move(deferredShadingPipelineLayout));
 }
 
 VulkanRHI::~VulkanRHI()
@@ -329,6 +433,7 @@ VulkanRHI::~VulkanRHI()
     vkDeviceWaitIdle(_device);
 
     vkDestroySampler(_device, _linearSampler, nullptr);
+    vkDestroySampler(_device, _nearestSampler, nullptr);
     _textureManager.clear(*this);
     _bufferManager.clear(*this);
     _shaderManager.clear(*this);
@@ -381,7 +486,6 @@ void VulkanRHI::executeImmediateCommandBuffer(const std::function<void(VkCommand
 
 VkCommandBuffer VulkanRHI::getCommandBuffer() const { return _commandBuffers[_frameId % MaxFramesInFlight]; }
 
-// TODO: pass data
 Handle<Texture> VulkanRHI::createTexture(const Texture::CreateInfo& info)
 {
     return createTexture({
@@ -420,6 +524,10 @@ void VulkanRHI::destroyBuffer(const Handle<Buffer> handle) { _bufferManager.rele
 
 void VulkanRHI::render(Scene& scene) const
 {
+    if (scene.size<RenderComponent>() == 0) {
+        return;
+    }
+
     const uint32_t frameInFlightId = _frameId % MaxFramesInFlight;
 
     if (vkWaitForFences(_device, 1, &_frameFences[frameInFlightId], VK_TRUE, NH3D_MAX_T(uint64_t)) != VK_SUCCESS) {
@@ -434,15 +542,9 @@ void VulkanRHI::render(Scene& scene) const
         NH3D_ABORT_VK("Failed to acquire next swapchain image");
     }
 
-    const auto& scImageViewData = _textureManager.get<ImageView>(_swapchainTextures[swapchainImageId]);
-    auto& scMetadata = _textureManager.get<TextureMetadata>(_swapchainTextures[swapchainImageId]);
-
     VkCommandBuffer commandBuffer = getCommandBuffer();
 
     beginCommandBuffer(commandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-
-    // TODO: track dirty state properly
-    constexpr bool dirtyRenderingData = true;
 
     // Buffer updates
     const GPUBuffer& transformStagingBuffer = _bufferManager.get<GPUBuffer>(_cullingTransformStagingBuffer);
@@ -451,6 +553,8 @@ void VulkanRHI::render(Scene& scene) const
         = reinterpret_cast<TransformComponent*>(VulkanBuffer::getMappedAddress(*this, transformStagingAllocation));
 
     uint objectCount = 0;
+    // TODO: track dirty state properly
+    constexpr bool dirtyRenderingData = true;
     if (dirtyRenderingData) {
         const GPUBuffer& objectDataStagingBuffer = _bufferManager.get<GPUBuffer>(_cullingRenderDataStagingBuffer);
         const BufferAllocationInfo& objectDataStagingAllocation = _bufferManager.get<BufferAllocationInfo>(_cullingRenderDataStagingBuffer);
@@ -474,14 +578,11 @@ void VulkanRHI::render(Scene& scene) const
             objectCount++;
         }
 
-        if (objectCount != 0) {
-            const GPUBuffer& objectDataBuffer = _bufferManager.get<GPUBuffer>(_cullingRenderDataBuffer);
-            VulkanBuffer::copyBuffer(
-                commandBuffer, objectDataStagingBuffer.buffer, objectDataBuffer.buffer, sizeof(RenderData) * objectCount);
+        const GPUBuffer& objectDataBuffer = _bufferManager.get<GPUBuffer>(_cullingRenderDataBuffer);
+        VulkanBuffer::copyBuffer(commandBuffer, objectDataStagingBuffer.buffer, objectDataBuffer.buffer, sizeof(RenderData) * objectCount);
 
-            VulkanBuffer::insertMemoryBarrier(commandBuffer, objectDataBuffer.buffer, VK_ACCESS_2_TRANSFER_WRITE_BIT,
-                VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_SHADER_READ_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
-        }
+        VulkanBuffer::insertMemoryBarrier(commandBuffer, objectDataBuffer.buffer, VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_SHADER_READ_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
     } else {
         // Only update transforms
         // TODO: remove the need for RenderComponent here, it should only be used
@@ -491,117 +592,183 @@ void VulkanRHI::render(Scene& scene) const
         }
     }
 
-    if (objectCount != 0) {
-        // Reset the culling draw counter
-        vkCmdFillBuffer(commandBuffer, _bufferManager.get<GPUBuffer>(_cullingDrawCounterBuffer).buffer, 0, sizeof(uint32), 0);
+    // Reset the culling draw counter
+    vkCmdFillBuffer(commandBuffer, _bufferManager.get<GPUBuffer>(_cullingDrawCounterBuffer).buffer, 0, sizeof(uint32), 0);
 
-        const GPUBuffer& transformBuffer = _bufferManager.get<GPUBuffer>(_cullingTransformBuffer);
-        VulkanBuffer::copyBuffer(
-            commandBuffer, transformStagingBuffer.buffer, transformBuffer.buffer, sizeof(TransformComponent) * objectCount);
-        VulkanBuffer::insertMemoryBarrier(commandBuffer, transformBuffer.buffer, VK_ACCESS_2_TRANSFER_WRITE_BIT,
-            VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_SHADER_READ_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
+    const GPUBuffer& transformBuffer = _bufferManager.get<GPUBuffer>(_cullingTransformBuffer);
+    VulkanBuffer::copyBuffer(
+        commandBuffer, transformStagingBuffer.buffer, transformBuffer.buffer, sizeof(TransformComponent) * objectCount);
+    VulkanBuffer::insertMemoryBarrier(commandBuffer, transformBuffer.buffer, VK_ACCESS_2_TRANSFER_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_SHADER_READ_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
 
-        // Update visible flags buffer
-        const uint32 visibleFlagsBufferSize = objectCount > 0 ? ((objectCount - 1) >> 3) + 1 : 0;
-        const GPUBuffer& visibleFlagStagingBuffer = _bufferManager.get<GPUBuffer>(_cullingVisibleFlagStagingBuffer);
-        const BufferAllocationInfo& visibleFlagStagingAllocation
-            = _bufferManager.get<BufferAllocationInfo>(_cullingVisibleFlagStagingBuffer);
-        const GPUBuffer& visibleFlagBuffer = _bufferManager.get<GPUBuffer>(_cullingVisibleFlagBuffer);
+    // Update visible flags buffer
+    const uint32 visibleFlagsBufferSize = objectCount > 0 ? ((objectCount - 1) >> 3) + 1 : 0;
+    const GPUBuffer& visibleFlagStagingBuffer = _bufferManager.get<GPUBuffer>(_cullingVisibleFlagStagingBuffer);
+    const BufferAllocationInfo& visibleFlagStagingAllocation = _bufferManager.get<BufferAllocationInfo>(_cullingVisibleFlagStagingBuffer);
+    const GPUBuffer& visibleFlagBuffer = _bufferManager.get<GPUBuffer>(_cullingVisibleFlagBuffer);
 
-        void* visibleFlagsPtr = VulkanBuffer::getMappedAddress(*this, visibleFlagStagingAllocation);
-        std::memcpy(visibleFlagsPtr, scene.getRawVisibleFlags(), visibleFlagsBufferSize);
-        VulkanBuffer::copyBuffer(commandBuffer, visibleFlagStagingBuffer.buffer, visibleFlagBuffer.buffer, visibleFlagsBufferSize);
-        VulkanBuffer::insertMemoryBarrier(commandBuffer, visibleFlagBuffer.buffer, VK_ACCESS_2_TRANSFER_WRITE_BIT,
-            VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_SHADER_READ_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
+    void* visibleFlagsPtr = VulkanBuffer::getMappedAddress(*this, visibleFlagStagingAllocation);
+    std::memcpy(visibleFlagsPtr, scene.getRawVisibleFlags(), visibleFlagsBufferSize);
+    VulkanBuffer::copyBuffer(commandBuffer, visibleFlagStagingBuffer.buffer, visibleFlagBuffer.buffer, visibleFlagsBufferSize);
+    VulkanBuffer::insertMemoryBarrier(commandBuffer, visibleFlagBuffer.buffer, VK_ACCESS_2_TRANSFER_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_SHADER_READ_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
 
-        // Update culling parameters buffer
-        const GPUBuffer& cullingParametersBuffer = _bufferManager.get<GPUBuffer>(_cullingParametersBuffer);
-        // TODO: get actual camera data
-        const CullingParameters cullingParameters {
-            .objectCount = objectCount,
-        };
+    // Update culling parameters buffer
+    const VkBuffer cullingParametersBuffer = _bufferManager.get<GPUBuffer>(_cullingParametersBuffer).buffer;
+    // TODO: get actual camera data
+    const CullingParameters cullingParameters {
+        .objectCount = objectCount,
+    };
 
-        vkCmdUpdateBuffer(
-            commandBuffer, cullingParametersBuffer.buffer, 0, sizeof(CullingParameters), reinterpret_cast<const void*>(&cullingParameters));
-        VulkanBuffer::insertMemoryBarrier(commandBuffer, cullingParametersBuffer.buffer, VK_ACCESS_2_TRANSFER_WRITE_BIT,
-            VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_SHADER_READ_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
+    vkCmdUpdateBuffer(
+        commandBuffer, cullingParametersBuffer, 0, sizeof(CullingParameters), reinterpret_cast<const void*>(&cullingParameters));
+    VulkanBuffer::insertMemoryBarrier(commandBuffer, cullingParametersBuffer, VK_ACCESS_2_TRANSFER_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_SHADER_READ_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
 
-        // Frustum culling dispatch
-        auto cullingPipeline = _computeShaderManager.get<VkPipeline>(_frustumCullingCS);
-        auto cullingPipelineLayout = _computeShaderManager.get<VkPipelineLayout>(_frustumCullingCS);
-        const VkDescriptorSet cullingDescriptorSets[] = {
-            VulkanBindGroup::getUpdatedDescriptorSet(
-                _device, _bindGroupManager.get<DescriptorSets>(_cullingRenderDataBindGroup), frameInFlightId),
-            VulkanBindGroup::getUpdatedDescriptorSet(
-                _device, _bindGroupManager.get<DescriptorSets>(_cullingFrameDataBindGroup), frameInFlightId),
-            VulkanBindGroup::getUpdatedDescriptorSet(
-                _device, _bindGroupManager.get<DescriptorSets>(_drawIndirectCommandBindGroup), frameInFlightId),
-            VulkanBindGroup::getUpdatedDescriptorSet(_device, _bindGroupManager.get<DescriptorSets>(_drawRecordBindGroup), frameInFlightId),
-        };
+    // Frustum culling dispatch
+    const auto cullingPipeline = _computeShaderManager.get<VkPipeline>(_frustumCullingCS);
+    const auto cullingPipelineLayout = _computeShaderManager.get<VkPipelineLayout>(_frustumCullingCS);
+    const VkDescriptorSet cullingDescriptorSets[] = {
+        VulkanBindGroup::getUpdatedDescriptorSet(
+            _device, _bindGroupManager.get<DescriptorSets>(_cullingRenderDataBindGroup), frameInFlightId),
+        VulkanBindGroup::getUpdatedDescriptorSet(
+            _device, _bindGroupManager.get<DescriptorSets>(_cullingFrameDataBindGroup), frameInFlightId),
+        VulkanBindGroup::getUpdatedDescriptorSet(
+            _device, _bindGroupManager.get<DescriptorSets>(_drawIndirectCommandBindGroup), frameInFlightId),
+        VulkanBindGroup::getUpdatedDescriptorSet(_device, _bindGroupManager.get<DescriptorSets>(_drawRecordBindGroup), frameInFlightId),
+    };
 
-        VulkanBindGroup::bind(commandBuffer, { cullingDescriptorSets, std::size(cullingDescriptorSets) }, VK_PIPELINE_BIND_POINT_COMPUTE,
-            cullingPipelineLayout);
+    VulkanBindGroup::bind(
+        commandBuffer, { cullingDescriptorSets, std::size(cullingDescriptorSets) }, VK_PIPELINE_BIND_POINT_COMPUTE, cullingPipelineLayout);
 
-        const vec3i cullingKernelSize { std::ceil(objectCount / 64.f), 1, 1 };
-        VulkanComputeShader::dispatch(commandBuffer, cullingPipeline, cullingKernelSize);
+    const vec3i cullingKernelSize { std::ceil(objectCount / 64.f), 1, 1 };
+    VulkanComputeShader::dispatch(commandBuffer, cullingPipeline, cullingKernelSize);
 
-        const GPUBuffer& drawIndirectBuffer = _bufferManager.get<GPUBuffer>(_drawIndirectBuffer);
-        VulkanBuffer::insertMemoryBarrier(commandBuffer, drawIndirectBuffer.buffer, VK_ACCESS_2_SHADER_WRITE_BIT,
-            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT);
+    const GPUBuffer& drawIndirectBuffer = _bufferManager.get<GPUBuffer>(_drawIndirectBuffer);
+    VulkanBuffer::insertMemoryBarrier(commandBuffer, drawIndirectBuffer.buffer, VK_ACCESS_2_SHADER_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT);
 
-        const GPUBuffer& drawRecordBuffer = _bufferManager.get<GPUBuffer>(_drawRecordBuffer);
-        VulkanBuffer::insertMemoryBarrier(commandBuffer, drawRecordBuffer.buffer, VK_ACCESS_2_SHADER_WRITE_BIT,
-            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT, VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT);
+    const GPUBuffer& drawRecordBuffer = _bufferManager.get<GPUBuffer>(_drawRecordBuffer);
+    VulkanBuffer::insertMemoryBarrier(commandBuffer, drawRecordBuffer.buffer, VK_ACCESS_2_SHADER_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT, VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT);
 
-        auto graphicsPipeline = _shaderManager.get<VkPipeline>(_gbufferShader);
-        auto graphicsLayout = _shaderManager.get<VkPipelineLayout>(_gbufferShader);
+    auto graphicsPipeline = _shaderManager.get<VkPipeline>(_gbufferShader);
+    auto graphicsLayout = _shaderManager.get<VkPipelineLayout>(_gbufferShader);
 
-        const VkDescriptorSet graphicsDescriptorSets[] = {
-            VulkanBindGroup::getUpdatedDescriptorSet(_device, _bindGroupManager.get<DescriptorSets>(_textureBindGroup), frameInFlightId),
-            VulkanBindGroup::getUpdatedDescriptorSet(_device, _bindGroupManager.get<DescriptorSets>(_drawRecordBindGroup), frameInFlightId),
-        };
-        VulkanBindGroup::bind(
-            commandBuffer, { graphicsDescriptorSets, std::size(graphicsDescriptorSets) }, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsLayout);
+    const VkDescriptorSet graphicsDescriptorSets[] = {
+        VulkanBindGroup::getUpdatedDescriptorSet(_device, _bindGroupManager.get<DescriptorSets>(_albedoTextureBindGroup), frameInFlightId),
+        VulkanBindGroup::getUpdatedDescriptorSet(_device, _bindGroupManager.get<DescriptorSets>(_drawRecordBindGroup), frameInFlightId),
+    };
+    VulkanBindGroup::bind(
+        commandBuffer, { graphicsDescriptorSets, std::size(graphicsDescriptorSets) }, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsLayout);
 
-        const auto& rtImageViewData = _textureManager.get<ImageView>(_renderTargets[frameInFlightId]);
-        auto& rtMetadata = _textureManager.get<TextureMetadata>(_renderTargets[frameInFlightId]);
-        VulkanTexture::insertMemoryBarrier(commandBuffer, rtImageViewData.image, VK_ACCESS_2_TRANSFER_READ_BIT,
-            VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-        VulkanTexture::clear(commandBuffer, rtImageViewData.image, color4 { 0.0f, 0.0f, 0.0f, 1.0f }, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-        VulkanTexture::insertMemoryBarrier(commandBuffer, rtImageViewData.image, VK_ACCESS_2_TRANSFER_WRITE_BIT,
-            VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    const auto& albedoRTImageViewData = _textureManager.get<ImageView>(_gbufferRTs[frameInFlightId].albedoRT);
+    const auto& albedoRTMetadata = _textureManager.get<TextureMetadata>(_gbufferRTs[frameInFlightId].albedoRT);
+    VulkanTexture::insertMemoryBarrier(commandBuffer, albedoRTImageViewData.image, VK_ACCESS_2_SHADER_READ_BIT,
+        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    VulkanTexture::clearColor(
+        commandBuffer, albedoRTImageViewData.image, color4 { 0.0f, 0.0f, 0.0f, 1.0f }, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    VulkanTexture::insertMemoryBarrier(commandBuffer, albedoRTImageViewData.image, VK_ACCESS_2_TRANSFER_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_CLEAR_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-        const VkRenderingAttachmentInfo colorAttachmentInfo {
+    const auto& normalRTImageViewData = _textureManager.get<ImageView>(_gbufferRTs[frameInFlightId].normalRT);
+    const auto& normalRTMetadata = _textureManager.get<TextureMetadata>(_gbufferRTs[frameInFlightId].normalRT);
+    VulkanTexture::insertMemoryBarrier(commandBuffer, normalRTImageViewData.image, VK_ACCESS_2_SHADER_READ_BIT,
+        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    VulkanTexture::clearColor(commandBuffer, normalRTImageViewData.image, color4 { 0.0f }, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    VulkanTexture::insertMemoryBarrier(commandBuffer, normalRTImageViewData.image, VK_ACCESS_2_TRANSFER_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_CLEAR_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    const auto& depthRTViewData = _textureManager.get<ImageView>(_gbufferRTs[frameInFlightId].depthRT);
+    const auto& depthRTMetadata = _textureManager.get<TextureMetadata>(_gbufferRTs[frameInFlightId].depthRT);
+    VulkanTexture::insertMemoryBarrier(commandBuffer, depthRTViewData.image, VK_ACCESS_2_SHADER_READ_BIT,
+        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_CLEAR_BIT,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_UNDEFINED, true);
+    VulkanTexture::clearDepth(commandBuffer, depthRTViewData.image, 0.0f, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL); // 1 for reverse Z?
+    VulkanTexture::insertMemoryBarrier(commandBuffer, depthRTViewData.image, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_CLEAR_BIT,
+        VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, true);
+
+    const VkRenderingAttachmentInfo colorAttachmentsInfo[] = {
+        {
             .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-            .imageView = rtImageViewData.view,
+            .imageView = normalRTImageViewData.view,
             .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        };
+        },
+        {
+            .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+            .imageView = albedoRTImageViewData.view,
+            .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        },
+    };
 
-        // TODO: projection matrix from camera into push constant
+    // TODO: projection matrix from camera into push constant
 
-        VulkanShader::draw(commandBuffer, graphicsPipeline,
+    VulkanShader::draw(commandBuffer, graphicsPipeline,
             {
                 .drawIndirectBuffer = drawIndirectBuffer.buffer,
-                .extent = { rtMetadata.extent.width, rtMetadata.extent.height },
-                .colorAttachments = { &colorAttachmentInfo, 1 },
+                .extent = { albedoRTMetadata.extent.width, albedoRTMetadata.extent.height },
+                .colorAttachments = { colorAttachmentsInfo, std::size(colorAttachmentsInfo) },
+                .depthAttachment = {
+                    .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+                    .imageView = depthRTViewData.view,
+                    .imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                },
             });
 
-        VulkanTexture::insertMemoryBarrier(commandBuffer, rtImageViewData.image, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_2_BLIT_BIT,
-            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-        VulkanTexture::insertMemoryBarrier(commandBuffer, scImageViewData.image, VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_NONE,
-            VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_BLIT_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-        VulkanTexture::blit(commandBuffer, rtImageViewData.image, rtMetadata.extent, scImageViewData.image, scMetadata.extent);
-    }
+    // TODO: transition GBuffer textures for compute reading
+    VulkanTexture::insertMemoryBarrier(commandBuffer, normalRTImageViewData.image, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_SHADER_READ_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+        VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    VulkanTexture::insertMemoryBarrier(commandBuffer, albedoRTImageViewData.image, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_SHADER_READ_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+        VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    VulkanTexture::insertMemoryBarrier(commandBuffer, depthRTViewData.image, VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT, VK_ACCESS_2_SHADER_READ_BIT,
+        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+        true);
+
+    // Clearing is not necessary I believe
+    const auto& finalRTImageViewData = _textureManager.get<ImageView>(_finalRTs[frameInFlightId]);
+    const auto& finalRTMetadata = _textureManager.get<TextureMetadata>(_finalRTs[frameInFlightId]);
+    VulkanTexture::insertMemoryBarrier(commandBuffer, finalRTImageViewData.image, VK_ACCESS_2_TRANSFER_READ_BIT,
+        VK_PIPELINE_STAGE_2_BLIT_BIT, VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+        VK_IMAGE_LAYOUT_GENERAL);
+
+    const auto deferredShadingPipeline = _computeShaderManager.get<VkPipeline>(_deferredShadingCS);
+    const auto deferredShadingPipelineLayout = _computeShaderManager.get<VkPipelineLayout>(_deferredShadingCS);
+
+    const VkDescriptorSet shadingDescriptorSets[] = {
+        VulkanBindGroup::getUpdatedDescriptorSet(
+            _device, _bindGroupManager.get<DescriptorSets>(_deferredShadingBindGroup), frameInFlightId),
+    };
+    VulkanBindGroup::bind(commandBuffer, { shadingDescriptorSets, std::size(shadingDescriptorSets) }, VK_PIPELINE_BIND_POINT_COMPUTE,
+        deferredShadingPipelineLayout);
+    const vec3i shadingKernelSize { std::ceil(finalRTMetadata.extent.width / 8.f), std::ceil(finalRTMetadata.extent.height / 8.f), 1 };
+
+    VulkanComputeShader::dispatch(commandBuffer, deferredShadingPipeline, shadingKernelSize);
+
+    VulkanTexture::insertMemoryBarrier(commandBuffer, finalRTImageViewData.image, VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_2_BLIT_BIT,
+        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
+
+    const auto& scImageViewData = _textureManager.get<ImageView>(_swapchainTextures[swapchainImageId]);
+    const auto& scMetadata = _textureManager.get<TextureMetadata>(_swapchainTextures[swapchainImageId]);
+    VulkanTexture::insertMemoryBarrier(commandBuffer, scImageViewData.image, VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_NONE,
+        VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_BLIT_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    VulkanTexture::blit(commandBuffer, finalRTImageViewData.image, finalRTMetadata.extent, scImageViewData.image, scMetadata.extent);
 
     VulkanTexture::insertMemoryBarrier(commandBuffer, scImageViewData.image, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_BLIT_BIT,
         VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_NONE, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     vkEndCommandBuffer(commandBuffer);
     submitCommandBuffer(_graphicsQueue,
-        makeSemaphoreSubmitInfo(_presentSemaphores[frameInFlightId], VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR),
+        makeSemaphoreSubmitInfo(_presentSemaphores[frameInFlightId], VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT),
         makeSemaphoreSubmitInfo(_renderSemaphores[swapchainImageId], VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT), commandBuffer,
         _frameFences[frameInFlightId]); // TODO: watch out for the ALL_GRAPHICS_BIT when doing Compute based shading
 
@@ -787,6 +954,7 @@ VkDevice VulkanRHI::createLogicalDevice(const VkPhysicalDevice gpu, const Physic
         .descriptorBindingSampledImageUpdateAfterBind = VK_TRUE,
         // .descriptorBindingStorageImageUpdateAfterBind = VK_TRUE, won't be needed I'm pretty sure
         .descriptorBindingVariableDescriptorCount = VK_TRUE,
+        .runtimeDescriptorArray = VK_TRUE,
         .scalarBlockLayout = VK_TRUE,
         .bufferDeviceAddress = VK_TRUE,
         // descriptorBindingUniformBufferUpdateAfterBind seems to be poorly supported, see
@@ -1012,23 +1180,24 @@ VmaAllocator VulkanRHI::createVMAAllocator(const VkInstance instance, const VkPh
     return allocator;
 }
 
-VkSampler VulkanRHI::createSampler(const VkDevice device) const
+VkSampler VulkanRHI::createSampler(const VkDevice device, const bool linear) const
 {
-    VkSampler sampler;
+    const VkFilter filter = linear ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
+
     const VkSamplerCreateInfo samplerCreateInfo {
         .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-        .magFilter = VK_FILTER_LINEAR,
-        .minFilter = VK_FILTER_LINEAR,
-        .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+        .magFilter = filter,
+        .minFilter = filter,
+        .mipmapMode = linear ? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST,
         .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
         .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
     };
 
+    VkSampler sampler;
     if (vkCreateSampler(_device, &samplerCreateInfo, nullptr, &sampler) != VK_SUCCESS) {
         NH3D_ABORT_VK("Failed to create Vulkan sampler");
     }
 
     return sampler;
 }
-
 }

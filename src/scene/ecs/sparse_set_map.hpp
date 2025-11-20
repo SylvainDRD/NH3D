@@ -21,6 +21,8 @@ class SparseSetMap {
 public:
     SparseSetMap() = default;
 
+    template <typename T> [[nodiscard]] uint32 size();
+
     void remove(const Entity entity, ComponentMask mask);
 
     void setParent(const Entity entity, const Entity parent);
@@ -60,6 +62,12 @@ private:
 };
 
 inline uint32 SparseSetMap::g_nextPoolIndex = 0;
+
+template <typename T> [[nodiscard]] inline uint32 SparseSetMap::size()
+{
+    const SparseSet<T>& set = getSet<std::remove_cvref_t<T>>();
+    return set.size();
+}
 
 template <NotHierarchyComponent T> [[nodiscard]] inline uint32 SparseSetMap::getId() const
 {

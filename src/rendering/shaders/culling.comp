@@ -1,10 +1,8 @@
 #version 460
-#extension GL_EXT_buffer_reference : require
-#extension GL_EXT_scalar_block_layout : require
 
-#include "structs.inc"
+#include "structs.inc.glsl"
 
-layout (local_size_x = 64) in;
+layout(local_size_x = 64) in;
 
 struct TransformData {
     vec4 rotation;
@@ -76,14 +74,14 @@ bool isVisibleFlagSet(uint index) {
     return (visibleFlags.flags[dataIndex] & (1 << bitIndex)) != 0;
 }
 
-void main() 
+void main()
 {
     uint index = gl_GlobalInvocationID.x;
 
     if (index >= cullingParams.objectCount) {
         return;
     }
-    
+
     // TODO: actual culling against frustum, this just dumps transforms that are marked visible
     if (!isVisibleFlagSet(index)) {
         return;
@@ -92,7 +90,7 @@ void main()
     RenderData obj = renderData.objects[index];
 
     // TODO: compute transform and rotate AABB
-    mat4x3 transform = mat4x3(1.0); 
+    mat4x3 transform = mat4x3(1.0);
 
     bool culled = false;
 

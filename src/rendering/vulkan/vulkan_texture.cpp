@@ -108,7 +108,7 @@ uint32 channelCount(const VkFormat format)
         rhi.executeImmediateCommandBuffer([&](VkCommandBuffer commandBuffer) {
             VulkanTexture::insertMemoryBarrier(commandBuffer, image, VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_NONE,
                 VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                VK_IMAGE_LAYOUT_UNDEFINED, 0, 1);
+                VK_IMAGE_LAYOUT_UNDEFINED, false, 0, 1);
 
             const VkBufferImageCopy copyRegion {
                 .bufferOffset = 0,
@@ -128,7 +128,7 @@ uint32 channelCount(const VkFormat format)
             if (info.generateMipMaps) {
                 VulkanTexture::insertMemoryBarrier(commandBuffer, image, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT,
                     VK_ACCESS_2_SHADER_READ_BIT, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 1);
+                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, false, 0, 1);
 
                 VkImageLayout previousMipLayout = layout;
                 for (uint32 i = 1; i < imageCreateInfo.mipLevels; ++i) {
@@ -151,26 +151,26 @@ uint32 channelCount(const VkFormat format)
                     VkImageLayout currentMipLayout = VK_IMAGE_LAYOUT_UNDEFINED;
                     VulkanTexture::insertMemoryBarrier(commandBuffer, image, VK_ACCESS_2_TRANSFER_WRITE_BIT,
                         VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-                        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, previousMipLayout, i - 1, 1);
+                        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, previousMipLayout, false, i - 1, 1);
                     VulkanTexture::insertMemoryBarrier(commandBuffer, image, VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_NONE,
                         VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                        currentMipLayout, i, 1);
+                        currentMipLayout, false, i, 1);
 
                     vkCmdBlitImage(commandBuffer, image, previousMipLayout, image, currentMipLayout, 1, &blit, VK_FILTER_LINEAR);
 
                     // Transition previous mip level to SHADER_READ_ONLY_OPTIMAL
                     VulkanTexture::insertMemoryBarrier(commandBuffer, image, VK_ACCESS_2_TRANSFER_READ_BIT,
                         VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT,
-                        VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, previousMipLayout, i - 1, 1);
+                        VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, previousMipLayout, false, i - 1, 1);
                     previousMipLayout = currentMipLayout;
                 }
                 VulkanTexture::insertMemoryBarrier(commandBuffer, image, VK_ACCESS_2_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT,
                     VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, previousMipLayout, imageCreateInfo.mipLevels - 1, 1);
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, previousMipLayout, false, imageCreateInfo.mipLevels - 1, 1);
             } else {
                 VulkanTexture::insertMemoryBarrier(commandBuffer, image, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT,
                     VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 1);
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, false, 0, 1);
             }
         });
 
@@ -248,7 +248,7 @@ bool VulkanTexture::valid(const ImageView& imageViewData, const TextureMetadata&
 
 void VulkanTexture::insertMemoryBarrier(VkCommandBuffer commandBuffer, const VkImage image, const VkAccessFlags2 srcAccessMask,
     const VkPipelineStageFlags2 srcStageMask, const VkAccessFlags2 dstAccessMask, const VkPipelineStageFlags2 dstStageMask,
-    const VkImageLayout newLayout, const VkImageLayout oldLayout, const uint32_t baseMipLevel, const uint32_t mipLevels)
+    const VkImageLayout newLayout, const VkImageLayout oldLayout, const bool isDepth, const uint32_t baseMipLevel, const uint32_t mipLevels)
 {
     const VkImageMemoryBarrier2 barrier { .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
         .srcStageMask = srcStageMask,
@@ -259,8 +259,7 @@ void VulkanTexture::insertMemoryBarrier(VkCommandBuffer commandBuffer, const VkI
         .newLayout = newLayout,
         .image = image,
         .subresourceRange = {
-            .aspectMask = static_cast<VkImageAspectFlags>(
-                (newLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT),
+            .aspectMask = isDepth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT,
             .baseMipLevel = baseMipLevel,
             .levelCount = mipLevels,
             .layerCount = VK_REMAINING_ARRAY_LAYERS,
@@ -275,7 +274,7 @@ void VulkanTexture::insertMemoryBarrier(VkCommandBuffer commandBuffer, const VkI
     vkCmdPipelineBarrier2(commandBuffer, &depInfo);
 }
 
-void VulkanTexture::clear(VkCommandBuffer commandBuffer, VkImage image, const color4 color, const VkImageLayout layout)
+void VulkanTexture::clearColor(VkCommandBuffer commandBuffer, VkImage image, const color4 color, const VkImageLayout layout)
 {
     const VkImageSubresourceRange imageRange = VkImageSubresourceRange {
         .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -283,6 +282,21 @@ void VulkanTexture::clear(VkCommandBuffer commandBuffer, VkImage image, const co
         .layerCount = VK_REMAINING_ARRAY_LAYERS,
     };
     vkCmdClearColorImage(commandBuffer, image, layout, reinterpret_cast<const VkClearColorValue*>(&color), 1, &imageRange);
+}
+
+void VulkanTexture::clearDepth(VkCommandBuffer commandBuffer, VkImage image, const float depth, const VkImageLayout layout)
+{
+    const VkImageSubresourceRange imageRange = VkImageSubresourceRange {
+        .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+        .levelCount = VK_REMAINING_MIP_LEVELS,
+        .layerCount = VK_REMAINING_ARRAY_LAYERS,
+    };
+
+    const VkClearDepthStencilValue clearValue {
+        .depth = depth,
+    };
+
+    vkCmdClearDepthStencilImage(commandBuffer, image, layout, &clearValue, 1, &imageRange);
 }
 
 void VulkanTexture::blit(

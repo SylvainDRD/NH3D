@@ -8,8 +8,8 @@
 namespace NH3D {
 
 struct Material {
-    Handle<Texture> albedoTexture; // invalid handle if no texture
     color3 albedo;
+    Handle<Texture> albedoTexture = InvalidHandle<Texture>; // invalid handle if no texture
 };
 
 }

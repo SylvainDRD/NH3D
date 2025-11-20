@@ -92,7 +92,7 @@ private:
 
     VmaAllocator createVMAAllocator(const VkInstance instance, const VkPhysicalDevice gpu, const VkDevice device) const;
 
-    VkSampler createSampler(const VkDevice device) const;
+    VkSampler createSampler(const VkDevice device, const bool linear) const;
 
 private:
     VkInstance _instance;
@@ -119,38 +119,48 @@ private:
 
     std::array<VkCommandBuffer, MaxFramesInFlight> _commandBuffers;
     std::array<VkFence, MaxFramesInFlight> _frameFences;
-    std::array<Handle<Texture>, MaxFramesInFlight> _renderTargets;
 
     std::array<VkSemaphore, MaxFramesInFlight> _presentSemaphores;
     std::vector<VkSemaphore> _renderSemaphores;
 
     VkSampler _linearSampler;
+    VkSampler _nearestSampler;
     mutable ResourceManager<VulkanTexture> _textureManager;
     mutable ResourceManager<VulkanBuffer> _bufferManager;
     mutable ResourceManager<VulkanShader> _shaderManager;
     mutable ResourceManager<VulkanComputeShader> _computeShaderManager;
     mutable ResourceManager<VulkanBindGroup> _bindGroupManager;
 
-    // TODO: replace by a proper render loop
-    Handle<ComputeShader> _frustumCullingCS;
+    Handle<ComputeShader> _frustumCullingCS = InvalidHandle<ComputeShader>;
     // Vertices/Indices/Material/AABB + visible flags
-    Handle<BindGroup> _cullingRenderDataBindGroup;
-    Handle<Buffer> _cullingRenderDataBuffer;
-    Handle<Buffer> _cullingRenderDataStagingBuffer;
-    Handle<Buffer> _cullingVisibleFlagBuffer;
-    Handle<Buffer> _cullingVisibleFlagStagingBuffer;
-    Handle<BindGroup> _cullingFrameDataBindGroup;
-    Handle<Buffer> _cullingParametersBuffer; // Update via vkCmdUpdateBuffer
-    Handle<Buffer> _cullingTransformBuffer;
-    Handle<Buffer> _cullingTransformStagingBuffer;
-    Handle<Buffer> _cullingDrawCounterBuffer; // vkCmdFillBuffer
+    Handle<BindGroup> _cullingRenderDataBindGroup = InvalidHandle<BindGroup>;
+    Handle<Buffer> _cullingRenderDataBuffer = InvalidHandle<Buffer>;
+    Handle<Buffer> _cullingRenderDataStagingBuffer = InvalidHandle<Buffer>;
+    Handle<Buffer> _cullingVisibleFlagBuffer = InvalidHandle<Buffer>;
+    Handle<Buffer> _cullingVisibleFlagStagingBuffer = InvalidHandle<Buffer>;
+    Handle<BindGroup> _cullingFrameDataBindGroup = InvalidHandle<BindGroup>;
+    Handle<Buffer> _cullingParametersBuffer = InvalidHandle<Buffer>; // Update via vkCmdUpdateBuffer
+    Handle<Buffer> _cullingTransformBuffer = InvalidHandle<Buffer>;
+    Handle<Buffer> _cullingTransformStagingBuffer = InvalidHandle<Buffer>;
+    Handle<Buffer> _cullingDrawCounterBuffer = InvalidHandle<Buffer>; // vkCmdFillBuffer
+
+    struct GBuffer {
+        Handle<Texture> normalRT;
+        Handle<Texture> albedoRT;
+        Handle<Texture> depthRT;
+    };
+    std::array<GBuffer, MaxFramesInFlight> _gbufferRTs;
+
     Handle<Shader> _gbufferShader;
     Handle<BindGroup> _drawIndirectCommandBindGroup;
-    // Struct buffer passed to VS
-    Handle<BindGroup> _drawRecordBindGroup;
     Handle<Buffer> _drawIndirectBuffer; // GPU written
+    Handle<BindGroup> _drawRecordBindGroup;
     Handle<Buffer> _drawRecordBuffer; // GPU written
-    Handle<BindGroup> _textureBindGroup;
+    Handle<BindGroup> _albedoTextureBindGroup;
+
+    Handle<ComputeShader> _deferredShadingCS;
+    Handle<BindGroup> _deferredShadingBindGroup;
+    std::array<Handle<Texture>, MaxFramesInFlight> _finalRTs;
 
     mutable uint32_t _frameId = 0;
 };

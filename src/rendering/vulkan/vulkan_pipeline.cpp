@@ -18,8 +18,8 @@ void VulkanPipeline::release(const IRHI& rhi, VkPipeline& pipeline, VkPipelineLa
     }
 }
 
-VkPipelineLayout VulkanPipeline::createPipelineLayout(
-    VkDevice device, const ArrayWrapper<VkDescriptorSetLayout> descriptorSetsLayouts, const ArrayWrapper<VkPushConstantRange> pushConstantRanges)
+VkPipelineLayout VulkanPipeline::createPipelineLayout(VkDevice device, const ArrayWrapper<VkDescriptorSetLayout> descriptorSetsLayouts,
+    const ArrayWrapper<VkPushConstantRange> pushConstantRanges)
 {
     const VkPipelineLayoutCreateInfo layoutCreateInfo {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -54,7 +54,7 @@ VkShaderModule VulkanPipeline::loadShaderModule(VkDevice device, const std::file
     file.read(buffer.data(), size);
     file.close();
 
-    VkShaderModuleCreateInfo moduleCreateInfo {
+    const VkShaderModuleCreateInfo moduleCreateInfo {
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO, .codeSize = size, .pCode = reinterpret_cast<uint32_t*>(buffer.data())
     };
 

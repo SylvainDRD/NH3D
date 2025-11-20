@@ -56,8 +56,6 @@ std::pair<std::vector<VertexData>, std::vector<uint32_t>> loadGLBMeshData(const 
     return {};
 }
 
-[[nodiscard]] uint32 Scene::size() const { return static_cast<uint32>(_entityMasks.size() - _availableEntities.size()); }
-
 [[nodiscard]] bool Scene::isValidEntity(const Entity entity) const
 {
     return entity < _entityMasks.size() && (_entityMasks[entity] & SparseSetMap::InvalidEntityMask) == 0;

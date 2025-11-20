@@ -25,7 +25,7 @@ public:
 
     Scene(IRHI& rhi, const std::filesystem::path& filePath);
 
-    [[nodiscard]] uint32 size() const;
+    template <typename T> [[nodiscard]] uint32 size();
 
     void remove(const Entity entity);
 
@@ -69,6 +69,8 @@ private:
 
     HierarchySparseSet _hierarchy;
 };
+
+template <typename T> [[nodiscard]] uint32 Scene::size() { return _setMap.size<T>(); }
 
 template <NotHierarchyComponent T> [[nodiscard]] inline T& Scene::get(const Entity entity)
 {

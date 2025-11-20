@@ -103,6 +103,8 @@ namespace NH3D {
         return VK_FORMAT_R32G32B32A32_UINT;
     case TextureFormat::RGBA32_SINT:
         return VK_FORMAT_R32G32B32A32_SINT;
+    case NH3D::TextureFormat::BC7_RGBA_SRGB:
+        return VK_FORMAT_BC7_SRGB_BLOCK;
     case TextureFormat::NH3D_TEXTURE_FORMAT_MAX:
         NH3D_ABORT("Invalid texture format");
         return VK_FORMAT_UNDEFINED; // Suppress warning

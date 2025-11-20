@@ -11,10 +11,16 @@ namespace NH3D {
 struct VulkanShader : public VulkanPipeline {
     using ResourceType = Shader;
 
+    struct ColorAttachmentInfo {
+        VkFormat format;
+        VkColorComponentFlags colorWriteMask;
+        bool blendEnable;
+    };
+
     struct ShaderInfo {
         const std::filesystem::path& vertexShaderPath;
         const std::filesystem::path& fragmentShaderPath;
-        const std::vector<VkFormat>& colorAttachmentFormats;
+        ArrayWrapper<ColorAttachmentInfo> colorAttachmentFormats;
         VkFormat depthAttachmentFormat;
         VkFormat stencilAttachmentFormat;
         ArrayWrapper<VkDescriptorSetLayout> descriptorSetsLayouts;

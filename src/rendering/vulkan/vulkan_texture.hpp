@@ -37,7 +37,6 @@ struct VulkanTexture {
         const VkImageAspectFlags aspect;
         const ArrayWrapper<byte> initialData;
         const bool generateMipMaps : 1;
-        const bool createSampler : 1;
     };
 
     /// "Constructors / Destructors"
@@ -55,10 +54,12 @@ struct VulkanTexture {
     /// Helper functions
     static void insertMemoryBarrier(VkCommandBuffer commandBuffer, const VkImage image, const VkAccessFlags2 srcAccessMask,
         const VkPipelineStageFlags2 srcStageMask, const VkAccessFlags2 dstAccessMask, const VkPipelineStageFlags2 dstStageMask,
-        const VkImageLayout newLayout, const VkImageLayout oldLayout = VK_IMAGE_LAYOUT_UNDEFINED, const uint32_t baseMipLevel = 0,
-        const uint32_t mipLevels = VK_REMAINING_MIP_LEVELS);
+        const VkImageLayout newLayout, const VkImageLayout oldLayout = VK_IMAGE_LAYOUT_UNDEFINED, const bool isDepth = false,
+        const uint32_t baseMipLevel = 0, const uint32_t mipLevels = VK_REMAINING_MIP_LEVELS);
 
-    static void clear(VkCommandBuffer commandBuffer, VkImage image, const color4 color, const VkImageLayout layout);
+    static void clearColor(VkCommandBuffer commandBuffer, VkImage image, const color4 color, const VkImageLayout layout);
+
+    static void clearDepth(VkCommandBuffer commandBuffer, VkImage image, const float depth, const VkImageLayout layout);
 
     static void blit(
         VkCommandBuffer commandBuffer, const VkImage srcImage, const VkExtent3D srcExtent, VkImage dstImage, const VkExtent3D dstExtent);

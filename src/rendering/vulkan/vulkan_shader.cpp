@@ -6,76 +6,114 @@ namespace NH3D {
 {
     const VkPipelineLayout pipelineLayout = createPipelineLayout(device, shaderInfo.descriptorSetsLayouts, shaderInfo.pushConstantRanges);
 
-    VkPipelineVertexInputStateCreateInfo vertexCI { .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
+    const VkPipelineVertexInputStateCreateInfo vertexCI {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+    };
 
-    VkPipelineInputAssemblyStateCreateInfo iasCI { .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+    const VkPipelineInputAssemblyStateCreateInfo iasCI {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
         .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-        .primitiveRestartEnable = VK_FALSE };
+        .primitiveRestartEnable = VK_FALSE,
+    };
 
-    VkPipelineRasterizationStateCreateInfo rasterCI { .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+    const VkPipelineRasterizationStateCreateInfo rasterCI {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
         .polygonMode = VK_POLYGON_MODE_FILL,
         .cullMode = VK_CULL_MODE_BACK_BIT,
         .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-        .lineWidth = 1.f };
-
-    VkPipelineViewportStateCreateInfo viewportCI {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO, .viewportCount = 1, .scissorCount = 1
+        .lineWidth = 1.f,
     };
 
-    VkPipelineMultisampleStateCreateInfo msaaCI { .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+    const VkPipelineViewportStateCreateInfo viewportCI {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+        .viewportCount = 1,
+        .scissorCount = 1,
+    };
+
+    const VkPipelineMultisampleStateCreateInfo msaaCI {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
         .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
         .sampleShadingEnable = VK_FALSE,
         .minSampleShading = 1.f,
         .alphaToCoverageEnable = VK_FALSE,
-        .alphaToOneEnable = VK_FALSE };
+        .alphaToOneEnable = VK_FALSE,
+    };
 
-    VkPipelineDepthStencilStateCreateInfo depthStencilCI { .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+    const VkPipelineDepthStencilStateCreateInfo depthStencilCI {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
         .depthTestEnable = VK_TRUE,
         .depthWriteEnable = VK_TRUE,
-        .depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
+        .depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL, // reverse Z?
         .depthBoundsTestEnable = VK_FALSE,
         .stencilTestEnable = VK_FALSE,
         .front = {},
         .back = {},
         .minDepthBounds = 0.f,
-        .maxDepthBounds = 1.f };
+        .maxDepthBounds = 1.f,
+    };
 
-    VkPipelineColorBlendAttachmentState blendAttachment { .blendEnable = VK_FALSE,
-        .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT };
+    NH3D_ASSERT(shaderInfo.colorAttachmentFormats.size <= 4, "Vulkan core guarantees only 4 color attachments");
+    std::array<VkPipelineColorBlendAttachmentState, 4> blendAttachments {};
 
-    VkPipelineColorBlendStateCreateInfo blendCI { .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+    for (uint32 i = 0; i < shaderInfo.colorAttachmentFormats.size; ++i) {
+        blendAttachments[i] = VkPipelineColorBlendAttachmentState {
+            .blendEnable = shaderInfo.colorAttachmentFormats.ptr[i].blendEnable,
+            .colorWriteMask = shaderInfo.colorAttachmentFormats.ptr[i].colorWriteMask,
+        };
+    }
+
+    const VkPipelineColorBlendStateCreateInfo blendCI {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
         .logicOpEnable = VK_FALSE, // TODO: mmmmh
         .logicOp = VK_LOGIC_OP_COPY,
-        .attachmentCount = 1,
-        .pAttachments = &blendAttachment };
+        .attachmentCount = static_cast<uint32_t>(shaderInfo.colorAttachmentFormats.size),
+        .pAttachments = blendAttachments.data(),
+    };
 
-    VkDynamicState dynState[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
-    VkPipelineDynamicStateCreateInfo dynStateCI { .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+    const VkDynamicState dynState[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+    const VkPipelineDynamicStateCreateInfo dynStateCI {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
         .dynamicStateCount = sizeof(dynState) / sizeof(VkDynamicState),
-        .pDynamicStates = dynState };
+        .pDynamicStates = dynState,
+    };
 
     const VkShaderModule vertexShader = loadShaderModule(device, shaderInfo.vertexShaderPath);
     const VkShaderModule fragmentShader = loadShaderModule(device, shaderInfo.fragmentShaderPath);
 
-    VkPipelineShaderStageCreateInfo vertexStageCI { .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+    const VkPipelineShaderStageCreateInfo vertexStageCI {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
         .stage = VK_SHADER_STAGE_VERTEX_BIT,
         .module = vertexShader,
-        .pName = "main" };
+        .pName = "main",
+    };
 
-    VkPipelineShaderStageCreateInfo fragmentStageCI { .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+    const VkPipelineShaderStageCreateInfo fragmentStageCI {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
         .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
         .module = fragmentShader,
-        .pName = "main" };
+        .pName = "main",
+    };
 
-    const VkPipelineShaderStageCreateInfo stagesCI[] = { vertexStageCI, fragmentStageCI };
+    const VkPipelineShaderStageCreateInfo stagesCI[] = {
+        vertexStageCI,
+        fragmentStageCI,
+    };
 
-    VkPipelineRenderingCreateInfo renderCI { .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-        .colorAttachmentCount = static_cast<uint32_t>(shaderInfo.colorAttachmentFormats.size()),
-        .pColorAttachmentFormats = shaderInfo.colorAttachmentFormats.data(),
+    std::array<VkFormat, 4> colorAttachmentFormats {};
+    for (uint32 i = 0; i < shaderInfo.colorAttachmentFormats.size; ++i) {
+        colorAttachmentFormats[i] = shaderInfo.colorAttachmentFormats.ptr[i].format;
+    }
+
+    const VkPipelineRenderingCreateInfo renderCI {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+        .colorAttachmentCount = shaderInfo.colorAttachmentFormats.size,
+        .pColorAttachmentFormats = colorAttachmentFormats.data(),
         .depthAttachmentFormat = shaderInfo.depthAttachmentFormat,
-        .stencilAttachmentFormat = shaderInfo.stencilAttachmentFormat };
+        .stencilAttachmentFormat = shaderInfo.stencilAttachmentFormat,
+    };
 
-    VkGraphicsPipelineCreateInfo pipelineCreateInfo { .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+    const VkGraphicsPipelineCreateInfo pipelineCreateInfo {
+        .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .pNext = &renderCI,
         .stageCount = 2, // TODO: expand to support more than fragment and vertex shaders
         .pStages = stagesCI,
@@ -87,7 +125,8 @@ namespace NH3D {
         .pDepthStencilState = &depthStencilCI,
         .pColorBlendState = &blendCI,
         .pDynamicState = &dynStateCI,
-        .layout = pipelineLayout };
+        .layout = pipelineLayout,
+    };
 
     VkPipeline pipeline;
     if (vkCreateGraphicsPipelines(device, nullptr, 1, &pipelineCreateInfo, nullptr, &pipeline) != VK_SUCCESS) {

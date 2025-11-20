@@ -51,6 +51,7 @@ enum class TextureFormat : uint32_t {
     RGBA32_UINT,
     RGBA32_SINT,
     RGBA32_SFLOAT,
+    BC7_RGBA_SRGB,
     NH3D_TEXTURE_FORMAT_MAX
 };
 

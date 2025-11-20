@@ -32,7 +32,7 @@ public:
 
     [[nodiscard]] inline const std::vector<Entity>& entities() const;
 
-    [[nodiscard]] inline size_t size() const;
+    [[nodiscard]] inline uint32 size() const;
 
     [[nodiscard]] inline bool getFlag(const Entity entity) const;
 
@@ -140,7 +140,7 @@ template <typename T> [[nodiscard]] inline T& SparseSet<T>::getRaw(const uint32 
 
 template <typename T> [[nodiscard]] const std::vector<Entity>& SparseSet<T>::entities() const { return _entities; }
 
-template <typename T> [[nodiscard]] inline size_t SparseSet<T>::size() const { return _entities.size(); }
+template <typename T> [[nodiscard]] inline uint32 SparseSet<T>::size() const { return _entities.size(); }
 
 template <typename T> [[nodiscard]] inline bool SparseSet<T>::getFlag(const Entity entity) const
 {
