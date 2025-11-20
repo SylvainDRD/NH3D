@@ -57,6 +57,7 @@ TEST(VulkanEnumTests, TextureFormatMappingTest)
         VK_FORMAT_R32G32B32A32_UINT,
         VK_FORMAT_R32G32B32A32_SINT,
         VK_FORMAT_R32G32B32A32_SFLOAT,
+        VK_FORMAT_BC7_SRGB_BLOCK,
     };
 
     constexpr uint32_t TestCases = sizeof(Expected) / sizeof(VkFormat);
