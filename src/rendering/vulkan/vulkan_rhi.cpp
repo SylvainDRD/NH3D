@@ -767,9 +767,8 @@ void VulkanRHI::render(Scene& scene) const
         VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_NONE, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     vkEndCommandBuffer(commandBuffer);
-    submitCommandBuffer(_graphicsQueue,
-        makeSemaphoreSubmitInfo(_presentSemaphores[frameInFlightId], VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT),
-        makeSemaphoreSubmitInfo(_renderSemaphores[swapchainImageId], VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT), commandBuffer,
+    submitCommandBuffer(_graphicsQueue, makeSemaphoreSubmitInfo(_presentSemaphores[frameInFlightId], VK_PIPELINE_STAGE_2_BLIT_BIT),
+        makeSemaphoreSubmitInfo(_renderSemaphores[swapchainImageId], VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT), commandBuffer,
         _frameFences[frameInFlightId]); // TODO: watch out for the ALL_GRAPHICS_BIT when doing Compute based shading
 
     const VkPresentInfoKHR presentInfo {
