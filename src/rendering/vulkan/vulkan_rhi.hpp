@@ -7,6 +7,7 @@
 #include <rendering/core/buffer.hpp>
 #include <rendering/core/compute_shader.hpp>
 #include <rendering/core/handle.hpp>
+#include <rendering/core/material.hpp>
 #include <rendering/core/resource_manager.hpp>
 #include <rendering/core/rhi.hpp>
 #include <rendering/core/shader.hpp>
@@ -57,6 +58,28 @@ private:
         bool isValid() const { return GraphicsQueueFamilyID != NH3D_MAX_T(uint32_t) && PresentQueueFamilyID != NH3D_MAX_T(uint32_t); }
     };
 
+    struct RenderData {
+        VkDeviceAddress vertexBuffer;
+        VkDeviceAddress indexBuffer;
+        uint indexCount;
+        Material material;
+        AABB localBoundingBox;
+    };
+
+    struct FrustumPlanes {
+        vec2 left;
+        vec2 right;
+        vec2 top;
+        vec2 bottom;
+    };
+
+    struct CullingParameters {
+        mat4 viewMatrix;
+        FrustumPlanes frustumPlanes; // small optimization: consider infinite far plane and assume d=0 for near plane
+        uint objectCount;
+    };
+
+private:
     VkCommandBuffer getCommandBuffer() const;
 
     Handle<Texture> createTexture(const VulkanTexture::CreateInfo& info);
@@ -94,7 +117,7 @@ private:
 
     VkSampler createSampler(const VkDevice device, const bool linear) const;
 
-    std::array<vec3, 4> getFrustumPlanes(const mat4& projectionMatrix) const;
+    FrustumPlanes getFrustumPlanes(const mat4& projectionMatrix) const;
 
 private:
     VkInstance _instance;

@@ -41,7 +41,10 @@ layout(set = 0, binding = 1, scalar) readonly buffer VisibleFlags {
 
 layout(set = 1, binding = 0, scalar) readonly uniform CullingParameters {
     mat4 viewMatrix;
-    vec3 frustumPlanes[4]; // small optimization: consider infinite far plane and assume d=0 for near plane
+    vec2 left;
+    vec2 right;
+    vec2 bottom;
+    vec2 top;
     uint objectCount;
 } cullingParams;
 
@@ -111,16 +114,33 @@ mat4 computeTransform(uint index) {
 }
 
 bool inFrustum(AABB viewAABB) {
-    return true;
+    return true; // TODO: remove
 
+    // Near
     if (viewAABB.max.z < 0.0) {
         return false;
     }
 
-    for (int i = 0; i < 4; ++i) {
-        vec3 plane = cullingParams.frustumPlanes[i];
+    // Components equal to zero were dropped
 
-        // TODO
+    // Left (plane y == 0)
+    if (dot(viewAABB.max.xy, cullingParams.left) < 0) {
+        return false;
+    }
+
+    // Right (plane y == 0)
+    if (dot(vec2(viewAABB.min.x, viewAABB.max.z), cullingParams.right) < 0) {
+        return false;
+    }
+
+    // Bottom (plane x == 0)
+    if (dot(viewAABB.max.yz, cullingParams.bottom) < 0) {
+        return false;
+    }
+
+    // Top (plane x == 0)
+    if (dot(viewAABB.min.yz, cullingParams.top) < 0) {
+        return false;
     }
 
     return true;

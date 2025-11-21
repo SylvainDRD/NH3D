@@ -21,20 +21,6 @@
 
 namespace NH3D {
 
-struct RenderData {
-    VkDeviceAddress vertexBuffer;
-    VkDeviceAddress indexBuffer;
-    uint indexCount;
-    Material material;
-    AABB localBoundingBox;
-};
-
-struct CullingParameters {
-    mat4 viewMatrix;
-    std::array<vec3, 4> frustumPlanes; // small optimization: consider infinite far plane and assume d=0 for near plane
-    uint objectCount;
-};
-
 VulkanRHI::VulkanRHI(const Window& Window)
     : IRHI {}
     , _textureManager { 1000, 100 }
@@ -1219,34 +1205,32 @@ VkSampler VulkanRHI::createSampler(const VkDevice device, const bool linear) con
     return sampler;
 }
 
-std::array<vec3, 4> VulkanRHI::getFrustumPlanes(const mat4& projectionMatrix) const
+VulkanRHI::FrustumPlanes VulkanRHI::getFrustumPlanes(const mat4& projectionMatrix) const
 {
-    std::array<vec3, 4> frustumPlanes;
+    FrustumPlanes frustumPlanes;
 
-    // Left plane
-    frustumPlanes[0] = vec3 {
+    // Dropping the Y component for left and right planes as it is zero, and the X component for top and bottom planes as it is zero
+
+    frustumPlanes.left = vec2 {
         projectionMatrix[0][3] + projectionMatrix[0][0],
-        projectionMatrix[1][3] + projectionMatrix[1][0],
+        // projectionMatrix[1][3] + projectionMatrix[1][0],
         projectionMatrix[2][3] + projectionMatrix[2][0],
     };
 
-    // Right plane
-    frustumPlanes[1] = vec3 {
+    frustumPlanes.right = vec2 {
         projectionMatrix[0][3] - projectionMatrix[0][0],
-        projectionMatrix[1][3] - projectionMatrix[1][0],
+        // projectionMatrix[1][3] - projectionMatrix[1][0],
         projectionMatrix[2][3] - projectionMatrix[2][0],
     };
 
-    // Bottom plane
-    frustumPlanes[2] = vec3 {
-        projectionMatrix[0][3] + projectionMatrix[0][1],
+    frustumPlanes.bottom = vec2 {
+        // projectionMatrix[0][3] + projectionMatrix[0][1],
         projectionMatrix[1][3] + projectionMatrix[1][1],
         projectionMatrix[2][3] + projectionMatrix[2][1],
     };
 
-    // Top plane
-    frustumPlanes[3] = vec3 {
-        projectionMatrix[0][3] - projectionMatrix[0][1],
+    frustumPlanes.top = vec2 {
+        // projectionMatrix[0][3] - projectionMatrix[0][1],
         projectionMatrix[1][3] - projectionMatrix[1][1],
         projectionMatrix[2][3] - projectionMatrix[2][1],
     };
