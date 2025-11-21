@@ -11,11 +11,16 @@ class Scene;
 // Beware of updates of two nodes in the same subtree by two different threads, race condition
 // TODO: force RigidBodyComponents only on root HierarchyComponent, disallow otherwise
 struct TransformComponent {
+    TransformComponent(
+        const vec3& position = vec3 { 0.0f }, const quat& rotation = quat { 1.0f, 0.0f, 0.0f, 0.0f }, const vec3& scale = vec3 { 1.0f });
+
     [[nodiscard]] const quat& rotation() const;
 
     [[nodiscard]] const vec3& position() const;
 
     [[nodiscard]] const vec3& scale() const;
+
+    operator mat4() const;
 
     void setPosition(Scene& scene, const Entity self, const vec3& position);
 

@@ -94,6 +94,8 @@ private:
 
     VkSampler createSampler(const VkDevice device, const bool linear) const;
 
+    std::array<vec3, 4> getFrustumPlanes(const mat4& projectionMatrix) const;
+
 private:
     VkInstance _instance;
 #if NH3D_DEBUG
@@ -137,7 +139,8 @@ private:
     Handle<Buffer> _cullingRenderDataBuffer = InvalidHandle<Buffer>;
     Handle<Buffer> _cullingRenderDataStagingBuffer = InvalidHandle<Buffer>;
     Handle<Buffer> _cullingVisibleFlagBuffer = InvalidHandle<Buffer>;
-    Handle<Buffer> _cullingVisibleFlagStagingBuffer = InvalidHandle<Buffer>;
+    std::array<Handle<Buffer>, MaxFramesInFlight> _cullingVisibleFlagStagingBuffer
+        = { InvalidHandle<Buffer>, InvalidHandle<Buffer> }; // Init only helps for MaxFramesInFlight == 2
     Handle<BindGroup> _cullingFrameDataBindGroup = InvalidHandle<BindGroup>;
     Handle<Buffer> _cullingParametersBuffer = InvalidHandle<Buffer>; // Update via vkCmdUpdateBuffer
     Handle<Buffer> _cullingTransformBuffer = InvalidHandle<Buffer>;

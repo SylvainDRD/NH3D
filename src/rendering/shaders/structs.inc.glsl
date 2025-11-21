@@ -27,5 +27,5 @@ struct DrawRecord {
     VertexBuffer vertexBuffer;
     IndexBuffer indexBuffer;
     Material material;
-    mat4x3 modelMatrix;
+    mat4x3 modelViewMatrix;
 };

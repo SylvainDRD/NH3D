@@ -25,8 +25,6 @@ public:
 
     Scene(IRHI& rhi, const std::filesystem::path& filePath);
 
-    template <typename T> [[nodiscard]] uint32 size();
-
     void remove(const Entity entity);
 
     void setParent(const Entity entity, const Entity parent);
@@ -70,8 +68,6 @@ private:
     HierarchySparseSet _hierarchy;
 };
 
-template <typename T> [[nodiscard]] uint32 Scene::size() { return _setMap.size<T>(); }
-
 template <NotHierarchyComponent T> [[nodiscard]] inline T& Scene::get(const Entity entity)
 {
     NH3D_ASSERT(isValidEntity(entity), "Attempting to get components of an invalid entity");
@@ -110,7 +106,7 @@ template <NotHierarchyComponent... Ts> inline void Scene::add(const Entity entit
 
     _entityMasks[entity] |= mask;
 
-    if (ComponentMasks::checkComponents(_setMap.mask<CameraComponent>(), mask) && _mainCamera == InvalidEntity) {
+    if (ComponentMasks::checkComponents(mask, _setMap.mask<CameraComponent>()) && _mainCamera == InvalidEntity) {
         _mainCamera = entity;
     }
 }

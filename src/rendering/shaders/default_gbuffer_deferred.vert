@@ -6,7 +6,7 @@ layout(set = 1, binding = 0, scalar) readonly buffer DrawRecordBuffer {
     DrawRecord drawRecords[];
 };
 
-layout(push_constant) uniform ViewProjectionMatrix
+layout(push_constant) uniform ProjectionMatrix
 {
     mat4 matrix;
 } projection;
@@ -17,12 +17,13 @@ layout(location = 2) out flat Material outMaterial; // TODO: benchmark bindless 
 
 void main()
 {
-    // TODO: apply transform
-
     DrawRecord drawRecord = drawRecords[gl_DrawID];
 
     uint index = drawRecord.indexBuffer.indices[gl_VertexIndex];
-    gl_Position = vec4(drawRecord.vertexBuffer.vertices[index].position.xyz, 1.0);
+    // TODO: uncomment
+    // vec3 viewPosition = drawRecord.modelViewMatrix * vec4(drawRecord.vertexBuffer.vertices[index].position, 1.0);
+    // gl_Position = projection.matrix * vec4(viewPosition, 1.0);
+    gl_Position = vec4(drawRecord.vertexBuffer.vertices[index].position, 1.0);
 
     outNormal = drawRecord.vertexBuffer.vertices[index].normal;
     outUV = drawRecord.vertexBuffer.vertices[index].uv;

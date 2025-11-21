@@ -1,6 +1,8 @@
 #pragma once
 
 #define GLM_ENABLE_EXPERIMENTAL
+#define GLM_FORCE_LEFT_HANDED
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
@@ -8,6 +10,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/norm.hpp>
+#include <glm/gtx/quaternion.hpp>
 #include <glm/gtx/rotate_vector.hpp>
 #include <misc/types.hpp>
 
@@ -30,18 +33,13 @@ using glm::smoothstep;
 using glm::step;
 
 // Lerp alias (to glm::mix)
-template <class A, class B>
-constexpr auto lerp(const A& a, const A& b, const B t) -> decltype(glm::mix(a, b, t))
+template <class A, class B> constexpr auto lerp(const A& a, const A& b, const B t) -> decltype(glm::mix(a, b, t))
 {
     return glm::mix(a, b, t);
 }
 
 // Saturate helper: clamp to [0, 1]
-template <class T>
-constexpr T saturate(T x)
-{
-    return glm::clamp(x, T { 0 }, T { 1 });
-}
+template <class T> constexpr T saturate(T x) { return glm::clamp(x, T { 0 }, T { 1 }); }
 
 // Rounding/truncation
 using glm::ceil;
@@ -86,5 +84,6 @@ using glm::angleAxis;
 using glm::conjugate;
 using glm::normalize;
 using glm::slerp;
+using glm::toMat4;
 
 } // namespace NH3D

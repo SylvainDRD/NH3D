@@ -1,9 +1,8 @@
 #pragma once
 
 #include <cstdint>
-#include <glm/glm.hpp>
-#include <glm/gtc/quaternion.hpp>
 #include <memory>
+#include <misc/math.hpp>
 #include <misc/utils.hpp>
 
 namespace NH3D {

@@ -1,22 +1,34 @@
 #include "transform_component.hpp"
+#include <misc/math.hpp>
 #include <scene/ecs/components/hierarchy_component.hpp>
 #include <scene/scene.hpp>
 
 namespace NH3D {
 
-[[nodiscard]] const quat& TransformComponent::rotation() const
+TransformComponent::TransformComponent(const vec3& position, const quat& rotation, const vec3& scale)
+    : _position(position)
+    , _rotation(rotation)
+    , _scale(scale)
 {
-    return _rotation;
 }
 
-[[nodiscard]] const vec3& TransformComponent::position() const
-{
-    return _position;
-}
+[[nodiscard]] const quat& TransformComponent::rotation() const { return _rotation; }
 
-[[nodiscard]] const vec3& TransformComponent::scale() const
+[[nodiscard]] const vec3& TransformComponent::position() const { return _position; }
+
+[[nodiscard]] const vec3& TransformComponent::scale() const { return _scale; }
+
+TransformComponent::operator mat4() const
 {
-    return _scale;
+    mat4 transform = toMat4(_rotation);
+
+    transform[0] *= _scale.x;
+    transform[1] *= _scale.y;
+    transform[2] *= _scale.z;
+
+    transform[3] = vec4(_position, 1.0f);
+
+    return transform;
 }
 
 void TransformComponent::setPosition(Scene& scene, const Entity self, const vec3& position)

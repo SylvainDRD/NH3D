@@ -102,7 +102,7 @@ template <typename T> inline void SparseSet<T>::add(const Entity entity, T&& com
     _data.emplace_back(std::forward<T>(component));
     _entities.emplace_back(entity);
 
-    _flags.setFlag(entity, true);
+    _flags.setFlag(index, true);
 }
 
 template <typename T> inline void SparseSet<T>::remove(const Entity entity)

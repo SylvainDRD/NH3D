@@ -1,14 +1,15 @@
 #include "vulkan_rhi.hpp"
-#include "rendering/vulkan/vulkan_bind_group.hpp"
-#include "rendering/vulkan/vulkan_compute_shader.hpp"
 #include <cmath>
 #include <cstdint>
 #include <general/window.hpp>
 #include <initializer_list>
+#include <misc/math.hpp>
 #include <misc/types.hpp>
 #include <misc/utils.hpp>
 #include <rendering/core/buffer.hpp>
 #include <rendering/core/resource_manager.hpp>
+#include <rendering/vulkan/vulkan_bind_group.hpp>
+#include <rendering/vulkan/vulkan_compute_shader.hpp>
 #include <rendering/vulkan/vulkan_enums.hpp>
 #include <scene/ecs/components/render_component.hpp>
 #include <scene/ecs/components/transform_component.hpp>
@@ -30,7 +31,7 @@ struct RenderData {
 
 struct CullingParameters {
     mat4 viewMatrix;
-    vec4 frustumPlanes[6];
+    std::array<vec3, 4> frustumPlanes; // small optimization: consider infinite far plane and assume d=0 for near plane
     uint objectCount;
 };
 
@@ -130,7 +131,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
 
     const VkDescriptorType objectDataTypes[] = {
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, // RenderData buffer
-        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, // VisibleFlags buffer
+        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, // VisibleFlags buffer
     };
     auto [objectDataDescriptorSets, objectDataMetadata] = VulkanBindGroup::create(_device,
         {
@@ -155,22 +156,24 @@ VulkanRHI::VulkanRHI(const Window& Window)
         });
     _cullingRenderDataStagingBuffer = _bufferManager.store(std::move(objectDataStagingBuffer), std::move(objectDataStagingAllocation));
 
-    constexpr size_t UniformBufferGuaranteedMaxSize = 16384;
     auto [visibleFlagBuffer, visibleFlagAllocation] = VulkanBuffer::create(*this,
         {
-            .size = UniformBufferGuaranteedMaxSize,
-            .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            .size = 100000 / 8 + 1,
+            .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
         });
     _cullingVisibleFlagBuffer = _bufferManager.store(std::move(visibleFlagBuffer), std::move(visibleFlagAllocation));
 
-    auto [visibleFlagStagingBuffer, visibleFlagStagingAllocation] = VulkanBuffer::create(*this,
-        {
-            .size = UniformBufferGuaranteedMaxSize,
-            .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            .memoryUsage = VMA_MEMORY_USAGE_CPU_ONLY,
-        });
-    _cullingVisibleFlagStagingBuffer = _bufferManager.store(std::move(visibleFlagStagingBuffer), std::move(visibleFlagStagingAllocation));
+    for (int i = 0; i < IRHI::MaxFramesInFlight; ++i) {
+        auto [visibleFlagStagingBuffer, visibleFlagStagingAllocation] = VulkanBuffer::create(*this,
+            {
+                .size = 100000 / 8 + 1,
+                .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                .memoryUsage = VMA_MEMORY_USAGE_CPU_ONLY,
+            });
+        _cullingVisibleFlagStagingBuffer[i]
+            = _bufferManager.store(std::move(visibleFlagStagingBuffer), std::move(visibleFlagStagingAllocation));
+    }
 
     for (int i = 0; i < IRHI::MaxFramesInFlight; ++i) {
         VulkanBindGroup::updateDescriptorSet(_device, objectDataDescriptorSets.sets[i],
@@ -186,7 +189,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
                 .offset = 0,
                 .range = VK_WHOLE_SIZE,
             },
-            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1);
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1);
     }
 
     const VkDescriptorType frameDataTypes[] = {
@@ -524,7 +527,7 @@ void VulkanRHI::destroyBuffer(const Handle<Buffer> handle) { _bufferManager.rele
 
 void VulkanRHI::render(Scene& scene) const
 {
-    if (scene.size<RenderComponent>() == 0) {
+    if (scene.getMainCamera() == InvalidEntity) {
         return;
     }
 
@@ -602,24 +605,40 @@ void VulkanRHI::render(Scene& scene) const
         VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_SHADER_READ_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
 
     // Update visible flags buffer
-    const uint32 visibleFlagsBufferSize = objectCount > 0 ? ((objectCount - 1) >> 3) + 1 : 0;
-    const GPUBuffer& visibleFlagStagingBuffer = _bufferManager.get<GPUBuffer>(_cullingVisibleFlagStagingBuffer);
-    const BufferAllocationInfo& visibleFlagStagingAllocation = _bufferManager.get<BufferAllocationInfo>(_cullingVisibleFlagStagingBuffer);
+    const uint32 visibleFlagsBufferSize = (objectCount + (sizeof(uint32) << 3) - 1) / (sizeof(uint32) << 3) * sizeof(uint32);
+    const GPUBuffer& visibleFlagStagingBuffer = _bufferManager.get<GPUBuffer>(_cullingVisibleFlagStagingBuffer[frameInFlightId]);
+    const BufferAllocationInfo& visibleFlagStagingAllocation
+        = _bufferManager.get<BufferAllocationInfo>(_cullingVisibleFlagStagingBuffer[frameInFlightId]);
     const GPUBuffer& visibleFlagBuffer = _bufferManager.get<GPUBuffer>(_cullingVisibleFlagBuffer);
 
     void* visibleFlagsPtr = VulkanBuffer::getMappedAddress(*this, visibleFlagStagingAllocation);
     std::memcpy(visibleFlagsPtr, scene.getRawVisibleFlags(), visibleFlagsBufferSize);
+    VulkanBuffer::insertMemoryBarrier(commandBuffer, visibleFlagStagingBuffer.buffer, VK_ACCESS_2_HOST_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_HOST_BIT, VK_ACCESS_2_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT);
+    VulkanBuffer::insertMemoryBarrier(commandBuffer, visibleFlagBuffer.buffer, VK_ACCESS_2_SHADER_READ_BIT,
+        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT);
     VulkanBuffer::copyBuffer(commandBuffer, visibleFlagStagingBuffer.buffer, visibleFlagBuffer.buffer, visibleFlagsBufferSize);
     VulkanBuffer::insertMemoryBarrier(commandBuffer, visibleFlagBuffer.buffer, VK_ACCESS_2_TRANSFER_WRITE_BIT,
         VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_SHADER_READ_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
 
-    // Update culling parameters buffer
-    const VkBuffer cullingParametersBuffer = _bufferManager.get<GPUBuffer>(_cullingParametersBuffer).buffer;
-    // TODO: get actual camera data
+    // Compute updated culling parameters
+    const Entity mainCameraEntity = scene.getMainCamera();
+    const CameraComponent& cameraSettings = scene.get<CameraComponent>(mainCameraEntity);
+    const TransformComponent& cameraTransform = scene.get<TransformComponent>(mainCameraEntity);
+    const VkExtent3D rtExtent = _textureManager.get<TextureMetadata>(_gbufferRTs[frameInFlightId].albedoRT).extent;
+    const float aspectRatio = rtExtent.width / static_cast<float>(rtExtent.height);
+
+    const mat4 projectionMatrix = perspective(cameraSettings.fovY, aspectRatio, cameraSettings.near, cameraSettings.far);
+    const mat4 viewMatrix = transpose(mat4(cameraTransform)); // assumes scale is uniform and non-zero
+
     const CullingParameters cullingParameters {
+        .viewMatrix = viewMatrix,
+        .frustumPlanes = getFrustumPlanes(projectionMatrix),
         .objectCount = objectCount,
     };
 
+    // Update culling parameters buffer
+    const VkBuffer cullingParametersBuffer = _bufferManager.get<GPUBuffer>(_cullingParametersBuffer).buffer;
     vkCmdUpdateBuffer(
         commandBuffer, cullingParametersBuffer, 0, sizeof(CullingParameters), reinterpret_cast<const void*>(&cullingParameters));
     VulkanBuffer::insertMemoryBarrier(commandBuffer, cullingParametersBuffer, VK_ACCESS_2_TRANSFER_WRITE_BIT,
@@ -707,7 +726,7 @@ void VulkanRHI::render(Scene& scene) const
         },
     };
 
-    // TODO: projection matrix from camera into push constant
+    vkCmdPushConstants(commandBuffer, graphicsLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mat4), &projectionMatrix);
 
     VulkanShader::draw(commandBuffer, graphicsPipeline,
             {
@@ -1199,4 +1218,40 @@ VkSampler VulkanRHI::createSampler(const VkDevice device, const bool linear) con
 
     return sampler;
 }
+
+std::array<vec3, 4> VulkanRHI::getFrustumPlanes(const mat4& projectionMatrix) const
+{
+    std::array<vec3, 4> frustumPlanes;
+
+    // Left plane
+    frustumPlanes[0] = vec3 {
+        projectionMatrix[0][3] + projectionMatrix[0][0],
+        projectionMatrix[1][3] + projectionMatrix[1][0],
+        projectionMatrix[2][3] + projectionMatrix[2][0],
+    };
+
+    // Right plane
+    frustumPlanes[1] = vec3 {
+        projectionMatrix[0][3] - projectionMatrix[0][0],
+        projectionMatrix[1][3] - projectionMatrix[1][0],
+        projectionMatrix[2][3] - projectionMatrix[2][0],
+    };
+
+    // Bottom plane
+    frustumPlanes[2] = vec3 {
+        projectionMatrix[0][3] + projectionMatrix[0][1],
+        projectionMatrix[1][3] + projectionMatrix[1][1],
+        projectionMatrix[2][3] + projectionMatrix[2][1],
+    };
+
+    // Top plane
+    frustumPlanes[3] = vec3 {
+        projectionMatrix[0][3] - projectionMatrix[0][1],
+        projectionMatrix[1][3] - projectionMatrix[1][1],
+        projectionMatrix[2][3] - projectionMatrix[2][1],
+    };
+
+    return frustumPlanes;
+}
+
 }

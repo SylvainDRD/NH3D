@@ -89,6 +89,10 @@ void VulkanBuffer::flush(const VulkanRHI& rhi, const BufferAllocationInfo& alloc
 
 void VulkanBuffer::copyBuffer(VkCommandBuffer commandBuffer, const VkBuffer srcBuffer, const VkBuffer dstBuffer, const size_t size)
 {
+    if (size == 0) {
+        return;
+    }
+
     const VkBufferCopy copyRegion { .size = size };
     vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
 }
