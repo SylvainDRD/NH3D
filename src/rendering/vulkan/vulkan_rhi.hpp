@@ -59,12 +59,16 @@ private:
         bool isValid() const { return GraphicsQueueFamilyID != NH3D_MAX_T(uint32_t) && PresentQueueFamilyID != NH3D_MAX_T(uint32_t); }
     };
 
-    struct RenderData {
+    struct MeshData {
         VkDeviceAddress vertexBuffer;
         VkDeviceAddress indexBuffer;
-        uint indexCount;
         Material material;
-        AABB localBoundingBox;
+        AABB objectAABB;
+    };
+
+    struct RenderData {
+        MeshData mesh;
+        uint indexCount;
     };
 
     struct FrustumPlanes {

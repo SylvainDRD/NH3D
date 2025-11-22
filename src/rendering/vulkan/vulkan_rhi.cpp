@@ -553,14 +553,13 @@ void VulkanRHI::render(Scene& scene) const
             RenderData objectData;
 
             const VkBuffer vertexBuffer = _bufferManager.get<GPUBuffer>(renderComponent.getMesh().vertexBuffer).buffer;
-            objectData.vertexBuffer = VulkanBuffer::getDeviceAddress(*this, vertexBuffer);
-
             const GPUBuffer& indexBuffer = _bufferManager.get<GPUBuffer>(renderComponent.getMesh().indexBuffer);
-            objectData.indexBuffer = VulkanBuffer::getDeviceAddress(*this, indexBuffer.buffer);
-            objectData.indexCount = indexBuffer.size / sizeof(uint32);
 
-            objectData.material = renderComponent.getMaterial();
-            objectData.localBoundingBox = renderComponent.getMesh().objectAABB;
+            objectData.mesh.vertexBuffer = VulkanBuffer::getDeviceAddress(*this, vertexBuffer);
+            objectData.mesh.indexBuffer = VulkanBuffer::getDeviceAddress(*this, indexBuffer.buffer);
+            objectData.mesh.material = renderComponent.getMaterial();
+            objectData.mesh.objectAABB = renderComponent.getMesh().objectAABB;
+            objectData.indexCount = indexBuffer.size / sizeof(uint32);
 
             objectDataPtr[objectCount] = objectData;
             transformDataPtr[objectCount] = transformComponent;

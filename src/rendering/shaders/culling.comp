@@ -20,15 +20,12 @@ struct MeshData {
     VertexBuffer vertexBuffer;
     IndexBuffer indexBuffer;
     Material material;
-    AABB localBoundingBox;
+    AABB objectAABB;
 };
 
 struct RenderData {
-    VertexBuffer vertexBuffer;
-    IndexBuffer indexBuffer;
+    MeshData mesh;
     uint indexCount;
-    Material material;
-    AABB localBoundingBox;
 };
 
 layout(set = 0, binding = 0, scalar) readonly buffer RenderDataBuffer {
@@ -147,6 +144,28 @@ bool inFrustum(AABB viewAABB) {
     return true;
 }
 
+AABB computeViewAABB(mat4 viewSpaceTransform, AABB objectAABB) {
+    // Compute world AABB from local AABB, see Graphics Gems - "Transforming Axis-Aligned Bounding Boxes"
+    // It's just decomposing the matrix multiplication to avoid doing 8 corner transformations and a lot of min/max ops
+    // Not too sure how efficient this is on GPU TBH
+    vec3 nmin, nmax;
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            float a = viewSpaceTransform[j][i] * objectAABB.min[j];
+            float b = viewSpaceTransform[j][i] * objectAABB.max[j];
+
+            if (a < b) {
+                nmin[j] = a;
+                nmax[j] = b;
+            } else {
+                nmin[j] = b;
+                nmax[j] = a;
+            }
+        }
+    }
+    return AABB(nmin, nmax);
+}
+
 void main()
 {
     uint index = gl_GlobalInvocationID.x;
@@ -163,25 +182,7 @@ void main()
 
     mat4 viewSpaceTransform = cullingParams.viewMatrix * computeTransform(index);
 
-    // Compute world AABB from local AABB, see Graphics Gems - "Transforming Axis-Aligned Bounding Boxes"
-    // It's just decomposing the matrix multiplication to avoid doing 8 corner transformations and a lot of min/max ops
-    // Not too sure how efficient this is on GPU TBH
-    vec3 nmin, nmax;
-    for (int i = 0; i < 4; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            float a = viewSpaceTransform[j][i] * obj.localBoundingBox.min[j];
-            float b = viewSpaceTransform[j][i] * obj.localBoundingBox.max[j];
-
-            if (a < b) {
-                nmin[j] = a;
-                nmax[j] = b;
-            } else {
-                nmin[j] = b;
-                nmax[j] = a;
-            }
-        }
-    }
-    AABB viewAABB = AABB(nmin, nmax);
+    AABB viewAABB = computeViewAABB(viewSpaceTransform, obj.mesh.objectAABB);
 
     if (inFrustum(viewAABB)) {
         uint drawIndex = atomicAdd(drawCounter.count, 1); // To be reset by CPU before dispatch
@@ -190,9 +191,9 @@ void main()
         drawIndirectCommands.commands[drawIndex].instanceCount = 1;
         drawIndirectCommands.commands[drawIndex].firstVertex = 0;
         drawIndirectCommands.commands[drawIndex].firstInstance = 0;
-        drawRecordBuffer.drawRecords[drawIndex].vertexBuffer = obj.vertexBuffer;
-        drawRecordBuffer.drawRecords[drawIndex].indexBuffer = obj.indexBuffer;
-        drawRecordBuffer.drawRecords[drawIndex].material = obj.material;
+        drawRecordBuffer.drawRecords[drawIndex].vertexBuffer = obj.mesh.vertexBuffer;
+        drawRecordBuffer.drawRecords[drawIndex].indexBuffer = obj.mesh.indexBuffer;
+        drawRecordBuffer.drawRecords[drawIndex].material = obj.mesh.material;
 
         mat4x3 modelViewMatrix;
         modelViewMatrix[0] = vec3(viewSpaceTransform[0]);
