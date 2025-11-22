@@ -2,13 +2,13 @@
 
 namespace NH3D {
 
-void ResourceMapper::storeMesh(const std::string& name, const GPUMesh& mesh) { _meshMap[name] = mesh; }
+void ResourceMapper::storeMesh(const std::string& name, const Mesh& mesh) { _meshMap[name] = mesh; }
 
-GPUMesh ResourceMapper::getMesh(const std::string& name) const
+Mesh ResourceMapper::getMesh(const std::string& name) const
 {
     auto it = _meshMap.find(name);
     if (it == _meshMap.end()) {
-        return GPUMesh {
+        return Mesh {
             .vertexBuffer = InvalidHandle<Buffer>,
             .indexBuffer = InvalidHandle<Buffer>,
         };

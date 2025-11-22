@@ -40,9 +40,10 @@ template <NonVoid T> struct ArrayWrapper {
     const uint32 size; // element count
 };
 
-struct AABB {
-    vec3 min;
-    vec3 max;
+struct VertexData {
+    vec3 position;
+    vec3 normal;
+    vec2 uv;
 };
 
 }

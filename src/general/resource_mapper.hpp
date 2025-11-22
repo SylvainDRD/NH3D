@@ -3,8 +3,8 @@
 #include <misc/types.hpp>
 #include <misc/utils.hpp>
 #include <rendering/core/buffer.hpp>
-#include <rendering/core/gpu_mesh.hpp>
 #include <rendering/core/handle.hpp>
+#include <rendering/core/mesh.hpp>
 #include <rendering/core/shader.hpp>
 #include <rendering/core/texture.hpp>
 #include <unordered_map>
@@ -17,8 +17,8 @@ public:
     ResourceMapper() = default;
     ~ResourceMapper() = default;
 
-    void storeMesh(const std::string& name, const GPUMesh& mesh);
-    [[nodiscard]] GPUMesh getMesh(const std::string& name) const;
+    void storeMesh(const std::string& name, const Mesh& mesh);
+    [[nodiscard]] Mesh getMesh(const std::string& name) const;
 
     void storeTexture(const std::string& name, Handle<Texture> texture);
     [[nodiscard]] Handle<Texture> getTexture(const std::string& name) const;
@@ -28,7 +28,7 @@ public:
 
 private:
     // Only stores handles for move resilience
-    std::unordered_map<std::string, GPUMesh> _meshMap;
+    std::unordered_map<std::string, Mesh> _meshMap;
     std::unordered_map<std::string, Handle<Texture>> _textureMap;
     std::unordered_map<std::string, Handle<Shader>> _shaderMap;
 };

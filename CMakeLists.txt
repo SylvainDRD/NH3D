@@ -11,6 +11,7 @@ project(${NH3D_LIB} VERSION ${NH3D_VERSION_MAJOR}.${NH3D_VERSION_MINOR}.${NH3D_V
 file(GLOB SRC 	${CMAKE_SOURCE_DIR}/src/scene/*.cpp
     ${CMAKE_SOURCE_DIR}/src/scene/ecs/*.cpp
     ${CMAKE_SOURCE_DIR}/src/scene/ecs/components/*.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/*.cpp
     ${CMAKE_SOURCE_DIR}/src/general/*.cpp
     ${CMAKE_SOURCE_DIR}/src/utils/*.cpp
     ${CMAKE_SOURCE_DIR}/src/rendering/*.cpp

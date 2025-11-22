@@ -39,6 +39,7 @@ layout(set = 0, binding = 1, scalar) readonly buffer VisibleFlags {
     uint flags[];
 } visibleFlags;
 
+// TODO: Move to push constants
 layout(set = 1, binding = 0, scalar) readonly uniform CullingParameters {
     mat4 viewMatrix;
     vec2 left;

@@ -1,7 +1,7 @@
 #include <general/engine.hpp>
 #include <misc/types.hpp>
 #include <misc/utils.hpp>
-#include <rendering/core/gpu_mesh.hpp>
+#include <rendering/core/mesh.hpp>
 #include <rendering/core/rhi.hpp>
 #include <scene/ecs/components/render_component.hpp>
 #include <scene/ecs/components/transform_component.hpp>
@@ -36,7 +36,7 @@ int main()
     };
     const std::vector<uint32> indices = { 0, 1, 2 };
 
-    GPUMesh meshData {
+    Mesh meshData {
         .vertexBuffer = rhi.createBuffer({ .size = static_cast<uint32>(vertexData.size() * sizeof(VertexData)),
             .usage = BufferUsageFlagBits::STORAGE_BUFFER_BIT | BufferUsageFlagBits::DST_TRANSFER_BIT,
             .memory = BufferMemoryUsage::GPU_ONLY,
@@ -46,6 +46,7 @@ int main()
             .usage = BufferUsageFlagBits::INDEX_BUFFER_BIT | BufferUsageFlagBits::DST_TRANSFER_BIT,
             .memory = BufferMemoryUsage::GPU_ONLY,
             .initialData = { reinterpret_cast<const byte*>(indices.data()), static_cast<uint32>(indices.size() * sizeof(uint32)) } }),
+        .objectAABB = AABB::fromMesh(vertexData, indices),
     };
 
     engine.getResourceMapper().storeMesh("basic triangle", meshData);
