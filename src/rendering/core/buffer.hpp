@@ -8,8 +8,8 @@ namespace NH3D {
 struct Buffer {
     struct CreateInfo {
         uint32 size; // in bytes
-        BufferUsageFlags usage;
-        BufferMemoryUsage memory;
+        BufferUsageFlags usageFlags;
+        BufferMemoryUsage memoryUsage;
         const ArrayWrapper<byte> initialData; // optional
     };
 };

@@ -1,4 +1,5 @@
 #include <general/engine.hpp>
+#include <imgui.h>
 #include <misc/types.hpp>
 #include <misc/utils.hpp>
 #include <rendering/core/mesh.hpp>
@@ -38,13 +39,13 @@ int main()
 
     Mesh meshData {
         .vertexBuffer = rhi.createBuffer({ .size = static_cast<uint32>(vertexData.size() * sizeof(VertexData)),
-            .usage = BufferUsageFlagBits::STORAGE_BUFFER_BIT | BufferUsageFlagBits::DST_TRANSFER_BIT,
-            .memory = BufferMemoryUsage::GPU_ONLY,
+            .usageFlags = BufferUsageFlagBits::STORAGE_BUFFER_BIT | BufferUsageFlagBits::DST_TRANSFER_BIT,
+            .memoryUsage = BufferMemoryUsage::GPU_ONLY,
             .initialData
             = { reinterpret_cast<const byte*>(vertexData.data()), static_cast<uint32>(vertexData.size() * sizeof(VertexData)) } }),
         .indexBuffer = rhi.createBuffer({ .size = static_cast<uint32>(indices.size() * sizeof(uint32)),
-            .usage = BufferUsageFlagBits::INDEX_BUFFER_BIT | BufferUsageFlagBits::DST_TRANSFER_BIT,
-            .memory = BufferMemoryUsage::GPU_ONLY,
+            .usageFlags = BufferUsageFlagBits::INDEX_BUFFER_BIT | BufferUsageFlagBits::DST_TRANSFER_BIT,
+            .memoryUsage = BufferMemoryUsage::GPU_ONLY,
             .initialData = { reinterpret_cast<const byte*>(indices.data()), static_cast<uint32>(indices.size() * sizeof(uint32)) } }),
         .objectAABB = AABB::fromMesh(vertexData, indices),
     };
@@ -56,8 +57,12 @@ int main()
     scene.create(
         RenderComponent { meshData, Material { .albedo = color3 { 1.0f, 0.0f, 0.0f } } }, TransformComponent { { 0.0f, 0.0f, 0.8f } });
 
-    while (engine.update())
-        ;
+    do {
+        ImGui::NewFrame();
+        ImGui::ShowDemoWindow();
+        // ImGui::End();
+        ImGui::Render();
+    } while (engine.update());
 
     return 0;
 }

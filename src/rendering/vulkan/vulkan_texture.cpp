@@ -58,7 +58,8 @@ uint32 channelCount(const VkFormat format)
         .arrayLayers = 1, // TODO: use that for 3D textures?
         .samples = VK_SAMPLE_COUNT_1_BIT,
         .tiling = VK_IMAGE_TILING_OPTIMAL,
-        .usage = info.generateMipMaps ? (info.usage | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT) : info.usage,
+        .usage
+        = info.generateMipMaps ? (info.usageFlags | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT) : info.usageFlags,
         .initialLayout = layout,
     };
 
@@ -78,7 +79,7 @@ uint32 channelCount(const VkFormat format)
         .viewType = info.extent.depth == 1 ? VK_IMAGE_VIEW_TYPE_2D : VK_IMAGE_VIEW_TYPE_3D,
         .format = info.format,
         .subresourceRange = {
-            .aspectMask = info.aspect,
+            .aspectMask = info.aspectFlags,
             .baseMipLevel = 0,
             .levelCount = imageCreateInfo.mipLevels,
             .baseArrayLayer = 0,
@@ -115,7 +116,7 @@ uint32 channelCount(const VkFormat format)
                 .bufferRowLength = 0,
                 .bufferImageHeight = 0,
                 .imageSubresource = {
-                    .aspectMask = info.aspect,
+                    .aspectMask = info.aspectFlags,
                     .mipLevel = 0,
                     .baseArrayLayer = 0,
                     .layerCount = 1,
@@ -133,13 +134,13 @@ uint32 channelCount(const VkFormat format)
                 VkImageLayout previousMipLayout = layout;
                 for (uint32 i = 1; i < imageCreateInfo.mipLevels; ++i) {
                     const VkImageBlit blit {
-                    .srcSubresource = { .aspectMask = info.aspect, .mipLevel = i - 1, .baseArrayLayer = 0, .layerCount = 1, },
+                    .srcSubresource = { .aspectMask = info.aspectFlags, .mipLevel = i - 1, .baseArrayLayer = 0, .layerCount = 1, },
                     .srcOffsets = { { 0, 0, 0 },
                         {
                             std::max(1, static_cast<int>(info.extent.width) >> (i - 1)),
                             std::max(1, static_cast<int>(info.extent.height) >> (i - 1)),
                             static_cast<int>(info.extent.depth), }, },
-                    .dstSubresource = { .aspectMask = info.aspect, .mipLevel = i, .baseArrayLayer = 0, .layerCount = 1, },
+                    .dstSubresource = { .aspectMask = info.aspectFlags, .mipLevel = i, .baseArrayLayer = 0, .layerCount = 1, },
                     .dstOffsets = { { 0, 0, 0 },
                         {
                             std::max(1, static_cast<int>(info.extent.width) >> i),

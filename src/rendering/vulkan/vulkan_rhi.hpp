@@ -26,6 +26,8 @@
 
 namespace NH3D {
 
+class VulkanDebugDrawer;
+
 class VulkanRHI : public IRHI {
     NH3D_NO_COPY_MOVE(VulkanRHI)
 public:
@@ -39,9 +41,21 @@ public:
 
     inline VmaAllocator getAllocator() const { return _allocator; }
 
+    [[nodiscard]] inline ResourceManager<VulkanTexture>& getTextureManager() { return _textureManager; }
+
+    [[nodiscard]] inline ResourceManager<VulkanBuffer>& getBufferManager() { return _bufferManager; }
+
+    [[nodiscard]] inline ResourceManager<VulkanShader>& getShaderManager() { return _shaderManager; }
+
+    [[nodiscard]] inline ResourceManager<VulkanComputeShader>& getComputeShaderManager() { return _computeShaderManager; }
+
+    [[nodiscard]] inline ResourceManager<VulkanBindGroup>& getBindGroupManager() { return _bindGroupManager; }
+
     void executeImmediateCommandBuffer(const std::function<void(VkCommandBuffer)>& recordFunction) const;
 
     virtual Handle<Texture> createTexture(const Texture::CreateInfo& info) override;
+
+    Handle<Texture> createTexture(const VulkanTexture::CreateInfo& info);
 
     virtual void destroyTexture(const Handle<Texture> handle) override;
 
@@ -50,6 +64,8 @@ public:
     virtual void destroyBuffer(const Handle<Buffer> handle) override;
 
     virtual void render(Scene& scene) const override;
+
+    Handle<BindGroup> createBindGroup(const VulkanBindGroup::CreateInfo& info);
 
 private:
     struct PhysicalDeviceQueueFamilyID {
@@ -85,9 +101,7 @@ private:
     };
 
 private:
-    VkCommandBuffer getCommandBuffer() const;
-
-    Handle<Texture> createTexture(const VulkanTexture::CreateInfo& info);
+    VkCommandBuffer getFrameCommandBuffer() const;
 
     VkInstance createVkInstance(std::vector<const char*>&& requiredWindowExtensions) const;
 
@@ -192,6 +206,8 @@ private:
     Handle<ComputeShader> _deferredShadingCS;
     Handle<BindGroup> _deferredShadingBindGroup;
     std::array<Handle<Texture>, MaxFramesInFlight> _finalRTs;
+
+    Uptr<VulkanDebugDrawer> _debugDrawer;
 
     mutable uint32_t _frameId = 0;
 };

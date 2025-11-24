@@ -33,8 +33,8 @@ struct VulkanTexture {
     struct CreateInfo {
         const VkFormat format;
         const VkExtent3D extent;
-        const VkImageUsageFlags usage;
-        const VkImageAspectFlags aspect;
+        const VkImageUsageFlags usageFlags;
+        const VkImageAspectFlags aspectFlags;
         const ArrayWrapper<byte> initialData;
         const bool generateMipMaps : 1;
     };

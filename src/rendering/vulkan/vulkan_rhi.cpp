@@ -9,8 +9,12 @@
 #include <rendering/core/buffer.hpp>
 #include <rendering/core/resource_manager.hpp>
 #include <rendering/vulkan/vulkan_bind_group.hpp>
+#include <rendering/vulkan/vulkan_buffer.hpp>
 #include <rendering/vulkan/vulkan_compute_shader.hpp>
+#include <rendering/vulkan/vulkan_debug_drawer.hpp>
 #include <rendering/vulkan/vulkan_enums.hpp>
+#include <rendering/vulkan/vulkan_shader.hpp>
+#include <rendering/vulkan/vulkan_texture.hpp>
 #include <scene/ecs/components/render_component.hpp>
 #include <scene/ecs/components/transform_component.hpp>
 #include <scene/scene.hpp>
@@ -89,29 +93,29 @@ VulkanRHI::VulkanRHI(const Window& Window)
         _gbufferRTs[i].normalRT = createTexture({
             .format = normalRTFormat,
             .extent = { Window.getWidth(), Window.getHeight(), 1 },
-            .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-            .aspect = VK_IMAGE_ASPECT_COLOR_BIT,
+            .usageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+            .aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
         });
 
         _gbufferRTs[i].albedoRT = createTexture({
             .format = albedoRTFormat,
             .extent = { Window.getWidth(), Window.getHeight(), 1 },
-            .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-            .aspect = VK_IMAGE_ASPECT_COLOR_BIT,
+            .usageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+            .aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
         });
 
         _gbufferRTs[i].depthRT = createTexture({
             .format = VK_FORMAT_D32_SFLOAT,
             .extent = { Window.getWidth(), Window.getHeight(), 1 },
-            .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-            .aspect = VK_IMAGE_ASPECT_DEPTH_BIT,
+            .usageFlags = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            .aspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT,
         });
 
         _finalRTs[i] = createTexture({
             .format = VK_FORMAT_R16G16B16A16_SFLOAT, // Alpha?
             .extent = { Window.getWidth(), Window.getHeight(), 1 },
-            .usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-            .aspect = VK_IMAGE_ASPECT_COLOR_BIT,
+            .usageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+            .aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
         });
     }
 
@@ -119,12 +123,10 @@ VulkanRHI::VulkanRHI(const Window& Window)
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, // RenderData buffer
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, // VisibleFlags buffer
     };
-    auto [objectDataDescriptorSets, objectDataMetadata] = VulkanBindGroup::create(_device,
-        {
-            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-            .bindingTypes = { objectDataTypes, std::size(objectDataTypes) },
-        });
-    _cullingRenderDataBindGroup = _bindGroupManager.store(std::move(objectDataDescriptorSets), std::move(objectDataMetadata));
+    _cullingRenderDataBindGroup = createBindGroup({
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        .bindingTypes = { objectDataTypes, std::size(objectDataTypes) },
+    });
 
     auto [objectDataBuffer, objectDataAllocation] = VulkanBuffer::create(*this,
         {
@@ -161,6 +163,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
             = _bufferManager.store(std::move(visibleFlagStagingBuffer), std::move(visibleFlagStagingAllocation));
     }
 
+    auto& objectDataDescriptorSets = _bindGroupManager.get<DescriptorSets>(_cullingRenderDataBindGroup);
     for (int i = 0; i < IRHI::MaxFramesInFlight; ++i) {
         VulkanBindGroup::updateDescriptorSet(_device, objectDataDescriptorSets.sets[i],
             VkDescriptorBufferInfo {
@@ -183,12 +186,10 @@ VulkanRHI::VulkanRHI(const Window& Window)
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, // TransformData buffer
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, // DrawCounter buffer
     };
-    auto [frameDataDescriptorSets, frameDataMetadata] = VulkanBindGroup::create(_device,
-        {
-            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-            .bindingTypes = { frameDataTypes, std::size(frameDataTypes) },
-        });
-    _cullingFrameDataBindGroup = _bindGroupManager.store(std::move(frameDataDescriptorSets), std::move(frameDataMetadata));
+    _cullingFrameDataBindGroup = createBindGroup({
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        .bindingTypes = { frameDataTypes, std::size(frameDataTypes) },
+    });
 
     auto [cullingParametersBuffer, cullingParametersAllocation] = VulkanBuffer::create(*this,
         {
@@ -223,6 +224,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
         });
     _cullingDrawCounterBuffer = _bufferManager.store(std::move(cullingDrawCounterBuffer), std::move(cullingDrawCounterAllocation));
 
+    auto& frameDataDescriptorSets = _bindGroupManager.get<DescriptorSets>(_cullingFrameDataBindGroup);
     for (int i = 0; i < IRHI::MaxFramesInFlight; ++i) {
         VulkanBindGroup::updateDescriptorSet(_device, frameDataDescriptorSets.sets[i],
             VkDescriptorBufferInfo {
@@ -248,12 +250,10 @@ VulkanRHI::VulkanRHI(const Window& Window)
     }
 
     const VkDescriptorType drawIndirectTypes[] = { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
-    auto [drawIndirectDescriptorSets, drawIndirectMetadata] = VulkanBindGroup::create(_device,
-        {
-            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-            .bindingTypes = { drawIndirectTypes, std::size(drawIndirectTypes) },
-        });
-    _drawIndirectCommandBindGroup = _bindGroupManager.store(std::move(drawIndirectDescriptorSets), std::move(drawIndirectMetadata));
+    _drawIndirectCommandBindGroup = createBindGroup({
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        .bindingTypes = { drawIndirectTypes, std::size(drawIndirectTypes) },
+    });
 
     auto [drawIndirectBuffer, drawIndirectAllocation] = VulkanBuffer::create(*this,
         {
@@ -262,6 +262,8 @@ VulkanRHI::VulkanRHI(const Window& Window)
             .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
         });
     _drawIndirectBuffer = _bufferManager.store(std::move(drawIndirectBuffer), std::move(drawIndirectAllocation));
+
+    auto& drawIndirectDescriptorSets = _bindGroupManager.get<DescriptorSets>(_drawIndirectCommandBindGroup);
     for (int i = 0; i < IRHI::MaxFramesInFlight; ++i) {
         VulkanBindGroup::updateDescriptorSet(_device, drawIndirectDescriptorSets.sets[i],
             VkDescriptorBufferInfo {
@@ -271,20 +273,20 @@ VulkanRHI::VulkanRHI(const Window& Window)
             },
             VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
     }
-    const VkDescriptorType storageBufferType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    auto [drawRecordDescriptorSets, drawRecordMetadata] = VulkanBindGroup::create(_device,
-        {
-            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT,
-            .bindingTypes = { &storageBufferType, 1 },
-        });
-    _drawRecordBindGroup = _bindGroupManager.store(std::move(drawRecordDescriptorSets), std::move(drawRecordMetadata));
 
+    const VkDescriptorType storageBufferType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    _drawRecordBindGroup = createBindGroup({
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT,
+        .bindingTypes = { &storageBufferType, 1 },
+    });
     auto [drawRecordBuffer, drawRecordAllocation] = VulkanBuffer::create(*this,
         {
             .size = (sizeof(VkDeviceAddress) * 2 + sizeof(Material) + sizeof(mat4x3)) * 100000,
             .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
             .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
         });
+
+    auto& drawRecordDescriptorSets = _bindGroupManager.get<DescriptorSets>(_drawRecordBindGroup);
     for (int i = 0; i < IRHI::MaxFramesInFlight; ++i) {
         VulkanBindGroup::updateDescriptorSet(_device, drawRecordDescriptorSets.sets[i],
             VkDescriptorBufferInfo {
@@ -297,15 +299,15 @@ VulkanRHI::VulkanRHI(const Window& Window)
     _drawRecordBuffer = _bufferManager.store(std::move(drawRecordBuffer), std::move(drawRecordAllocation));
 
     const VkDescriptorType textureBindingTypes[] = { VK_DESCRIPTOR_TYPE_SAMPLER, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE };
-    auto [textureDescriptorSets, textureMetadata] = VulkanBindGroup::create(_device,
-        {
-            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .bindingTypes = { textureBindingTypes, std::size(textureBindingTypes) },
-            .finalBindingCount = 1000,
-        });
+    _albedoTextureBindGroup = createBindGroup({
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .bindingTypes = { textureBindingTypes, std::size(textureBindingTypes) },
+        .finalBindingCount = 1000,
+    });
 
     _linearSampler = createSampler(_device, false);
     _nearestSampler = createSampler(_device, true);
+    auto& textureDescriptorSets = _bindGroupManager.get<DescriptorSets>(_albedoTextureBindGroup);
     for (int i = 0; i < IRHI::MaxFramesInFlight; ++i) {
         VulkanBindGroup::updateDescriptorSet(_device, textureDescriptorSets.sets[i],
             VkDescriptorImageInfo {
@@ -315,7 +317,6 @@ VulkanRHI::VulkanRHI(const Window& Window)
             },
             VK_DESCRIPTOR_TYPE_SAMPLER, 0);
     }
-    _albedoTextureBindGroup = _bindGroupManager.store(std::move(textureDescriptorSets), std::move(textureMetadata));
 
     const VkDescriptorType deferredShadingBindingTypes[] = {
         VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, // Normal RT
@@ -323,12 +324,11 @@ VulkanRHI::VulkanRHI(const Window& Window)
         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, // Depth RT
         VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, // Final output RT
     };
-    auto [deferredShadingDescriptorSets, deferredShadingMetadata] = VulkanBindGroup::create(_device,
-        {
-            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-            .bindingTypes = { deferredShadingBindingTypes, std::size(deferredShadingBindingTypes) },
-        });
-    _deferredShadingBindGroup = _bindGroupManager.store(std::move(deferredShadingDescriptorSets), std::move(deferredShadingMetadata));
+    _deferredShadingBindGroup = createBindGroup({
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        .bindingTypes = { deferredShadingBindingTypes, std::size(deferredShadingBindingTypes) },
+    });
+    auto& deferredShadingDescriptorSets = _bindGroupManager.get<DescriptorSets>(_deferredShadingBindGroup);
 
     for (int i = 0; i < IRHI::MaxFramesInFlight; ++i) {
         const auto& normalRTImageViewData = _textureManager.get<ImageView>(_gbufferRTs[i].normalRT);
@@ -366,11 +366,16 @@ VulkanRHI::VulkanRHI(const Window& Window)
             VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3);
     }
 
+    const auto& objectDataMetadataLayout = _bindGroupManager.get<BindGroupMetadata>(_cullingRenderDataBindGroup).layout;
+    const auto& frameDataMetadataLayout = _bindGroupManager.get<BindGroupMetadata>(_cullingFrameDataBindGroup).layout;
+    const auto& drawIndirectMetadataLayout = _bindGroupManager.get<BindGroupMetadata>(_drawIndirectCommandBindGroup).layout;
+    const auto& textureMetadataLayout = _bindGroupManager.get<BindGroupMetadata>(_albedoTextureBindGroup).layout;
+    const auto& drawRecordMetadataLayout = _bindGroupManager.get<BindGroupMetadata>(_drawRecordBindGroup).layout;
     const VkDescriptorSetLayout cullingLayouts[] = {
-        objectDataMetadata.layout,
-        frameDataMetadata.layout,
-        drawIndirectMetadata.layout,
-        drawRecordMetadata.layout,
+        objectDataMetadataLayout,
+        frameDataMetadataLayout,
+        drawIndirectMetadataLayout,
+        drawRecordMetadataLayout,
     };
     auto [cullingComputeShader, cullingComputeLayout] = VulkanComputeShader::create(_device,
         {
@@ -394,7 +399,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
         },
     };
 
-    const VkDescriptorSetLayout gbufferLayouts[] = { textureMetadata.layout, drawRecordMetadata.layout };
+    const VkDescriptorSetLayout gbufferLayouts[] = { textureMetadataLayout, drawRecordMetadataLayout };
     auto [gbufferShader, gbufferPipelineLayout] = VulkanShader::create(_device,
         {
             .vertexShaderPath = NH3D_DIR "src/rendering/shaders/default_gbuffer_deferred.vert.spv",
@@ -406,8 +411,9 @@ VulkanRHI::VulkanRHI(const Window& Window)
         });
     _gbufferShader = _shaderManager.store(std::move(gbufferShader), std::move(gbufferPipelineLayout));
 
+    const auto& deferredShadingMetadataLayout = _bindGroupManager.get<BindGroupMetadata>(_deferredShadingBindGroup).layout;
     const VkDescriptorSetLayout deferredShadingLayouts[] = {
-        deferredShadingMetadata.layout,
+        deferredShadingMetadataLayout,
     };
     auto [deferredShadingShader, deferredShadingPipelineLayout] = VulkanComputeShader::create(_device,
         {
@@ -415,11 +421,15 @@ VulkanRHI::VulkanRHI(const Window& Window)
             .descriptorSetsLayouts = { deferredShadingLayouts, std::size(deferredShadingLayouts) },
         });
     _deferredShadingCS = _computeShaderManager.store(std::move(deferredShadingShader), std::move(deferredShadingPipelineLayout));
+
+    _debugDrawer = std::make_unique<VulkanDebugDrawer>(this, VkExtent2D { Window.getWidth(), Window.getHeight() });
 }
 
 VulkanRHI::~VulkanRHI()
 {
     vkDeviceWaitIdle(_device);
+
+    _debugDrawer.reset();
 
     vkDestroySampler(_device, _linearSampler, nullptr);
     vkDestroySampler(_device, _nearestSampler, nullptr);
@@ -473,15 +483,15 @@ void VulkanRHI::executeImmediateCommandBuffer(const std::function<void(VkCommand
     vkResetCommandBuffer(_immediateCommandBuffer, 0);
 }
 
-VkCommandBuffer VulkanRHI::getCommandBuffer() const { return _commandBuffers[_frameId % MaxFramesInFlight]; }
+VkCommandBuffer VulkanRHI::getFrameCommandBuffer() const { return _commandBuffers[_frameId % MaxFramesInFlight]; }
 
 Handle<Texture> VulkanRHI::createTexture(const Texture::CreateInfo& info)
 {
     return createTexture({
         .format = MapTextureFormat(info.format),
         .extent = { info.size.x, info.size.y, info.size.z },
-        .usage = MapTextureUsageFlags(info.usage),
-        .aspect = MapTextureAspectFlags(info.aspect),
+        .usageFlags = MapTextureUsageFlags(info.usage),
+        .aspectFlags = MapTextureAspectFlags(info.aspect),
         .initialData = info.initialData,
         .generateMipMaps = info.generateMipMaps,
     });
@@ -501,8 +511,8 @@ Handle<Buffer> VulkanRHI::createBuffer(const Buffer::CreateInfo& info)
     auto&& [buffer, allocation] = VulkanBuffer::create(*this,
         {
             .size = info.size,
-            .usage = MapBufferUsageFlags(info.usage),
-            .memoryUsage = MapBufferMemoryUsage(info.memory),
+            .usage = MapBufferUsageFlags(info.usageFlags),
+            .memoryUsage = MapBufferMemoryUsage(info.memoryUsage),
             .initialData = info.initialData,
         });
 
@@ -531,7 +541,7 @@ void VulkanRHI::render(Scene& scene) const
         NH3D_ABORT_VK("Failed to acquire next swapchain image");
     }
 
-    VkCommandBuffer commandBuffer = getCommandBuffer();
+    VkCommandBuffer commandBuffer = getFrameCommandBuffer();
 
     beginCommandBuffer(commandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
@@ -598,8 +608,6 @@ void VulkanRHI::render(Scene& scene) const
 
     void* visibleFlagsPtr = VulkanBuffer::getMappedAddress(*this, visibleFlagStagingAllocation);
     std::memcpy(visibleFlagsPtr, scene.getRawVisibleFlags(), visibleFlagsBufferSize);
-    VulkanBuffer::insertMemoryBarrier(commandBuffer, visibleFlagStagingBuffer.buffer, VK_ACCESS_2_HOST_WRITE_BIT,
-        VK_PIPELINE_STAGE_2_HOST_BIT, VK_ACCESS_2_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT);
     VulkanBuffer::insertMemoryBarrier(commandBuffer, visibleFlagBuffer.buffer, VK_ACCESS_2_SHADER_READ_BIT,
         VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT);
     VulkanBuffer::copyBuffer(commandBuffer, visibleFlagStagingBuffer.buffer, visibleFlagBuffer.buffer, visibleFlagsBufferSize);
@@ -698,6 +706,8 @@ void VulkanRHI::render(Scene& scene) const
         VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
         VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, true);
 
+    vkCmdPushConstants(commandBuffer, graphicsLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mat4), &projectionMatrix);
+
     const VkRenderingAttachmentInfo colorAttachmentsInfo[] = {
         {
             .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
@@ -711,10 +721,7 @@ void VulkanRHI::render(Scene& scene) const
         },
     };
 
-    vkCmdPushConstants(commandBuffer, graphicsLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mat4), &projectionMatrix);
-
-    VulkanShader::draw(commandBuffer, graphicsPipeline,
-            {
+    VulkanShader::draw(commandBuffer, graphicsPipeline, {
                 .drawIndirectBuffer = drawIndirectBuffer.buffer,
                 .extent = { albedoRTMetadata.extent.width, albedoRTMetadata.extent.height },
                 .colorAttachments = { colorAttachmentsInfo, std::size(colorAttachmentsInfo) },
@@ -725,7 +732,6 @@ void VulkanRHI::render(Scene& scene) const
                 },
             });
 
-    // TODO: transition GBuffer textures for compute reading
     VulkanTexture::insertMemoryBarrier(commandBuffer, normalRTImageViewData.image, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
         VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_SHADER_READ_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
         VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
@@ -758,8 +764,12 @@ void VulkanRHI::render(Scene& scene) const
     VulkanComputeShader::dispatch(commandBuffer, deferredShadingPipeline, shadingKernelSize);
 
     VulkanTexture::insertMemoryBarrier(commandBuffer, finalRTImageViewData.image, VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
-        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_2_BLIT_BIT,
-        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
+        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
+    _debugDrawer->renderDebugUI(commandBuffer, frameInFlightId, _finalRTs[frameInFlightId]);
+    VulkanTexture::insertMemoryBarrier(commandBuffer, finalRTImageViewData.image, VK_ACCESS_2_SHADER_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_2_BLIT_BIT,
+        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
     const auto& scImageViewData = _textureManager.get<ImageView>(_swapchainTextures[swapchainImageId]);
     const auto& scMetadata = _textureManager.get<TextureMetadata>(_swapchainTextures[swapchainImageId]);
@@ -772,8 +782,8 @@ void VulkanRHI::render(Scene& scene) const
 
     vkEndCommandBuffer(commandBuffer);
     submitCommandBuffer(_graphicsQueue, makeSemaphoreSubmitInfo(_presentSemaphores[frameInFlightId], VK_PIPELINE_STAGE_2_BLIT_BIT),
-        makeSemaphoreSubmitInfo(_renderSemaphores[swapchainImageId], VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT), commandBuffer,
-        _frameFences[frameInFlightId]); // TODO: watch out for the ALL_GRAPHICS_BIT when doing Compute based shading
+        makeSemaphoreSubmitInfo(_renderSemaphores[swapchainImageId], VK_PIPELINE_STAGE_2_BLIT_BIT), commandBuffer,
+        _frameFences[frameInFlightId]);
 
     const VkPresentInfoKHR presentInfo {
         .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
@@ -786,6 +796,18 @@ void VulkanRHI::render(Scene& scene) const
     vkQueuePresentKHR(_presentQueue, &presentInfo);
 
     ++_frameId;
+}
+
+Handle<BindGroup> VulkanRHI::createBindGroup(const VulkanBindGroup::CreateInfo& info)
+{
+    auto&& [descriptorSets, metadata] = VulkanBindGroup::create(_device,
+        {
+            .stageFlags = info.stageFlags,
+            .bindingTypes = info.bindingTypes,
+            .finalBindingCount = info.finalBindingCount,
+        });
+
+    return _bindGroupManager.store(std::move(descriptorSets), std::move(metadata));
 }
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL vulkanValidationCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity,

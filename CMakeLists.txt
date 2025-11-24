@@ -8,24 +8,26 @@ set(NH3D_VERSION_PATCH 1)
 project(${NH3D_LIB} VERSION ${NH3D_VERSION_MAJOR}.${NH3D_VERSION_MINOR}.${NH3D_VERSION_PATCH} DESCRIPTION "")
 
 ## Library
-file(GLOB SRC 	${CMAKE_SOURCE_DIR}/src/scene/*.cpp
-    ${CMAKE_SOURCE_DIR}/src/scene/ecs/*.cpp
-    ${CMAKE_SOURCE_DIR}/src/scene/ecs/components/*.cpp
-    ${CMAKE_SOURCE_DIR}/src/core/*.cpp
-    ${CMAKE_SOURCE_DIR}/src/general/*.cpp
-    ${CMAKE_SOURCE_DIR}/src/utils/*.cpp
-    ${CMAKE_SOURCE_DIR}/src/rendering/*.cpp
-    ${CMAKE_SOURCE_DIR}/src/rendering/render_graph/*.cpp
-    ${CMAKE_SOURCE_DIR}/src/rendering/vulkan/*.cpp
-   )
+file(GLOB NH3D_SOURCES 	${CMAKE_SOURCE_DIR}/src/scene/*.cpp
+                        ${CMAKE_SOURCE_DIR}/src/scene/ecs/*.cpp
+                        ${CMAKE_SOURCE_DIR}/src/scene/ecs/components/*.cpp
+                        ${CMAKE_SOURCE_DIR}/src/core/*.cpp
+                        ${CMAKE_SOURCE_DIR}/src/general/*.cpp
+                        ${CMAKE_SOURCE_DIR}/src/utils/*.cpp
+                        ${CMAKE_SOURCE_DIR}/src/rendering/*.cpp
+                        ${CMAKE_SOURCE_DIR}/src/rendering/render_graph/*.cpp
+                        ${CMAKE_SOURCE_DIR}/src/rendering/vulkan/*.cpp
+                        ${CMAKE_SOURCE_DIR}/external/imgui/*.cpp
+)
 
-add_library(${NH3D_LIB} STATIC ${SRC})
+add_library(${NH3D_LIB} STATIC ${NH3D_SOURCES})
 
 target_compile_definitions(${NH3D_LIB} PRIVATE  -DNH3D_NAME="${NH3D_LIB}"
             -DNH3D_VERSION_MAJOR=${NH3D_VERSION_MAJOR}
             -DNH3D_VERSION_MINOR=${NH3D_VERSION_MINOR}
             -DNH3D_VERSION_PATCH=${NH3D_VERSION_PATCH}
-            -DNH3D_DIR="${CMAKE_SOURCE_DIR}/")
+            -DNH3D_DIR="${CMAKE_SOURCE_DIR}/"
+)
 
 
 set(NH3D_CXX_STANDARD cxx_std_20)
@@ -64,6 +66,7 @@ set(NH3D_INCLUDES 	${CMAKE_SOURCE_DIR}/src
      ${DEPENDENCIES_PATH}/VulkanMemoryAllocator/include
      ${DEPENDENCIES_PATH}/json/include
      ${DEPENDENCIES_PATH}/tinygltf
+     ${DEPENDENCIES_PATH}/imgui
 )
 target_include_directories(${NH3D_LIB} PRIVATE ${NH3D_INCLUDES})
 
@@ -72,7 +75,6 @@ set(NH3D_LIBRARIES  ${Vulkan_LIBRARIES}
      glfw
      SDL3::SDL3
      GPUOpen::VulkanMemoryAllocator
-
 )
 target_link_libraries(${NH3D_LIB} PRIVATE ${NH3D_LIBRARIES})
 
@@ -87,7 +89,10 @@ endif()
 
 ## Editor
 set(NH3D_EDITOR_BIN NH3D-Editor)
-add_executable(${NH3D_EDITOR_BIN} src/editor/main.cpp)
+file(GLOB NH3D_EDITOR_SOURCES ${CMAKE_SOURCE_DIR}/src/editor/main.cpp 
+                              ${CMAKE_SOURCE_DIR}/external/imgui/*.cpp
+)
+add_executable(${NH3D_EDITOR_BIN} ${NH3D_EDITOR_SOURCES})
 
 target_compile_features(${NH3D_EDITOR_BIN} PRIVATE ${NH3D_CXX_STANDARD})
 
