@@ -529,14 +529,14 @@ void VulkanRHI::render(Scene& scene) const
 
     const uint32_t frameInFlightId = _frameId % MaxFramesInFlight;
 
-    if (vkWaitForFences(_device, 1, &_frameFences[frameInFlightId], VK_TRUE, NH3D_MAX_T(uint64_t)) != VK_SUCCESS) {
+    if (vkWaitForFences(_device, 1, &_frameFences[frameInFlightId], VK_TRUE, NH3D_MAX_T(uint64)) != VK_SUCCESS) {
         NH3D_ABORT_VK("GPU stall detected");
     }
     vkResetFences(_device, 1, &_frameFences[frameInFlightId]);
 
     uint32_t swapchainImageId;
     // TODO: handle resize
-    if (vkAcquireNextImageKHR(_device, _swapchain, NH3D_MAX_T(uint64_t), _presentSemaphores[frameInFlightId], nullptr, &swapchainImageId)
+    if (vkAcquireNextImageKHR(_device, _swapchain, NH3D_MAX_T(uint64), _presentSemaphores[frameInFlightId], nullptr, &swapchainImageId)
         != VK_SUCCESS) {
         NH3D_ABORT_VK("Failed to acquire next swapchain image");
     }
@@ -901,7 +901,7 @@ std::pair<VkPhysicalDevice, VulkanRHI::PhysicalDeviceQueueFamilyID> VulkanRHI::s
     std::vector<VkQueueFamilyProperties> queueData { 16 };
 
     std::string selectedDeviceName;
-    uint32_t deviceId = NH3D_MAX_T(uint32_t);
+    uint32_t deviceId = NH3D_MAX_T(uint32);
 
     const VkQueueFlags requiredQueueFlags = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT;
 
@@ -914,7 +914,7 @@ std::pair<VkPhysicalDevice, VulkanRHI::PhysicalDeviceQueueFamilyID> VulkanRHI::s
 
         if (features.multiDrawIndirect
             && (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU
-                || (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU && deviceId == NH3D_MAX_T(uint32_t)))) {
+                || (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU && deviceId == NH3D_MAX_T(uint32)))) {
             uint32_t familyCount;
             vkGetPhysicalDeviceQueueFamilyProperties(availableGpus[i], &familyCount, nullptr);
 
@@ -942,7 +942,7 @@ std::pair<VkPhysicalDevice, VulkanRHI::PhysicalDeviceQueueFamilyID> VulkanRHI::s
         }
     }
 
-    if (deviceId == NH3D_MAX_T(uint32_t)) {
+    if (deviceId == NH3D_MAX_T(uint32)) {
         NH3D_ABORT_VK("Couldn't find a suitable physical device");
     }
 
@@ -955,7 +955,7 @@ std::pair<VkPhysicalDevice, VulkanRHI::PhysicalDeviceQueueFamilyID> VulkanRHI::s
 
 VkDevice VulkanRHI::createLogicalDevice(const VkPhysicalDevice gpu, const PhysicalDeviceQueueFamilyID queues) const
 {
-    std::unordered_set<uint32_t> queueIndices { queues.GraphicsQueueFamilyID, queues.PresentQueueFamilyID };
+    std::unordered_set<uint32> queueIndices { queues.GraphicsQueueFamilyID, queues.PresentQueueFamilyID };
 
     const float priority = 1.f;
     std::vector<VkDeviceQueueCreateInfo> queuesCreateInfo {};

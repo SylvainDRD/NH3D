@@ -8,17 +8,20 @@
 namespace NH3D {
 
 Window::Window()
-    : _width { 1600 }
-    , _height { 800 }
 {
     if (!SDL_Init(SDL_INIT_EVENTS)) {
         NH3D_ABORT("SDL init failed");
     }
 
-    _window = SDL_CreateWindow(NH3D_NAME, _width, _height, 0);
+    _window = SDL_CreateWindow(NH3D_NAME, 1600, 800, 0);
     if (!_window) {
         NH3D_ABORT("Window creation failed");
     }
+
+    int width, height;
+    SDL_GetWindowSizeInPixels(_window, &width, &height);
+    _width = static_cast<uint32_t>(width);
+    _height = static_cast<uint32_t>(height);
 
     NH3D_LOG("Window creation completed");
 }

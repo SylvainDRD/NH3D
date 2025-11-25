@@ -25,9 +25,9 @@ public:
 
     [[nodiscard]] VkSurfaceKHR createVkSurface(VkInstance instance) const;
 
-    [[nodiscard]] uint32_t getWidth() const;
+    [[nodiscard]] uint32 getWidth() const;
 
-    [[nodiscard]] uint32_t getHeight() const;
+    [[nodiscard]] uint32 getHeight() const;
 
     [[nodiscard]] bool pollEvents() const;
 
@@ -46,9 +46,9 @@ private:
 
     mutable vec2 _mousePosition;
 
-    uint32_t _width;
+    uint32 _width;
 
-    uint32_t _height;
+    uint32 _height;
 };
 
 }

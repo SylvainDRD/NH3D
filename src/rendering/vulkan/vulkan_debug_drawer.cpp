@@ -32,7 +32,7 @@ VulkanDebugDrawer::VulkanDebugDrawer(VulkanRHI* rhi, const VkExtent2D extent, co
     io.Fonts->GetTexDataAsRGBA32(&fontData, &fontTexWidth, &fontTexHeight);
     const uint32 uploadSize = 4 * fontTexWidth * fontTexHeight * sizeof(byte);
 
-    Handle<Texture> fontTexture = _rhi->createTexture(VulkanTexture::CreateInfo {
+    const Handle<Texture> fontTexture = _rhi->createTexture(VulkanTexture::CreateInfo {
         .format = VK_FORMAT_R8G8B8A8_UNORM,
         .extent = VkExtent3D { static_cast<uint32>(fontTexWidth), static_cast<uint32>(fontTexHeight), 1 },
         .usageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
@@ -275,8 +275,9 @@ void VulkanDebugDrawer::updateBuffers(const uint32 frameInFlightId)
             .usageFlags = BufferUsageFlagBits::VERTEX_BUFFER_BIT,
             .memoryUsage = BufferMemoryUsage::CPU_GPU,
         });
+    } else {
+        bufferManager.get<GPUBuffer>(_vertexBuffers[frameInFlightId]).size = vertexBufferSize;
     }
-    bufferManager.get<GPUBuffer>(_vertexBuffers[frameInFlightId]).size = vertexBufferSize;
 
     if (_indexBuffers[frameInFlightId] == InvalidHandle<Buffer>
         || bufferManager.get<BufferAllocationInfo>(_indexBuffers[frameInFlightId]).allocationInfo.size < indexBufferSize) {
@@ -289,8 +290,9 @@ void VulkanDebugDrawer::updateBuffers(const uint32 frameInFlightId)
             .usageFlags = BufferUsageFlagBits::INDEX_BUFFER_BIT,
             .memoryUsage = BufferMemoryUsage::CPU_GPU,
         });
+    } else {
+        bufferManager.get<GPUBuffer>(_indexBuffers[frameInFlightId]).size = indexBufferSize;
     }
-    bufferManager.get<GPUBuffer>(_indexBuffers[frameInFlightId]).size = indexBufferSize;
 
     // Update data
     const auto& vertexBufferAllocation = bufferManager.get<BufferAllocationInfo>(_vertexBuffers[frameInFlightId]);
