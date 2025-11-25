@@ -264,8 +264,9 @@ void VulkanDebugDrawer::updateBuffers(const uint32 frameInFlightId)
 
     auto& bufferManager = _rhi->getBufferManager();
 
+    // Note to self: VMA extra allocated memory is not safely usable
     if (_vertexBuffers[frameInFlightId] == InvalidHandle<Buffer>
-        || bufferManager.get<BufferAllocationInfo>(_vertexBuffers[frameInFlightId]).allocationInfo.size < vertexBufferSize) {
+        || bufferManager.get<GPUBuffer>(_vertexBuffers[frameInFlightId]).size < vertexBufferSize) {
         if (_vertexBuffers[frameInFlightId] != InvalidHandle<Buffer>) {
             _rhi->destroyBuffer(_vertexBuffers[frameInFlightId]);
         }
@@ -280,7 +281,7 @@ void VulkanDebugDrawer::updateBuffers(const uint32 frameInFlightId)
     }
 
     if (_indexBuffers[frameInFlightId] == InvalidHandle<Buffer>
-        || bufferManager.get<BufferAllocationInfo>(_indexBuffers[frameInFlightId]).allocationInfo.size < indexBufferSize) {
+        || bufferManager.get<GPUBuffer>(_indexBuffers[frameInFlightId]).size < indexBufferSize) {
         if (_indexBuffers[frameInFlightId] != InvalidHandle<Buffer>) {
             _rhi->destroyBuffer(_indexBuffers[frameInFlightId]);
         }
