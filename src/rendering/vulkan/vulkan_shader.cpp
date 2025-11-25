@@ -8,6 +8,10 @@ namespace NH3D {
 
     const VkPipelineVertexInputStateCreateInfo vertexCI {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+        .vertexBindingDescriptionCount = shaderInfo.vertexInputInfo.bindingDescriptions.size,
+        .pVertexBindingDescriptions = shaderInfo.vertexInputInfo.bindingDescriptions.ptr,
+        .vertexAttributeDescriptionCount = shaderInfo.vertexInputInfo.attributeDescriptions.size,
+        .pVertexAttributeDescriptions = shaderInfo.vertexInputInfo.attributeDescriptions.ptr,
     };
 
     const VkPipelineInputAssemblyStateCreateInfo iasCI {
@@ -19,7 +23,7 @@ namespace NH3D {
     const VkPipelineRasterizationStateCreateInfo rasterCI {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
         .polygonMode = VK_POLYGON_MODE_FILL,
-        .cullMode = VK_CULL_MODE_BACK_BIT,
+        .cullMode = shaderInfo.cullMode,
         .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
         .lineWidth = 1.f,
     };
@@ -41,8 +45,8 @@ namespace NH3D {
 
     const VkPipelineDepthStencilStateCreateInfo depthStencilCI {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-        .depthTestEnable = VK_TRUE,
-        .depthWriteEnable = VK_TRUE,
+        .depthTestEnable = shaderInfo.depthAttachmentFormat != VK_FORMAT_UNDEFINED ? VK_TRUE : VK_FALSE,
+        .depthWriteEnable = shaderInfo.depthAttachmentFormat != VK_FORMAT_UNDEFINED ? VK_TRUE : VK_FALSE,
         .depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL, // reverse Z?
         .depthBoundsTestEnable = VK_FALSE,
         .stencilTestEnable = VK_FALSE,
@@ -58,6 +62,12 @@ namespace NH3D {
     for (uint32 i = 0; i < shaderInfo.colorAttachmentFormats.size; ++i) {
         blendAttachments[i] = VkPipelineColorBlendAttachmentState {
             .blendEnable = shaderInfo.colorAttachmentFormats.ptr[i].blendEnable,
+            .srcColorBlendFactor = shaderInfo.colorAttachmentFormats.ptr[i].srcColorBlendFactor,
+            .dstColorBlendFactor = shaderInfo.colorAttachmentFormats.ptr[i].dstColorBlendFactor,
+            .colorBlendOp = shaderInfo.colorAttachmentFormats.ptr[i].colorBlendOp,
+            .srcAlphaBlendFactor = shaderInfo.colorAttachmentFormats.ptr[i].srcAlphaBlendFactor,
+            .dstAlphaBlendFactor = shaderInfo.colorAttachmentFormats.ptr[i].dstAlphaBlendFactor,
+            .alphaBlendOp = shaderInfo.colorAttachmentFormats.ptr[i].alphaBlendOp,
             .colorWriteMask = shaderInfo.colorAttachmentFormats.ptr[i].colorWriteMask,
         };
     }
@@ -66,14 +76,14 @@ namespace NH3D {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
         .logicOpEnable = VK_FALSE, // TODO: mmmmh
         .logicOp = VK_LOGIC_OP_COPY,
-        .attachmentCount = static_cast<uint32_t>(shaderInfo.colorAttachmentFormats.size),
+        .attachmentCount = shaderInfo.colorAttachmentFormats.size,
         .pAttachments = blendAttachments.data(),
     };
 
     const VkDynamicState dynState[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
     const VkPipelineDynamicStateCreateInfo dynStateCI {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-        .dynamicStateCount = sizeof(dynState) / sizeof(VkDynamicState),
+        .dynamicStateCount = std::size(dynState),
         .pDynamicStates = dynState,
     };
 

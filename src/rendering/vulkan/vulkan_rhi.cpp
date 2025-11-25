@@ -422,7 +422,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
         });
     _deferredShadingCS = _computeShaderManager.store(std::move(deferredShadingShader), std::move(deferredShadingPipelineLayout));
 
-    _debugDrawer = std::make_unique<VulkanDebugDrawer>(this, VkExtent2D { Window.getWidth(), Window.getHeight() });
+    _debugDrawer = std::make_unique<VulkanDebugDrawer>(this, VkExtent2D { Window.getWidth(), Window.getHeight() }, surfaceFormat);
 }
 
 VulkanRHI::~VulkanRHI()
@@ -764,12 +764,8 @@ void VulkanRHI::render(Scene& scene) const
     VulkanComputeShader::dispatch(commandBuffer, deferredShadingPipeline, shadingKernelSize);
 
     VulkanTexture::insertMemoryBarrier(commandBuffer, finalRTImageViewData.image, VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
-        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
-    _debugDrawer->renderDebugUI(commandBuffer, frameInFlightId, _finalRTs[frameInFlightId]);
-    VulkanTexture::insertMemoryBarrier(commandBuffer, finalRTImageViewData.image, VK_ACCESS_2_SHADER_WRITE_BIT,
-        VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_2_BLIT_BIT,
-        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_2_BLIT_BIT,
+        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
 
     const auto& scImageViewData = _textureManager.get<ImageView>(_swapchainTextures[swapchainImageId]);
     const auto& scMetadata = _textureManager.get<TextureMetadata>(_swapchainTextures[swapchainImageId]);
@@ -778,7 +774,14 @@ void VulkanRHI::render(Scene& scene) const
     VulkanTexture::blit(commandBuffer, finalRTImageViewData.image, finalRTMetadata.extent, scImageViewData.image, scMetadata.extent);
 
     VulkanTexture::insertMemoryBarrier(commandBuffer, scImageViewData.image, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_BLIT_BIT,
-        VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_NONE, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    _debugDrawer->renderDebugUI(commandBuffer, frameInFlightId, _swapchainTextures[swapchainImageId]);
+
+    VulkanTexture::insertMemoryBarrier(commandBuffer, scImageViewData.image, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_NONE, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
     vkEndCommandBuffer(commandBuffer);
     submitCommandBuffer(_graphicsQueue, makeSemaphoreSubmitInfo(_presentSemaphores[frameInFlightId], VK_PIPELINE_STAGE_2_BLIT_BIT),

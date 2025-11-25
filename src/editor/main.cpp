@@ -57,10 +57,14 @@ int main()
     scene.create(
         RenderComponent { meshData, Material { .albedo = color3 { 1.0f, 0.0f, 0.0f } } }, TransformComponent { { 0.0f, 0.0f, 0.8f } });
 
+    ImGuiIO& io = ImGui::GetIO();
+    io.IniFilename = NH3D_DIR "imgui.ini";
+
     do {
+        // Pass values to be displayed in imGui
         ImGui::NewFrame();
         ImGui::ShowDemoWindow();
-        // ImGui::End();
+        // ImGui::End(); Conflicts with ShowDemoWindow
         ImGui::Render();
     } while (engine.update());
 

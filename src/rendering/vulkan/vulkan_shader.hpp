@@ -12,19 +12,32 @@ struct VulkanShader : public VulkanPipeline {
     using ResourceType = Shader;
 
     struct ColorAttachmentInfo {
-        VkFormat format;
-        VkColorComponentFlags colorWriteMask;
-        bool blendEnable;
+        const VkFormat format;
+        const VkColorComponentFlags colorWriteMask;
+        const VkBlendFactor srcColorBlendFactor;
+        const VkBlendFactor dstColorBlendFactor;
+        const VkBlendOp colorBlendOp;
+        const VkBlendFactor srcAlphaBlendFactor;
+        const VkBlendFactor dstAlphaBlendFactor;
+        const VkBlendOp alphaBlendOp;
+        const VkBool32 blendEnable;
+    };
+
+    struct VertexInputInfo {
+        const ArrayWrapper<VkVertexInputBindingDescription> bindingDescriptions;
+        const ArrayWrapper<VkVertexInputAttributeDescription> attributeDescriptions;
     };
 
     struct ShaderInfo {
         const std::filesystem::path& vertexShaderPath;
         const std::filesystem::path& fragmentShaderPath;
-        ArrayWrapper<ColorAttachmentInfo> colorAttachmentFormats;
-        VkFormat depthAttachmentFormat;
-        VkFormat stencilAttachmentFormat;
-        ArrayWrapper<VkDescriptorSetLayout> descriptorSetsLayouts;
-        ArrayWrapper<VkPushConstantRange> pushConstantRanges;
+        const VertexInputInfo vertexInputInfo;
+        const VkCullModeFlags cullMode = VK_CULL_MODE_BACK_BIT;
+        const ArrayWrapper<ColorAttachmentInfo> colorAttachmentFormats;
+        const VkFormat depthAttachmentFormat;
+        const VkFormat stencilAttachmentFormat;
+        const ArrayWrapper<VkDescriptorSetLayout> descriptorSetsLayouts;
+        const ArrayWrapper<VkPushConstantRange> pushConstantRanges;
     };
 
     /// "Constructor"

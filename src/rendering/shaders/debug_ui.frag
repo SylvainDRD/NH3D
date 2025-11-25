@@ -12,5 +12,5 @@ layout(location = 0) out vec4 outColor;
 
 void main()
 {
-    outColor = inColor * texture(fontSampler, inUV);
+    outColor = pow(inColor * texture(fontSampler, inUV), vec4(2.2, 2.2, 2.2, 1.0)); // Reverse sRGB gamma correction, a bit hacky but heh
 }

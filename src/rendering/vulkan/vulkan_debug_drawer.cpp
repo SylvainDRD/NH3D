@@ -11,10 +11,9 @@ namespace NH3D {
 struct ImGuiPushConstants {
     vec2 scale;
     vec2 translate;
-    VkDeviceAddress vertexBuffer;
 };
 
-VulkanDebugDrawer::VulkanDebugDrawer(VulkanRHI* rhi, const VkExtent2D& extent)
+VulkanDebugDrawer::VulkanDebugDrawer(VulkanRHI* rhi, const VkExtent2D extent, const VkFormat attachmentFormat)
     : _rhi(rhi)
 {
     ImGui::CreateContext();
@@ -23,22 +22,10 @@ VulkanDebugDrawer::VulkanDebugDrawer(VulkanRHI* rhi, const VkExtent2D& extent)
     io.FontGlobalScale = 1.0f;
     ImGuiStyle& style = ImGui::GetStyle();
     style.ScaleAllSizes(1.0f);
-    io.DisplaySize = ImVec2 { static_cast<float>(extent.width), static_cast<float>(extent.height) }; // TODO: handle resize
-    io.DisplayFramebufferScale = ImVec2 { 1.0f, 1.0f };
+    ImGui::StyleColorsDark();
 
-    // TODO: check if necessary
-    // #if defined(_WIN32)
-    //     // If we directly work with os specific key codes, we need to map special key types like tab
-    //     io.KeyMap[ImGuiKey_Tab] = VK_TAB;
-    //     io.KeyMap[ImGuiKey_LeftArrow] = VK_LEFT;
-    //     io.KeyMap[ImGuiKey_RightArrow] = VK_RIGHT;
-    //     io.KeyMap[ImGuiKey_UpArrow] = VK_UP;
-    //     io.KeyMap[ImGuiKey_DownArrow] = VK_DOWN;
-    //     io.KeyMap[ImGuiKey_Backspace] = VK_BACK;
-    //     io.KeyMap[ImGuiKey_Enter] = VK_RETURN;
-    //     io.KeyMap[ImGuiKey_Space] = VK_SPACE;
-    //     io.KeyMap[ImGuiKey_Delete] = VK_DELETE;
-    // #endif
+    io.DisplaySize = ImVec2 { float(extent.width), float(extent.height) }; // TODO: handle resize
+    io.DisplayFramebufferScale = ImVec2 { 1.0f, 1.0f };
 
     byte* fontData;
     int fontTexWidth, fontTexHeight;
@@ -87,11 +74,50 @@ VulkanDebugDrawer::VulkanDebugDrawer(VulkanRHI* rhi, const VkExtent2D& extent)
             _rhi->getVkDevice(), descriptorSets.sets[i], fontImageInfo, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0);
     }
 
+    const VkVertexInputBindingDescription bindingDescriptions[] = {
+        {
+            .binding = 0,
+            .stride = sizeof(ImDrawVert),
+            .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+        },
+    };
+    const VkVertexInputAttributeDescription attributeDescriptions[] = {
+        {
+            .location = 0,
+            .binding = 0,
+            .format = VK_FORMAT_R32G32_SFLOAT,
+            .offset = offsetof(ImDrawVert, pos),
+        },
+        {
+            .location = 1,
+            .binding = 0,
+            .format = VK_FORMAT_R32G32_SFLOAT,
+            .offset = offsetof(ImDrawVert, uv),
+        },
+        {
+            .location = 2,
+            .binding = 0,
+            .format = VK_FORMAT_R8G8B8A8_UNORM,
+            .offset = offsetof(ImDrawVert, col),
+        },
+    };
+
+    const VulkanShader::VertexInputInfo vertexInputInfo {
+        .bindingDescriptions = { bindingDescriptions, std::size(bindingDescriptions) },
+        .attributeDescriptions = { attributeDescriptions, std::size(attributeDescriptions) },
+    };
+
     const VulkanShader::ColorAttachmentInfo colorAttachmentInfo[] = {
         {
-            .format = VK_FORMAT_R16G16B16A16_SFLOAT, // TODO: pass as param
+            .format = attachmentFormat,
             .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
-            .blendEnable = true,
+            .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+            .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+            .colorBlendOp = VK_BLEND_OP_ADD,
+            .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+            .dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+            .alphaBlendOp = VK_BLEND_OP_ADD,
+            .blendEnable = VK_TRUE,
         },
     };
     const VkDescriptorSetLayout bindingLayouts[] = {
@@ -109,6 +135,8 @@ VulkanDebugDrawer::VulkanDebugDrawer(VulkanRHI* rhi, const VkExtent2D& extent)
         VulkanShader::ShaderInfo {
             .vertexShaderPath = NH3D_DIR "src/rendering/shaders/debug_ui.vert.spv",
             .fragmentShaderPath = NH3D_DIR "src/rendering/shaders/debug_ui.frag.spv",
+            .vertexInputInfo = vertexInputInfo,
+            .cullMode = VK_CULL_MODE_NONE,
             .colorAttachmentFormats = { colorAttachmentInfo, std::size(colorAttachmentInfo) },
             .descriptorSetsLayouts = { bindingLayouts, std::size(bindingLayouts) },
             .pushConstantRanges = { pushConstantRange, std::size(pushConstantRange) },
@@ -128,7 +156,7 @@ VulkanDebugDrawer::~VulkanDebugDrawer()
     _rhi = nullptr;
 }
 
-void VulkanDebugDrawer::renderDebugUI(VkCommandBuffer commandBuffer, const uint32_t frameInFlightId, const Handle<Texture> outputRT)
+void VulkanDebugDrawer::renderDebugUI(VkCommandBuffer commandBuffer, const uint32_t frameInFlightId, const Handle<Texture> renderTarget)
 {
     ImDrawData* drawData = ImGui::GetDrawData();
 
@@ -137,7 +165,7 @@ void VulkanDebugDrawer::renderDebugUI(VkCommandBuffer commandBuffer, const uint3
     }
 
     ImGuiIO& io = ImGui::GetIO();
-    updateBuffersCapacity(frameInFlightId);
+    updateBuffers(frameInFlightId);
 
     auto& bindGroupManager = _rhi->getBindGroupManager();
     auto& shaderManager = _rhi->getShaderManager();
@@ -151,18 +179,18 @@ void VulkanDebugDrawer::renderDebugUI(VkCommandBuffer commandBuffer, const uint3
     VulkanBindGroup::bind(commandBuffer, { &fontDescriptorSet, 1 }, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout);
 
     auto& textureManager = _rhi->getTextureManager();
-    const auto& outputRTImageViewData = textureManager.get<ImageView>(outputRT);
-    const auto& outputRTMetadata = textureManager.get<TextureMetadata>(outputRT);
+    const auto& rtImageViewData = textureManager.get<ImageView>(renderTarget);
+    const auto& rtMetadata = textureManager.get<TextureMetadata>(renderTarget);
     const VkRenderingAttachmentInfo colorAttachmentsInfo[] = {
         {
             .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-            .imageView = outputRTImageViewData.view,
+            .imageView = rtImageViewData.view,
             .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         },
     };
     const VkRenderingInfo renderingInfo {
         .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-        .renderArea = VkRect2D { {}, outputRTMetadata.extent.width, outputRTMetadata.extent.height },
+        .renderArea = VkRect2D { {}, { rtMetadata.extent.width, rtMetadata.extent.height } },
         .layerCount = 1,
         .colorAttachmentCount = std::size(colorAttachmentsInfo),
         .pColorAttachments = colorAttachmentsInfo,
@@ -186,14 +214,15 @@ void VulkanDebugDrawer::renderDebugUI(VkCommandBuffer commandBuffer, const uint3
     };
     vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
-    const VkDeviceSize offset = 0;
-    vkCmdBindIndexBuffer(commandBuffer, bufferManager.get<GPUBuffer>(_indexBuffers[frameInFlightId]).buffer, offset,
+    const VkDeviceSize offsets[] = { 0 };
+    vkCmdBindVertexBuffers(commandBuffer, 0, 1, &bufferManager.get<GPUBuffer>(_vertexBuffers[frameInFlightId]).buffer, offsets);
+    vkCmdBindIndexBuffer(commandBuffer, bufferManager.get<GPUBuffer>(_indexBuffers[frameInFlightId]).buffer, 0,
         VK_INDEX_TYPE_UINT16); // can use 16 bits indices in indexed drawing
 
     const VkDeviceAddress vertexBufferAddress
         = VulkanBuffer::getDeviceAddress(*_rhi, bufferManager.get<GPUBuffer>(_vertexBuffers[frameInFlightId]).buffer);
 
-    int32 vertexByteOffset = 0;
+    int32 vertexOffset = 0;
     int32 indexOffset = 0;
     for (uint32 i = 0; i < drawData->CmdListsCount; ++i) {
         const ImDrawList* drawList = drawData->CmdLists[i];
@@ -213,21 +242,17 @@ void VulkanDebugDrawer::renderDebugUI(VkCommandBuffer commandBuffer, const uint3
             };
             vkCmdSetScissor(commandBuffer, 0, 1, &scissorRect);
 
-            const VkDeviceAddress vertexBufferOffsetAddress = vertexBufferAddress + vertexByteOffset;
-            vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
-                sizeof(ImGuiPushConstants) - sizeof(VkDeviceAddress), sizeof(VkDeviceAddress), &vertexBufferOffsetAddress);
-
-            vkCmdDrawIndexed(commandBuffer, drawCmd->ElemCount, 1, indexOffset, 0, 0);
+            vkCmdDrawIndexed(commandBuffer, drawCmd->ElemCount, 1, indexOffset, vertexOffset, 0);
 
             indexOffset += drawCmd->ElemCount;
         }
-        vertexByteOffset += drawList->VtxBuffer.Size * sizeof(ImDrawVert);
+        vertexOffset += drawList->VtxBuffer.Size;
     }
 
     vkCmdEndRendering(commandBuffer);
 }
 
-void VulkanDebugDrawer::updateBuffersCapacity(const uint32 frameInFlightId)
+void VulkanDebugDrawer::updateBuffers(const uint32 frameInFlightId)
 {
     const ImDrawData* drawData = ImGui::GetDrawData();
     const uint32 vertexBufferSize = static_cast<uint32>(drawData->TotalVtxCount) * sizeof(ImDrawVert);

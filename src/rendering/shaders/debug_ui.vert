@@ -1,24 +1,15 @@
 #version 460
-#extension GL_EXT_buffer_reference : require
-#extension GL_EXT_scalar_block_layout : require
 
 // Directly inspired from Shascha Willems' Vulkan examples
 // https://github.com/SaschaWillems/Vulkan
 
-struct ImGuiVertex {
-    vec2 pos;
-    vec2 uv;
-    vec4 col;
-};
+layout(location = 0) in vec2 inPosition;
+layout(location = 1) in vec2 inUV;
+layout(location = 2) in vec4 inColor;
 
-layout(buffer_reference, scalar) readonly buffer VertexBuffer {
-    ImGuiVertex vertices[];
-};
-
-layout(push_constant) uniform PushConstants {
+layout(push_constant, std430) uniform PushConstants {
     vec2 scale;
     vec2 translate;
-    VertexBuffer vertexBuffer;
 } pushConstants;
 
 layout(location = 0) out vec2 outUV;
@@ -26,9 +17,7 @@ layout(location = 1) out vec4 outColor;
 
 void main()
 {
-    ImGuiVertex vertex = pushConstants.vertexBuffer.vertices[gl_VertexIndex];
-
-    outUV = vertex.uv;
-    outColor = vertex.col;
-    gl_Position = vec4(vertex.pos * pushConstants.scale + pushConstants.translate, 0.0, 1.0);
+    outUV = inUV;
+    outColor = inColor;
+    gl_Position = vec4(inPosition * pushConstants.scale + pushConstants.translate, 0.0, 1.0);
 }

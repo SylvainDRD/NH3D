@@ -54,7 +54,7 @@ struct VulkanBindGroup {
 
     template <typename T>
     static inline void updateDescriptorSet(
-        VkDevice device, const VkDescriptorSet descriptorSet, const T& info, const VkDescriptorType type, uint32 binding = 0)
+        VkDevice device, const VkDescriptorSet descriptorSet, const T& info, const VkDescriptorType type, uint32 binding)
     {
         const VkWriteDescriptorSet descWrite = createWriteDescriptorSet(descriptorSet, info, type, binding);
         vkUpdateDescriptorSets(device, 1, &descWrite, 0, nullptr);
@@ -62,7 +62,7 @@ struct VulkanBindGroup {
 
     template <typename T>
     static inline void registerBufferedUpdate(
-        const DescriptorSets& descriptorSets, const T& info, const VkDescriptorType type, uint32_t binding = 0)
+        const DescriptorSets& descriptorSets, const T& info, const VkDescriptorType type, uint32 binding)
     {
         for (uint32 i = 0; i < IRHI::MaxFramesInFlight; ++i) {
             VkWriteDescriptorSet descWrite = createWriteDescriptorSet(descriptorSets.sets[i], info, type, binding);

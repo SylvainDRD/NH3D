@@ -18,15 +18,15 @@ class VulkanDebugDrawer {
 public:
     VulkanDebugDrawer() = delete;
 
-    VulkanDebugDrawer(VulkanRHI* rhi, const VkExtent2D& extent);
+    VulkanDebugDrawer(VulkanRHI* rhi, const VkExtent2D extent, const VkFormat attachmentFormat);
 
     ~VulkanDebugDrawer();
 
-    void renderDebugUI(VkCommandBuffer commandBuffer, const uint32 frameInFlightId, const Handle<Texture> outputRT);
+    void renderDebugUI(VkCommandBuffer commandBuffer, const uint32 frameInFlightId, const Handle<Texture> renderTarget);
 
 private:
     // Reallocates if necessary
-    void updateBuffersCapacity(const uint32 bufferId);
+    void updateBuffers(const uint32 bufferId);
 
 private:
     VulkanRHI* _rhi;
