@@ -57,16 +57,25 @@ int main()
     scene.create(
         RenderComponent { meshData, Material { .albedo = color3 { 1.0f, 0.0f, 0.0f } } }, TransformComponent { { 0.0f, 0.0f, 0.8f } });
 
-    ImGuiIO& io = ImGui::GetIO();
-    io.IniFilename = NH3D_DIR "imgui.ini";
+    const Window& window = engine.getWindow();
 
-    do {
-        // Pass values to be displayed in imGui
+    ImGuiIO& io = ImGui::GetIO();
+    io.IniFilename = nullptr;
+
+    while (engine.update()) {
+        vec2 mousePos = window.getMousePosition();
+        io.DeltaTime = static_cast<float>(engine.deltaTime());
+        io.MousePos = { mousePos.x, mousePos.y };
+        io.MouseDown[ImGuiMouseButton_Left] = window.isMouseButtonPressed(MouseButton::Left);
+        io.MouseDown[ImGuiMouseButton_Right] = window.isMouseButtonPressed(MouseButton::Right);
+        io.MouseDown[ImGuiMouseButton_Middle] = window.isMouseButtonPressed(MouseButton::Middle);
+
         ImGui::NewFrame();
+
         ImGui::ShowDemoWindow();
         // ImGui::End(); Conflicts with ShowDemoWindow
         ImGui::Render();
-    } while (engine.update());
+    }
 
     return 0;
 }

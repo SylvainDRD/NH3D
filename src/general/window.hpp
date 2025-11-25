@@ -1,12 +1,20 @@
 #pragma once
 
+#include <SDL3/SDL.h>
+#include <functional>
+#include <misc/types.hpp>
 #include <misc/utils.hpp>
-#include <vulkan/vulkan_core.h>
-#define GLFW_INCLUDE_NONE
-#include <GLFW/glfw3.h>
+#include <vector>
 #include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan_core.h>
 
 namespace NH3D {
+
+enum class MouseButton {
+    Left = SDL_BUTTON_LMASK,
+    Middle = SDL_BUTTON_MMASK,
+    Right = SDL_BUTTON_RMASK,
+};
 
 class Window {
     NH3D_NO_COPY_MOVE(Window)
@@ -17,22 +25,30 @@ public:
 
     [[nodiscard]] VkSurfaceKHR createVkSurface(VkInstance instance) const;
 
-    [[nodiscard]] inline uint32_t getWidth() const { return _width; }
+    [[nodiscard]] uint32_t getWidth() const;
 
-    [[nodiscard]] inline uint32_t getHeight() const { return _height; }
+    [[nodiscard]] uint32_t getHeight() const;
 
-    inline void update() { glfwPollEvents(); }
+    [[nodiscard]] bool pollEvents() const;
 
-    [[nodiscard]] inline bool windowClosing() const { return glfwWindowShouldClose(_window); }
+    [[nodiscard]] bool isKeyPressed(const SDL_Scancode key) const;
+
+    [[nodiscard]] bool isMouseButtonPressed(const MouseButton button) const;
+
+    [[nodiscard]] vec2 getMousePosition() const;
 
     [[nodiscard]] std::vector<const char*> requiredVulkanExtensions() const;
 
 private:
-    GLFWwindow* _window;
+    SDL_Window* _window;
+
+    mutable SDL_MouseButtonFlags _mouseButtonState;
+
+    mutable vec2 _mousePosition;
 
     uint32_t _width;
 
     uint32_t _height;
 };
 
-} 
+}

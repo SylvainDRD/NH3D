@@ -50,7 +50,6 @@ find_package(Vulkan REQUIRED)
 set(DEPENDENCIES_PATH ${CMAKE_SOURCE_DIR}/external)
 
 add_subdirectory(${DEPENDENCIES_PATH}/glm)
-add_subdirectory(${DEPENDENCIES_PATH}/glfw)
 add_subdirectory(${DEPENDENCIES_PATH}/VulkanMemoryAllocator)
 add_subdirectory(${DEPENDENCIES_PATH}/json)
 add_subdirectory(${DEPENDENCIES_PATH}/SDL EXCLUDE_FROM_ALL)
@@ -62,24 +61,20 @@ add_subdirectory(${DEPENDENCIES_PATH}/tinygltf)
 set(NH3D_INCLUDES 	${CMAKE_SOURCE_DIR}/src
      ${Vulkan_INCLUDE_DIRS}
      ${DEPENDENCIES_PATH}/glm
-     ${DEPENDENCIES_PATH}/glfw/include
      ${DEPENDENCIES_PATH}/VulkanMemoryAllocator/include
      ${DEPENDENCIES_PATH}/json/include
      ${DEPENDENCIES_PATH}/tinygltf
      ${DEPENDENCIES_PATH}/imgui
+     ${DEPENDENCIES_PATH}/SDL/include
 )
 target_include_directories(${NH3D_LIB} PRIVATE ${NH3D_INCLUDES})
 
 set(NH3D_LIBRARIES  ${Vulkan_LIBRARIES}
      glm
-     glfw
      SDL3::SDL3
      GPUOpen::VulkanMemoryAllocator
 )
 target_link_libraries(${NH3D_LIB} PRIVATE ${NH3D_LIBRARIES})
-
-set(NH3D_DEPENDENCIES glfw)
-add_dependencies(${NH3D_LIB} ${NH3D_DEPENDENCIES})
 
 ## Test suite
 if(TRUE)

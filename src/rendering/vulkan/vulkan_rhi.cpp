@@ -1045,6 +1045,24 @@ std::pair<VkSwapchainKHR, VkFormat> VulkanRHI::createSwapchain(const VkDevice de
         NH3D_ABORT_VK("Couldn't find a supported surface format");
     }
 
+    // From Vulkan samples
+    uint32 presentModeCount;
+    vkGetPhysicalDeviceSurfacePresentModesKHR(gpu, surface, &presentModeCount, nullptr);
+
+    std::vector<VkPresentModeKHR> presentModes { presentModeCount };
+    vkGetPhysicalDeviceSurfacePresentModesKHR(gpu, surface, &presentModeCount, presentModes.data());
+
+    VkPresentModeKHR swapchainPresentMode = VK_PRESENT_MODE_FIFO_KHR;
+    for (uint32 i = 0; i < presentModeCount; i++) {
+        if (presentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR) {
+            swapchainPresentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+            break;
+        }
+        if (presentModes[i] == VK_PRESENT_MODE_IMMEDIATE_KHR) {
+            swapchainPresentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+        }
+    }
+
     VkSwapchainCreateInfoKHR swapchainCreateInfo {
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
         .surface = surface,
@@ -1058,7 +1076,7 @@ std::pair<VkSwapchainKHR, VkFormat> VulkanRHI::createSwapchain(const VkDevice de
         .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
         .preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
         .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-        .presentMode = VK_PRESENT_MODE_FIFO_KHR, // TODO: allow uncapped framerate
+        .presentMode = swapchainPresentMode,
         .clipped = VK_TRUE,
         .oldSwapchain = previousSwapchain,
     };

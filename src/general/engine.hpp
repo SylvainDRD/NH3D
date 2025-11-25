@@ -16,22 +16,32 @@ public:
 
     ~Engine();
 
-    [[nodiscard]] IRHI& getRHI() const;
+    [[nodiscard]] Window& getWindow();
 
-    [[nodiscard]] Scene& getMainScene() const;
+    [[nodiscard]] IRHI& getRHI();
 
-    ResourceMapper& getResourceMapper() const;
+    [[nodiscard]] Scene& getMainScene();
+
+    ResourceMapper& getResourceMapper();
 
     [[nodiscard]] bool update();
+
+    // In seconds, only valid after the first update() call
+    [[nodiscard]] float deltaTime() const;
 
 private:
     Window _window;
 
     Uptr<IRHI> _rhi;
 
-    mutable Scene _mainScene;
+    Scene _mainScene;
 
     Uptr<ResourceMapper> _resourceMapper;
+
+    std::chrono::time_point<std::chrono::high_resolution_clock> _lastFrameStartTime {};
+
+    // in seconds
+    float _deltaTime = NAN;
 };
 
 }

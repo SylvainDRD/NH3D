@@ -17,20 +17,28 @@ Engine::Engine()
 
 Engine::~Engine() { }
 
-IRHI& Engine::getRHI() const { return *_rhi; }
+Window& Engine::getWindow() { return _window; }
 
-Scene& Engine::getMainScene() const { return _mainScene; }
+IRHI& Engine::getRHI() { return *_rhi; }
 
-ResourceMapper& Engine::getResourceMapper() const { return *_resourceMapper; }
+Scene& Engine::getMainScene() { return _mainScene; }
+
+ResourceMapper& Engine::getResourceMapper() { return *_resourceMapper; }
 
 bool Engine::update()
 {
-    if (!_window.windowClosing()) {
+    const auto currentTime = std::chrono::high_resolution_clock::now();
+    const std::chrono::duration<float, std::milli> deltaTime = currentTime - _lastFrameStartTime;
+    _deltaTime = deltaTime.count() / 1000.0;
+
+    _lastFrameStartTime = std::chrono::high_resolution_clock::now();
+    if (!_window.pollEvents()) {
         _rhi->render(_mainScene);
-        _window.update();
         return true;
     }
     return false;
 }
 
-}
+float Engine::deltaTime() const { return _deltaTime; }
+
+} // namespace NH3D

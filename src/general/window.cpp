@@ -1,5 +1,6 @@
 #include "window.hpp"
-#include <GLFW/glfw3.h>
+#include <SDL3/SDL_vulkan.h>
+#include <misc/types.hpp>
 #include <misc/utils.hpp>
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -10,14 +11,11 @@ Window::Window()
     : _width { 1600 }
     , _height { 800 }
 {
-    if (!glfwInit()) {
-        NH3D_ABORT("GLFW init failed");
+    if (!SDL_Init(SDL_INIT_EVENTS)) {
+        NH3D_ABORT("SDL init failed");
     }
 
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE); // TODO
-    _window = glfwCreateWindow(_width, _height, NH3D_NAME, nullptr, nullptr);
-
+    _window = SDL_CreateWindow(NH3D_NAME, _width, _height, 0);
     if (!_window) {
         NH3D_ABORT("Window creation failed");
     }
@@ -27,21 +25,56 @@ Window::Window()
 
 Window::~Window()
 {
-    glfwDestroyWindow(_window);
-    glfwTerminate();
+    SDL_DestroyWindow(_window);
+    SDL_Quit();
 }
+
+[[nodiscard]] uint32_t Window::getWidth() const { return _width; }
+
+[[nodiscard]] uint32_t Window::getHeight() const { return _height; }
+
+[[nodiscard]] bool Window::pollEvents() const
+{
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+        switch (event.type) {
+        case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+            // Only return early if quitting, or mouse state will be outdated
+            return true;
+        default:
+            break;
+        }
+    }
+
+    _mouseButtonState = SDL_GetMouseState(&_mousePosition.x, &_mousePosition.y);
+
+    return false;
+}
+
+[[nodiscard]] bool Window::isKeyPressed(const SDL_Scancode key) const
+{
+    const bool* state = SDL_GetKeyboardState(nullptr);
+    return state[static_cast<SDL_Scancode>(key)];
+}
+
+[[nodiscard]] bool Window::isMouseButtonPressed(const MouseButton button) const
+{
+    return _mouseButtonState & static_cast<SDL_MouseButtonFlags>(button);
+}
+
+[[nodiscard]] vec2 Window::getMousePosition() const { return _mousePosition; }
 
 [[nodiscard]] std::vector<const char*> Window::requiredVulkanExtensions() const
 {
     std::vector<const char*> exts {};
 
-    uint32_t count;
-    const char** rawExts = glfwGetRequiredInstanceExtensions(&count);
+    uint32 count;
+    const char* const* rawExts = SDL_Vulkan_GetInstanceExtensions(&count);
 
-    for (int32_t i = 0; i < count; ++i) {
+    for (int32 i = 0; i < count; ++i) {
         exts.emplace_back(rawExts[i]);
 
-        NH3D_DEBUGLOG("GLFW requiring extension \"" << rawExts[i] << "\"");
+        NH3D_DEBUGLOG("SDL requiring extension \"" << rawExts[i] << "\"");
     }
 
     return exts;
@@ -51,11 +84,10 @@ Window::~Window()
 {
     VkSurfaceKHR surface;
 
-    if (glfwCreateWindowSurface(instance, _window, nullptr, &surface) != VK_SUCCESS) {
+    if (!SDL_Vulkan_CreateSurface(_window, instance, nullptr, &surface)) {
         NH3D_ABORT_VK("Failed to create the window surface");
     }
 
     return surface;
 }
-
 }

@@ -160,7 +160,7 @@ void VulkanDebugDrawer::renderDebugUI(VkCommandBuffer commandBuffer, const uint3
 {
     ImDrawData* drawData = ImGui::GetDrawData();
 
-    if (drawData->CmdListsCount == 0) {
+    if (drawData == nullptr || drawData->CmdListsCount == 0) {
         return;
     }
 
