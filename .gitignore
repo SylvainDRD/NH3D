@@ -37,3 +37,6 @@
 .zed/
 build
 .cache/
+
+# imgui
+imgui.ini
