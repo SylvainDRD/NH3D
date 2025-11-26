@@ -563,13 +563,15 @@ void VulkanRHI::render(Scene& scene) const
             RenderData objectData;
 
             const VkBuffer vertexBuffer = _bufferManager.get<GPUBuffer>(renderComponent.getMesh().vertexBuffer).buffer;
-            const GPUBuffer& indexBuffer = _bufferManager.get<GPUBuffer>(renderComponent.getMesh().indexBuffer);
+            const VkBuffer& indexBuffer = _bufferManager.get<GPUBuffer>(renderComponent.getMesh().indexBuffer).buffer;
+            // Buffers used as index/vertex buffers are assumed to be created with the exact size needed
+            const uint32 indexBufferSize = _bufferManager.get<BufferAllocationInfo>(renderComponent.getMesh().indexBuffer).allocatedSize;
 
             objectData.mesh.vertexBuffer = VulkanBuffer::getDeviceAddress(*this, vertexBuffer);
-            objectData.mesh.indexBuffer = VulkanBuffer::getDeviceAddress(*this, indexBuffer.buffer);
+            objectData.mesh.indexBuffer = VulkanBuffer::getDeviceAddress(*this, indexBuffer);
             objectData.mesh.material = renderComponent.getMaterial();
             objectData.mesh.objectAABB = renderComponent.getMesh().objectAABB;
-            objectData.indexCount = indexBuffer.size / sizeof(uint32);
+            objectData.indexCount = indexBufferSize / sizeof(uint32);
 
             objectDataPtr[objectCount] = objectData;
             transformDataPtr[objectCount] = transformComponent;

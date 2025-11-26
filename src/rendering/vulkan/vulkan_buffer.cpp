@@ -53,7 +53,7 @@ std::pair<GPUBuffer, BufferAllocationInfo> VulkanBuffer::create(const VulkanRHI&
         }
     }
 
-    return { { buffer, info.size }, { allocation, allocationInfo } };
+    return { { buffer }, { info.size, allocation, allocationInfo } };
 }
 
 void VulkanBuffer::release(const IRHI& rhi, GPUBuffer& buffer, BufferAllocationInfo& allocation)

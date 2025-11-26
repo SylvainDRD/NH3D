@@ -263,36 +263,33 @@ void VulkanDebugDrawer::updateBuffers(const uint32 frameInFlightId)
     }
 
     auto& bufferManager = _rhi->getBufferManager();
+    constexpr uint32 extraMemory = 16384;
 
     // Note to self: VMA extra allocated memory is not safely usable
     if (_vertexBuffers[frameInFlightId] == InvalidHandle<Buffer>
-        || bufferManager.get<GPUBuffer>(_vertexBuffers[frameInFlightId]).size < vertexBufferSize) {
+        || bufferManager.get<BufferAllocationInfo>(_vertexBuffers[frameInFlightId]).allocatedSize < vertexBufferSize) {
         if (_vertexBuffers[frameInFlightId] != InvalidHandle<Buffer>) {
             _rhi->destroyBuffer(_vertexBuffers[frameInFlightId]);
         }
 
         _vertexBuffers[frameInFlightId] = _rhi->createBuffer(Buffer::CreateInfo {
-            .size = vertexBufferSize,
+            .size = vertexBufferSize + extraMemory,
             .usageFlags = BufferUsageFlagBits::VERTEX_BUFFER_BIT,
             .memoryUsage = BufferMemoryUsage::CPU_GPU,
         });
-    } else {
-        bufferManager.get<GPUBuffer>(_vertexBuffers[frameInFlightId]).size = vertexBufferSize;
     }
 
     if (_indexBuffers[frameInFlightId] == InvalidHandle<Buffer>
-        || bufferManager.get<GPUBuffer>(_indexBuffers[frameInFlightId]).size < indexBufferSize) {
+        || bufferManager.get<BufferAllocationInfo>(_indexBuffers[frameInFlightId]).allocatedSize < indexBufferSize) {
         if (_indexBuffers[frameInFlightId] != InvalidHandle<Buffer>) {
             _rhi->destroyBuffer(_indexBuffers[frameInFlightId]);
         }
 
         _indexBuffers[frameInFlightId] = _rhi->createBuffer(Buffer::CreateInfo {
-            .size = indexBufferSize,
+            .size = indexBufferSize + extraMemory,
             .usageFlags = BufferUsageFlagBits::INDEX_BUFFER_BIT,
             .memoryUsage = BufferMemoryUsage::CPU_GPU,
         });
-    } else {
-        bufferManager.get<GPUBuffer>(_indexBuffers[frameInFlightId]).size = indexBufferSize;
     }
 
     // Update data

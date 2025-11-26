@@ -13,10 +13,10 @@ class VulkanRHI;
 
 struct GPUBuffer {
     VkBuffer buffer;
-    uint32 size; // in bytes
 };
 
 struct BufferAllocationInfo {
+    uint32 allocatedSize; // in bytes, the value returned by VMA allocationInfo.size is unreliable because not all memory is usable safely
     VmaAllocation allocation;
     VmaAllocationInfo allocationInfo; // TODO: check if required
 };
