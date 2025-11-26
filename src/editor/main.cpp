@@ -62,7 +62,10 @@ int main()
     ImGuiIO& io = ImGui::GetIO();
     io.IniFilename = nullptr;
 
-    double accumulatedTime = 0.0;
+    std::array<float, 128> frameTimes {};
+    int32 frameTimesIndex = 0;
+
+    float accumulatedTime = 0.0f;
     float maxDeltaTime = 0.0f;
     float lastFPS = 0.0f;
     while (engine.update()) {
@@ -73,20 +76,25 @@ int main()
         io.DeltaTime = engine.deltaTime();
         io.MousePos = { mousePos.x, mousePos.y };
         io.MouseDown[ImGuiMouseButton_Left] = window.isMouseButtonPressed(MouseButton::Left);
-        io.MouseDown[ImGuiMouseButton_Right] = window.isMouseButtonPressed(MouseButton::Right);
         io.MouseDown[ImGuiMouseButton_Middle] = window.isMouseButtonPressed(MouseButton::Middle);
 
-        if (accumulatedTime > 1.0) {
-            accumulatedTime = 0.0;
+        if (accumulatedTime > 0.125f) {
+            accumulatedTime = 0.0f;
 
             lastFPS = 1.0f / maxDeltaTime;
+
+            frameTimes[frameTimesIndex] = maxDeltaTime * 1000.0f; // in ms
+            frameTimesIndex = (frameTimesIndex + 1) & (frameTimes.size() - 1);
+
             maxDeltaTime = 0.0f;
         }
 
         ImGui::NewFrame();
 
-        ImGui::Begin("Debug Info");
+        ImGui::Begin("Debug Info", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
         ImGui::Text("FPS: %.2f", lastFPS);
+        ImGui::PlotLines("Overall Frame Time (ms)", frameTimes.data(), frameTimes.size(), (frameTimesIndex + 1) & (frameTimes.size() - 1),
+            nullptr, 0.0f, 16.0f, ImVec2(0, 80));
 
         ImGui::End();
         ImGui::Render();
