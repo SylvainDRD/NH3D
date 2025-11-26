@@ -1,8 +1,6 @@
 #pragma once
 
 #define GLM_ENABLE_EXPERIMENTAL
-#define GLM_FORCE_LEFT_HANDED
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
@@ -72,7 +70,13 @@ using glm::translate;
 
 using glm::lookAt;
 using glm::ortho;
-using glm::perspective;
+
+inline glm::mat4 perspective(float fovY, float aspect, float near, float far)
+{
+    glm::mat4 proj = glm::perspectiveLH_ZO(fovY, aspect, near, far);
+    proj[1][1] *= -1; // Flip Y for Vulkan
+    return proj;
+}
 
 // Matrix ops
 using glm::determinant;

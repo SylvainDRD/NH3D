@@ -20,18 +20,18 @@ int main()
 
     const std::vector<VertexData> vertexData = {
         {
-            .position = vec3 { -1.f, 1.f, 0.f },
-            .normal = vec3 { 1.0f, 0.0f, 0.0f },
+            .position = vec3 { -1.f, -1.f, 0.0f },
+            .normal = vec3 { 0.0f, 0.0f, -1.0f },
             .uv = vec2 { 1.0f, 0.0f },
         },
         {
-            .position = vec3 { 1.f, 1.f, 0.f },
-            .normal = vec3 { 0.0f, 1.0f, 0.0f },
+            .position = vec3 { 1.f, -1.f, 0.0f },
+            .normal = vec3 { 0.0f, 0.0f, -1.0f },
             .uv = vec2 { 0.0f, 0.0f },
         },
         {
-            .position = vec3 { 0.f, -1.f, 0.f },
-            .normal = vec3 { 0.0f, 0.0f, 1.0f },
+            .position = vec3 { 0.f, 1.f, 0.0f },
+            .normal = vec3 { 0.0f, 0.0f, -1.0f },
             .uv = vec2 { 0.5f, 1.0f },
         },
     };
@@ -55,7 +55,7 @@ int main()
     // Debug only
     scene.create(CameraComponent {}, TransformComponent {});
     scene.create(
-        RenderComponent { meshData, Material { .albedo = color3 { 1.0f, 0.0f, 0.0f } } }, TransformComponent { { 0.0f, 0.0f, 0.8f } });
+        RenderComponent { meshData, Material { .albedo = color3 { 1.0f, 0.0f, 0.0f } } }, TransformComponent { { 0.0f, 0.0f, 10.0f } });
 
     const Window& window = engine.getWindow();
 
@@ -95,6 +95,12 @@ int main()
         ImGui::Text("FPS: %.2f", lastFPS);
         ImGui::PlotLines("Overall Frame Time (ms)", frameTimes.data(), frameTimes.size(), (frameTimesIndex + 1) & (frameTimes.size() - 1),
             nullptr, 0.0f, 16.0f, ImVec2(0, 80));
+
+        for (const auto& [e, _, transform] : scene.makeView<const RenderComponent&, TransformComponent&>()) {
+            vec3 position = transform.position();
+            ImGui::SliderFloat3("Position", &position.x, -10.0f, 10.0f);
+            transform.setPosition(scene, e, position);
+        }
 
         ImGui::End();
         ImGui::Render();

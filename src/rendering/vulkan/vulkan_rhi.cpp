@@ -702,7 +702,7 @@ void VulkanRHI::render(Scene& scene) const
     VulkanTexture::insertMemoryBarrier(commandBuffer, depthRTViewData.image, VK_ACCESS_2_SHADER_READ_BIT,
         VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_CLEAR_BIT,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_UNDEFINED, true);
-    VulkanTexture::clearDepth(commandBuffer, depthRTViewData.image, 0.0f, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL); // 1 for reverse Z?
+    VulkanTexture::clearDepth(commandBuffer, depthRTViewData.image, 1.0f, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL); // 0 for reverse Z?
     VulkanTexture::insertMemoryBarrier(commandBuffer, depthRTViewData.image, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_CLEAR_BIT,
         VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
         VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,

@@ -10,6 +10,17 @@ layout(set = 0, binding = 2) uniform sampler2D depth;
 
 layout(set = 0, binding = 3, rgba16f) uniform writeonly image2D outLighting;
 
+float saturate(float x)
+{
+    return clamp(x, 0.0, 1.0);
+}
+
+vec3 normalDecode(vec3 n) {
+    n = n * 2.0 - 1.0;
+
+    return normalize(n);
+}
+
 void main() {
     ivec2 pixelCoords = ivec2(gl_GlobalInvocationID.xy);
 
@@ -18,12 +29,12 @@ void main() {
         return;
     }
 
-    vec3 normal = normalize(imageLoad(normals, pixelCoords).xyz); // TODO: octahedral decode
+    vec3 normal = normalDecode(imageLoad(normals, pixelCoords).xyz); // TODO: octahedron decode + texture id in B channel https://johnwhite3d.blogspot.com/2017/10/signed-octahedron-normal-encoding.html
     vec3 albedoColor = imageLoad(albedo, pixelCoords).xyz;
     float depthValue = texelFetch(depth, pixelCoords, 0).x;
 
     // TODO: pass lights in uniform buffer
-    vec3 lightDir = normalize(vec3(0.5, 1.0, 0.3));
+    vec3 lightDir = normalize(vec3(0.5, 1.0, -0.3));
     float diffuse = max(dot(normal, lightDir), 0.0);
     vec3 lighting = albedoColor * diffuse;
 
