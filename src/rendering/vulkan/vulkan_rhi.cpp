@@ -25,94 +25,6 @@
 
 namespace NH3D {
 
-// TODO: delete
-AABB computeViewAABB(mat4 viewSpaceTransform, AABB objectAABB)
-{
-    // Compute world AABB from local AABB, see Graphics Gems - "Transforming Axis-Aligned Bounding Boxes"
-    // It's just decomposing the matrix multiplication to avoid doing 8 corner transformations and a lot of min/max ops
-    // Not too sure how efficient this is on GPU TBH
-    vec3 nmin, nmax;
-    nmin = nmax = vec3(viewSpaceTransform[3]); // Translation part
-    for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            float a = viewSpaceTransform[j][i] * objectAABB.min[j];
-            float b = viewSpaceTransform[j][i] * objectAABB.max[j];
-
-            if (a < b) {
-                nmin[i] += a;
-                nmax[i] += b;
-            } else {
-                nmin[i] += b;
-                nmax[i] += a;
-            }
-        }
-    }
-    NH3D_DEBUGLOG("View AABB Min: " << nmin.x << " " << nmin.y << " " << nmin.z);
-    NH3D_DEBUGLOG("View AABB Max: " << nmax.x << " " << nmax.y << " " << nmax.z);
-
-    vec3 points[8] = {
-        objectAABB.min,
-        objectAABB.max,
-        vec3(objectAABB.min.x, objectAABB.min.y, objectAABB.max.z),
-        vec3(objectAABB.min.x, objectAABB.max.y, objectAABB.min.z),
-        vec3(objectAABB.min.x, objectAABB.max.y, objectAABB.max.z),
-        vec3(objectAABB.max.x, objectAABB.min.y, objectAABB.min.z),
-        vec3(objectAABB.max.x, objectAABB.min.y, objectAABB.max.z),
-        vec3(objectAABB.max.x, objectAABB.max.y, objectAABB.min.z),
-    };
-
-    nmin = nmax = vec3(viewSpaceTransform * vec4(points[0], 1.0));
-    for (int i = 1; i < 8; ++i) {
-        vec3 point = vec3(viewSpaceTransform * vec4(points[i], 1.0));
-        nmin = min(nmin, point);
-        nmax = max(nmax, point);
-    }
-
-    NH3D_DEBUGLOG("SAFE View AABB Min: " << nmin.x << " " << nmin.y << " " << nmin.z);
-    NH3D_DEBUGLOG("SAFE View AABB Max: " << nmax.x << " " << nmax.y << " " << nmax.z);
-
-    return AABB(nmin, nmax);
-}
-
-// TODO: delete
-bool inFrustum(AABB viewAABB, vec2 left, vec2 right, vec2 top, vec2 bottom)
-{
-    // Near
-    if (viewAABB.max.z < 0.0) {
-        NH3D_DEBUGLOG("Culled by near plane");
-        return false;
-    }
-
-    // Components equal to zero were dropped
-
-    // Left (plane y == 0)
-    if (dot(vec2(viewAABB.max.x, viewAABB.max.z), left) < 0) {
-        NH3D_DEBUGLOG("Culled by left plane");
-        return false;
-    }
-
-    // Right (plane y == 0)
-    if (dot(vec2(viewAABB.min.x, viewAABB.max.z), right) < 0) {
-        NH3D_DEBUGLOG("Culled by right plane");
-        return false;
-    }
-
-    // Bottom (plane x == 0)
-    if (dot(vec2(viewAABB.max.y, viewAABB.max.z), bottom) < 0) {
-        NH3D_DEBUGLOG("Culled by bottom plane");
-        return false;
-    }
-
-    // Top (plane x == 0)
-    if (dot(vec2(viewAABB.min.y, viewAABB.max.z), top) < 0) {
-        NH3D_DEBUGLOG("Culled by top plane");
-        return false;
-    }
-    NH3D_DEBUGLOG("Not culled!");
-
-    return true;
-}
-
 VulkanRHI::VulkanRHI(const Window& Window)
     : IRHI {}
     , _textureManager { 1000, 100 }
@@ -619,32 +531,6 @@ void VulkanRHI::destroyBuffer(const Handle<Buffer> handle) { _bufferManager.rele
 // TODO: cache command buffer
 void VulkanRHI::render(Scene& scene) const
 {
-    // TODO: delete test code
-    {
-        static vec3 lastPos;
-        const VkExtent3D rtExtent = _textureManager.get<TextureMetadata>(_gbufferRTs[0].albedoRT).extent;
-        const float aspectRatio = rtExtent.width / static_cast<float>(rtExtent.height);
-        AABB testAABB(vec3(-1.0f, -1.0f, 0.0f), vec3(1.0f, 1.0f, 0.0f));
-        TransformComponent testTRF { scene.get<TransformComponent>(1) };
-        CameraComponent testCAM { scene.get<CameraComponent>(0) };
-        mat4 viewMatrix = inverse(mat4(scene.get<TransformComponent>(0)));
-
-        if (lastPos != testTRF.position()) {
-            AABB viewAABB = computeViewAABB(viewMatrix * mat4(testTRF), testAABB);
-
-            mat4 projectionMatrix = perspective(testCAM.fovY, aspectRatio, testCAM.near, testCAM.far);
-
-            FrustumPlanes frustumPlanes = getFrustumPlanes(projectionMatrix);
-            NH3D_DEBUGLOG("Left: " << frustumPlanes.left.x << " " << frustumPlanes.left.y);
-            NH3D_DEBUGLOG("Right: " << frustumPlanes.right.x << " " << frustumPlanes.right.y);
-            NH3D_DEBUGLOG("Top: " << frustumPlanes.top.x << " " << frustumPlanes.top.y);
-            NH3D_DEBUGLOG("Bottom: " << frustumPlanes.bottom.x << " " << frustumPlanes.bottom.y);
-
-            bool cullingTest = inFrustum(viewAABB, frustumPlanes.left, frustumPlanes.right, frustumPlanes.top, frustumPlanes.bottom);
-            lastPos = testTRF.position();
-        }
-    }
-
     if (scene.getMainCamera() == InvalidEntity) {
         return;
     }
