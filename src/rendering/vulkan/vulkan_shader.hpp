@@ -50,6 +50,8 @@ struct VulkanShader : public VulkanPipeline {
 
     struct DrawParameters {
         const VkBuffer drawIndirectBuffer;
+        const VkBuffer drawIndirectCountBuffer;
+        const uint32 maxDrawCount;
         const VkExtent2D extent;
         const ArrayWrapper<VkRenderingAttachmentInfo> colorAttachments;
         const VkRenderingAttachmentInfo depthAttachment;

@@ -125,7 +125,7 @@ bool inFrustum(AABB viewAABB) {
     // Components equal to zero were dropped
 
     // Left (plane y == 0)
-    if (dot(viewAABB.max.xy, cullingParams.left) < 0) {
+    if (dot(viewAABB.max.xz, cullingParams.left) < 0) {
         return false;
     }
 
@@ -140,7 +140,7 @@ bool inFrustum(AABB viewAABB) {
     }
 
     // Top (plane x == 0)
-    if (dot(viewAABB.min.yz, cullingParams.top) < 0) {
+    if (dot(vec2(viewAABB.min.y, viewAABB.max.z), cullingParams.top) < 0) {
         return false;
     }
 
@@ -152,20 +152,41 @@ AABB computeViewAABB(mat4 viewSpaceTransform, AABB objectAABB) {
     // It's just decomposing the matrix multiplication to avoid doing 8 corner transformations and a lot of min/max ops
     // Not too sure how efficient this is on GPU TBH
     vec3 nmin, nmax;
-    for (int i = 0; i < 4; ++i) {
+    nmin = nmax = viewSpaceTransform[3].xyz; // Translation part
+    for (int i = 0; i < 3; ++i) {
         for (int j = 0; j < 3; ++j) {
             float a = viewSpaceTransform[j][i] * objectAABB.min[j];
             float b = viewSpaceTransform[j][i] * objectAABB.max[j];
 
             if (a < b) {
-                nmin[j] = a;
-                nmax[j] = b;
+                nmin[i] += a;
+                nmax[i] += b;
             } else {
-                nmin[j] = b;
-                nmax[j] = a;
+                nmin[i] += b;
+                nmax[i] += a;
             }
         }
     }
+
+    // vec3 points[8] = {
+    //         objectAABB.min,
+    //         objectAABB.max,
+    //         vec3(objectAABB.min.x, objectAABB.min.y, objectAABB.max.z),
+    //         vec3(objectAABB.min.x, objectAABB.max.y, objectAABB.min.z),
+    //         vec3(objectAABB.min.x, objectAABB.max.y, objectAABB.max.z),
+    //         vec3(objectAABB.max.x, objectAABB.min.y, objectAABB.min.z),
+    //         vec3(objectAABB.max.x, objectAABB.min.y, objectAABB.max.z),
+    //         vec3(objectAABB.max.x, objectAABB.max.y, objectAABB.min.z),
+    //     };
+
+    // vec3 nmin, nmax;
+    // nmin = nmax = (viewSpaceTransform * vec4(points[0], 1.0)).xyz;
+    // for (int i = 1; i < 8; ++i) {
+    //     vec3 point = (viewSpaceTransform * vec4(points[i], 1.0)).xyz;
+    //     nmin = min(nmin, point);
+    //     nmax = max(nmax, point);
+    // }
+
     return AABB(nmin, nmax);
 }
 

@@ -37,9 +37,9 @@ public:
 
     ~VulkanRHI();
 
-    inline VkDevice getVkDevice() const { return _device; }
+    [[nodiscard]] inline VkDevice getVkDevice() const { return _device; }
 
-    inline VmaAllocator getAllocator() const { return _allocator; }
+    [[nodiscard]] inline VmaAllocator getAllocator() const { return _allocator; }
 
     [[nodiscard]] inline ResourceManager<VulkanTexture>& getTextureManager() { return _textureManager; }
 
@@ -90,8 +90,8 @@ private:
     struct FrustumPlanes {
         vec2 left;
         vec2 right;
-        vec2 top;
         vec2 bottom;
+        vec2 top;
     };
 
     struct CullingParameters {

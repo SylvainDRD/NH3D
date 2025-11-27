@@ -25,6 +25,94 @@
 
 namespace NH3D {
 
+// TODO: delete
+AABB computeViewAABB(mat4 viewSpaceTransform, AABB objectAABB)
+{
+    // Compute world AABB from local AABB, see Graphics Gems - "Transforming Axis-Aligned Bounding Boxes"
+    // It's just decomposing the matrix multiplication to avoid doing 8 corner transformations and a lot of min/max ops
+    // Not too sure how efficient this is on GPU TBH
+    vec3 nmin, nmax;
+    nmin = nmax = vec3(viewSpaceTransform[3]); // Translation part
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            float a = viewSpaceTransform[j][i] * objectAABB.min[j];
+            float b = viewSpaceTransform[j][i] * objectAABB.max[j];
+
+            if (a < b) {
+                nmin[i] += a;
+                nmax[i] += b;
+            } else {
+                nmin[i] += b;
+                nmax[i] += a;
+            }
+        }
+    }
+    NH3D_DEBUGLOG("View AABB Min: " << nmin.x << " " << nmin.y << " " << nmin.z);
+    NH3D_DEBUGLOG("View AABB Max: " << nmax.x << " " << nmax.y << " " << nmax.z);
+
+    vec3 points[8] = {
+        objectAABB.min,
+        objectAABB.max,
+        vec3(objectAABB.min.x, objectAABB.min.y, objectAABB.max.z),
+        vec3(objectAABB.min.x, objectAABB.max.y, objectAABB.min.z),
+        vec3(objectAABB.min.x, objectAABB.max.y, objectAABB.max.z),
+        vec3(objectAABB.max.x, objectAABB.min.y, objectAABB.min.z),
+        vec3(objectAABB.max.x, objectAABB.min.y, objectAABB.max.z),
+        vec3(objectAABB.max.x, objectAABB.max.y, objectAABB.min.z),
+    };
+
+    nmin = nmax = vec3(viewSpaceTransform * vec4(points[0], 1.0));
+    for (int i = 1; i < 8; ++i) {
+        vec3 point = vec3(viewSpaceTransform * vec4(points[i], 1.0));
+        nmin = min(nmin, point);
+        nmax = max(nmax, point);
+    }
+
+    NH3D_DEBUGLOG("SAFE View AABB Min: " << nmin.x << " " << nmin.y << " " << nmin.z);
+    NH3D_DEBUGLOG("SAFE View AABB Max: " << nmax.x << " " << nmax.y << " " << nmax.z);
+
+    return AABB(nmin, nmax);
+}
+
+// TODO: delete
+bool inFrustum(AABB viewAABB, vec2 left, vec2 right, vec2 top, vec2 bottom)
+{
+    // Near
+    if (viewAABB.max.z < 0.0) {
+        NH3D_DEBUGLOG("Culled by near plane");
+        return false;
+    }
+
+    // Components equal to zero were dropped
+
+    // Left (plane y == 0)
+    if (dot(vec2(viewAABB.max.x, viewAABB.max.z), left) < 0) {
+        NH3D_DEBUGLOG("Culled by left plane");
+        return false;
+    }
+
+    // Right (plane y == 0)
+    if (dot(vec2(viewAABB.min.x, viewAABB.max.z), right) < 0) {
+        NH3D_DEBUGLOG("Culled by right plane");
+        return false;
+    }
+
+    // Bottom (plane x == 0)
+    if (dot(vec2(viewAABB.max.y, viewAABB.max.z), bottom) < 0) {
+        NH3D_DEBUGLOG("Culled by bottom plane");
+        return false;
+    }
+
+    // Top (plane x == 0)
+    if (dot(vec2(viewAABB.min.y, viewAABB.max.z), top) < 0) {
+        NH3D_DEBUGLOG("Culled by top plane");
+        return false;
+    }
+    NH3D_DEBUGLOG("Not culled!");
+
+    return true;
+}
+
 VulkanRHI::VulkanRHI(const Window& Window)
     : IRHI {}
     , _textureManager { 1000, 100 }
@@ -54,7 +142,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
     auto [swapchain, surfaceFormat] = createSwapchain(_device, _gpu, _surface, queues, { Window.getWidth(), Window.getHeight() });
     _swapchain = swapchain;
 
-    uint32_t swapchainImageCount;
+    uint32 swapchainImageCount;
     vkGetSwapchainImagesKHR(_device, _swapchain, &swapchainImageCount, nullptr);
 
     std::vector<VkImage> swapchainImages;
@@ -119,6 +207,8 @@ VulkanRHI::VulkanRHI(const Window& Window)
         });
     }
 
+    constexpr uint32 MaxObjects = 100000;
+
     const VkDescriptorType objectDataTypes[] = {
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, // RenderData buffer
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, // VisibleFlags buffer
@@ -130,7 +220,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
 
     auto [objectDataBuffer, objectDataAllocation] = VulkanBuffer::create(*this,
         {
-            .size = sizeof(RenderData) * 100000,
+            .size = sizeof(RenderData) * MaxObjects,
             .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
         });
@@ -138,7 +228,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
 
     auto [objectDataStagingBuffer, objectDataStagingAllocation] = VulkanBuffer::create(*this,
         {
-            .size = sizeof(RenderData) * 100000,
+            .size = sizeof(RenderData) * MaxObjects,
             .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             .memoryUsage = VMA_MEMORY_USAGE_CPU_ONLY,
         });
@@ -146,7 +236,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
 
     auto [visibleFlagBuffer, visibleFlagAllocation] = VulkanBuffer::create(*this,
         {
-            .size = 100000 / 8 + 1,
+            .size = MaxObjects / 8 + 1,
             .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
         });
@@ -155,7 +245,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
     for (int i = 0; i < IRHI::MaxFramesInFlight; ++i) {
         auto [visibleFlagStagingBuffer, visibleFlagStagingAllocation] = VulkanBuffer::create(*this,
             {
-                .size = 100000 / 8 + 1,
+                .size = MaxObjects / 8 + 1,
                 .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                 .memoryUsage = VMA_MEMORY_USAGE_CPU_ONLY,
             });
@@ -201,7 +291,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
 
     auto [cullingTransformBuffer, cullingTransformAllocation] = VulkanBuffer::create(*this,
         {
-            .size = (sizeof(vec4) + sizeof(vec3) * 2) * 100000,
+            .size = (sizeof(vec4) + sizeof(vec3) * 2) * MaxObjects,
             .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
         });
@@ -209,7 +299,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
 
     auto [cullingTransformStagingBuffer, cullingTransformStagingAllocation] = VulkanBuffer::create(*this,
         {
-            .size = (sizeof(vec4) + sizeof(vec3) * 2) * 100000,
+            .size = (sizeof(vec4) + sizeof(vec3) * 2) * MaxObjects,
             .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             .memoryUsage = VMA_MEMORY_USAGE_CPU_ONLY,
         });
@@ -219,7 +309,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
     auto [cullingDrawCounterBuffer, cullingDrawCounterAllocation] = VulkanBuffer::create(*this,
         {
             .size = sizeof(uint32),
-            .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
             .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
         });
     _cullingDrawCounterBuffer = _bufferManager.store(std::move(cullingDrawCounterBuffer), std::move(cullingDrawCounterAllocation));
@@ -257,11 +347,16 @@ VulkanRHI::VulkanRHI(const Window& Window)
 
     auto [drawIndirectBuffer, drawIndirectAllocation] = VulkanBuffer::create(*this,
         {
-            .size = sizeof(VkDrawIndirectCommand),
+            .size = MaxObjects * sizeof(VkDrawIndirectCommand),
             .usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
             .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
         });
     _drawIndirectBuffer = _bufferManager.store(std::move(drawIndirectBuffer), std::move(drawIndirectAllocation));
+
+    VkPhysicalDeviceProperties properties;
+    vkGetPhysicalDeviceProperties(_gpu, &properties);
+    NH3D_ASSERT(drawIndirectAllocation.allocatedSize / sizeof(VkDrawIndirectCommand) < properties.limits.maxDrawIndirectCount,
+        "Insufficient max indirect draw count");
 
     auto& drawIndirectDescriptorSets = _bindGroupManager.get<DescriptorSets>(_drawIndirectCommandBindGroup);
     for (int i = 0; i < IRHI::MaxFramesInFlight; ++i) {
@@ -281,7 +376,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
     });
     auto [drawRecordBuffer, drawRecordAllocation] = VulkanBuffer::create(*this,
         {
-            .size = (sizeof(VkDeviceAddress) * 2 + sizeof(Material) + sizeof(mat4x3)) * 100000,
+            .size = (sizeof(VkDeviceAddress) * 2 + sizeof(Material) + sizeof(mat4x3)) * MaxObjects,
             .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
             .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
         });
@@ -521,8 +616,35 @@ Handle<Buffer> VulkanRHI::createBuffer(const Buffer::CreateInfo& info)
 
 void VulkanRHI::destroyBuffer(const Handle<Buffer> handle) { _bufferManager.release(*this, handle); }
 
+// TODO: cache command buffer
 void VulkanRHI::render(Scene& scene) const
 {
+    // TODO: delete test code
+    {
+        static vec3 lastPos;
+        const VkExtent3D rtExtent = _textureManager.get<TextureMetadata>(_gbufferRTs[0].albedoRT).extent;
+        const float aspectRatio = rtExtent.width / static_cast<float>(rtExtent.height);
+        AABB testAABB(vec3(-1.0f, -1.0f, 0.0f), vec3(1.0f, 1.0f, 0.0f));
+        TransformComponent testTRF { scene.get<TransformComponent>(1) };
+        CameraComponent testCAM { scene.get<CameraComponent>(0) };
+        mat4 viewMatrix = inverse(mat4(scene.get<TransformComponent>(0)));
+
+        if (lastPos != testTRF.position()) {
+            AABB viewAABB = computeViewAABB(viewMatrix * mat4(testTRF), testAABB);
+
+            mat4 projectionMatrix = perspective(testCAM.fovY, aspectRatio, testCAM.near, testCAM.far);
+
+            FrustumPlanes frustumPlanes = getFrustumPlanes(projectionMatrix);
+            NH3D_DEBUGLOG("Left: " << frustumPlanes.left.x << " " << frustumPlanes.left.y);
+            NH3D_DEBUGLOG("Right: " << frustumPlanes.right.x << " " << frustumPlanes.right.y);
+            NH3D_DEBUGLOG("Top: " << frustumPlanes.top.x << " " << frustumPlanes.top.y);
+            NH3D_DEBUGLOG("Bottom: " << frustumPlanes.bottom.x << " " << frustumPlanes.bottom.y);
+
+            bool cullingTest = inFrustum(viewAABB, frustumPlanes.left, frustumPlanes.right, frustumPlanes.top, frustumPlanes.bottom);
+            lastPos = testTRF.position();
+        }
+    }
+
     if (scene.getMainCamera() == InvalidEntity) {
         return;
     }
@@ -585,7 +707,7 @@ void VulkanRHI::render(Scene& scene) const
             VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_SHADER_READ_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
     } else {
         // Only update transforms
-        // TODO: remove the need for RenderComponent here, it should only be used
+        // TODO: remove the need for RenderComponent here, it should only be used to filter
         for (const auto& [entity, _, transformComponent] : scene.makeView<RenderComponent, TransformComponent>()) {
             transformDataPtr[objectCount] = transformComponent;
             objectCount++;
@@ -593,7 +715,8 @@ void VulkanRHI::render(Scene& scene) const
     }
 
     // Reset the culling draw counter
-    vkCmdFillBuffer(commandBuffer, _bufferManager.get<GPUBuffer>(_cullingDrawCounterBuffer).buffer, 0, sizeof(uint32), 0);
+    const VkBuffer drawCountBuffer = _bufferManager.get<GPUBuffer>(_cullingDrawCounterBuffer).buffer;
+    vkCmdFillBuffer(commandBuffer, drawCountBuffer, 0, sizeof(uint32), 0);
 
     const GPUBuffer& transformBuffer = _bufferManager.get<GPUBuffer>(_cullingTransformBuffer);
     VulkanBuffer::copyBuffer(
@@ -624,7 +747,7 @@ void VulkanRHI::render(Scene& scene) const
     const float aspectRatio = rtExtent.width / static_cast<float>(rtExtent.height);
 
     const mat4 projectionMatrix = perspective(cameraSettings.fovY, aspectRatio, cameraSettings.near, cameraSettings.far);
-    const mat4 viewMatrix = transpose(mat4(cameraTransform)); // assumes scale is uniform and non-zero
+    const mat4 viewMatrix = inverse(mat4(cameraTransform)); // assumes scale is uniform and non-zero
 
     const CullingParameters cullingParameters {
         .viewMatrix = viewMatrix,
@@ -723,8 +846,12 @@ void VulkanRHI::render(Scene& scene) const
         },
     };
 
+    NH3D_ASSERT(objectCount < _bufferManager.get<BufferAllocationInfo>(_drawIndirectBuffer).allocatedSize / sizeof(VkDrawIndirectCommand),
+        "Draw indirect buffer too small for the number of objects");
     VulkanShader::draw(commandBuffer, graphicsPipeline, {
                 .drawIndirectBuffer = drawIndirectBuffer.buffer,
+                .drawIndirectCountBuffer = drawCountBuffer,
+                .maxDrawCount = objectCount, // Good enough for now
                 .extent = { albedoRTMetadata.extent.width, albedoRTMetadata.extent.height },
                 .colorAttachments = { colorAttachmentsInfo, std::size(colorAttachmentsInfo) },
                 .depthAttachment = {
@@ -893,7 +1020,7 @@ VkDebugUtilsMessengerEXT VulkanRHI::createDebugMessenger(const VkInstance instan
 std::pair<VkPhysicalDevice, VulkanRHI::PhysicalDeviceQueueFamilyID> VulkanRHI::selectPhysicalDevice(
     const VkInstance instance, const VkSurfaceKHR surface) const
 {
-    uint32_t physicalDeviceCount;
+    uint32 physicalDeviceCount;
     vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, nullptr);
 
     std::vector<VkPhysicalDevice> availableGpus { physicalDeviceCount };
@@ -903,11 +1030,11 @@ std::pair<VkPhysicalDevice, VulkanRHI::PhysicalDeviceQueueFamilyID> VulkanRHI::s
     std::vector<VkQueueFamilyProperties> queueData { 16 };
 
     std::string selectedDeviceName;
-    uint32_t deviceId = NH3D_MAX_T(uint32);
+    uint32 deviceId = NH3D_MAX_T(uint32);
 
     const VkQueueFlags requiredQueueFlags = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT;
 
-    for (uint32_t i = 0; i < physicalDeviceCount; ++i) {
+    for (uint32 i = 0; i < physicalDeviceCount; ++i) {
         VkPhysicalDeviceProperties properties;
         vkGetPhysicalDeviceProperties(availableGpus[i], &properties);
 
@@ -917,7 +1044,7 @@ std::pair<VkPhysicalDevice, VulkanRHI::PhysicalDeviceQueueFamilyID> VulkanRHI::s
         if (features.multiDrawIndirect
             && (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU
                 || (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU && deviceId == NH3D_MAX_T(uint32)))) {
-            uint32_t familyCount;
+            uint32 familyCount;
             vkGetPhysicalDeviceQueueFamilyProperties(availableGpus[i], &familyCount, nullptr);
 
             queueData.resize(familyCount);
@@ -980,6 +1107,7 @@ VkDevice VulkanRHI::createLogicalDevice(const VkPhysicalDevice gpu, const Physic
     VkPhysicalDeviceVulkan12Features features12 {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
         .pNext = &features11,
+        .drawIndirectCount = VK_TRUE,
         .descriptorIndexing = VK_TRUE,
         .descriptorBindingSampledImageUpdateAfterBind = VK_TRUE,
         // .descriptorBindingStorageImageUpdateAfterBind = VK_TRUE, won't be needed I'm pretty sure
@@ -1267,16 +1395,16 @@ VulkanRHI::FrustumPlanes VulkanRHI::getFrustumPlanes(const mat4& projectionMatri
         projectionMatrix[2][3] - projectionMatrix[2][0],
     };
 
-    frustumPlanes.bottom = vec2 {
-        // projectionMatrix[0][3] + projectionMatrix[0][1],
-        projectionMatrix[1][3] + projectionMatrix[1][1],
-        projectionMatrix[2][3] + projectionMatrix[2][1],
-    };
-
     frustumPlanes.top = vec2 {
         // projectionMatrix[0][3] - projectionMatrix[0][1],
-        projectionMatrix[1][3] - projectionMatrix[1][1],
+        projectionMatrix[1][3] + projectionMatrix[1][1], // sign flipped due to Vulkan NDC
         projectionMatrix[2][3] - projectionMatrix[2][1],
+    };
+
+    frustumPlanes.bottom = vec2 {
+        // projectionMatrix[0][3] + projectionMatrix[0][1],
+        projectionMatrix[1][3] - projectionMatrix[1][1], // sign flipped due to Vulkan NDC
+        projectionMatrix[2][3] + projectionMatrix[2][1],
     };
 
     return frustumPlanes;

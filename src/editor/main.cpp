@@ -53,7 +53,7 @@ int main()
     engine.getResourceMapper().storeMesh("basic triangle", meshData);
 
     // Debug only
-    scene.create(CameraComponent {}, TransformComponent {});
+    scene.create(CameraComponent {}, TransformComponent { { -4.2f, 2.25f, -0.88f }, quat { vec3 { 0.3f, 0.75f, 0.05f } } });
     scene.create(
         RenderComponent { meshData, Material { .albedo = color3 { 1.0f, 0.0f, 0.0f } } }, TransformComponent { { 0.0f, 0.0f, 10.0f } });
 

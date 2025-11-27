@@ -188,7 +188,8 @@ void VulkanShader::draw(VkCommandBuffer commandBuffer, const VkPipeline pipeline
 
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-    vkCmdDrawIndirect(commandBuffer, params.drawIndirectBuffer, 0, 1, sizeof(VkDrawIndirectCommand));
+    vkCmdDrawIndirectCount(
+        commandBuffer, params.drawIndirectBuffer, 0, params.drawIndirectCountBuffer, 0, params.maxDrawCount, sizeof(VkDrawIndirectCommand));
 
     vkCmdEndRendering(commandBuffer);
 }
