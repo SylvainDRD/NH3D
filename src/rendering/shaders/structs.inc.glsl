@@ -1,3 +1,6 @@
+#ifndef STRUCTS_INC_GLSL
+#define STRUCTS_INC_GLSL
+
 #extension GL_EXT_buffer_reference : require
 #extension GL_EXT_scalar_block_layout : require
 
@@ -29,3 +32,16 @@ struct DrawRecord {
     Material material;
     mat4x3 modelViewMatrix;
 };
+
+struct TransformData {
+    vec4 rotation;
+    vec3 translation;
+    vec3 scale;
+};
+
+struct AABB {
+    vec3 min;
+    vec3 max;
+};
+
+#endif // STRUCTS_INC_GLSL

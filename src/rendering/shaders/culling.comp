@@ -4,6 +4,7 @@
 
 #include "structs.inc.glsl"
 #include "culling.inc.glsl"
+#include "common.inc.glsl"
 
 layout(local_size_x = 64) in;
 
@@ -15,6 +16,7 @@ layout(set = 0, binding = 1, scalar) readonly buffer VisibleFlags {
     uint flags[];
 } visibleFlags;
 
+// Separate buffer for debugging purposes
 layout(set = 0, binding = 2, scalar) readonly buffer AABBBuffer {
     AABB aabb[];
 } objectAABBs;
@@ -65,7 +67,7 @@ void main()
 
     mat4 viewSpaceTransform = cullingData.parameters.viewMatrix * computeTransform(transformBuffer.transforms[index]);
 
-    AABB viewAABB = computeViewAABB(viewSpaceTransform, objectAABBs.aabb[index]);
+    AABB viewAABB = transformAABB(viewSpaceTransform, objectAABBs.aabb[index]);
 
     // if (inFrustum(viewAABB, cullingData.parameters)) {
     if (true) { // TODO: remove
