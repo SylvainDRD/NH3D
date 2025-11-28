@@ -63,8 +63,8 @@ VulkanRHI::VulkanRHI(const Window& Window)
     vkGetSwapchainImagesKHR(_device, _swapchain, &swapchainImageCount, swapchainImages.data());
 
     for (int i = 0; i < swapchainImageCount; ++i) {
-        auto&& [imageViewData, textureMetadata] = VulkanTexture::wrapSwapchainImage(std::cref(*this), swapchainImages[i], surfaceFormat,
-            VkExtent3D { Window.getWidth(), Window.getHeight(), 1 }, VK_IMAGE_ASPECT_COLOR_BIT);
+        auto&& [imageViewData, textureMetadata] = VulkanTexture::wrapSwapchainImage(
+            *this, swapchainImages[i], surfaceFormat, VkExtent3D { Window.getWidth(), Window.getHeight(), 1 }, VK_IMAGE_ASPECT_COLOR_BIT);
         _swapchainTextures[i] = _textureManager.store(std::move(imageViewData), std::move(textureMetadata));
     }
 
@@ -128,7 +128,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
     };
     _cullingRenderDataBindGroup = createBindGroup({
         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-        .bindingTypes = { objectDataTypes, std::size(objectDataTypes) },
+        .bindingTypes = objectDataTypes,
     });
 
     for (int i = 0; i < IRHI::MaxFramesInFlight; ++i) {
@@ -205,7 +205,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
     };
     _cullingFrameDataBindGroup = createBindGroup({
         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-        .bindingTypes = { frameDataTypes, std::size(frameDataTypes) },
+        .bindingTypes = frameDataTypes,
     });
 
     for (int i = 0; i < IRHI::MaxFramesInFlight; ++i) {
@@ -269,12 +269,12 @@ VulkanRHI::VulkanRHI(const Window& Window)
     const VkDescriptorType drawIndirectTypes[] = { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
     _drawIndirectCommandBindGroup = createBindGroup({
         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-        .bindingTypes = { drawIndirectTypes, std::size(drawIndirectTypes) },
+        .bindingTypes = drawIndirectTypes,
     });
     const VkDescriptorType storageBufferType[] = { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
     _drawRecordBindGroup = createBindGroup({
         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT,
-        .bindingTypes = { storageBufferType, std::size(storageBufferType) },
+        .bindingTypes = storageBufferType,
     });
     for (int i = 0; i < IRHI::MaxFramesInFlight; ++i) {
         auto [drawIndirectBuffer, drawIndirectAllocation] = VulkanBuffer::create(*this,
@@ -320,7 +320,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
     const VkDescriptorType textureBindingTypes[] = { VK_DESCRIPTOR_TYPE_SAMPLER, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE };
     _albedoTextureBindGroup = createBindGroup({
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-        .bindingTypes = { textureBindingTypes, std::size(textureBindingTypes) },
+        .bindingTypes = textureBindingTypes,
         .finalBindingCount = 1000,
     });
 
@@ -345,7 +345,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
     };
     _deferredShadingBindGroup = createBindGroup({
         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-        .bindingTypes = { deferredShadingBindingTypes, std::size(deferredShadingBindingTypes) },
+        .bindingTypes = deferredShadingBindingTypes,
     });
     auto& deferredShadingDescriptorSets = _bindGroupManager.get<DescriptorSets>(_deferredShadingBindGroup);
 
@@ -399,7 +399,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
     auto [cullingComputeShader, cullingComputeLayout] = VulkanComputeShader::create(_device,
         {
             .computeShaderPath = NH3D_DIR "src/rendering/shaders/culling.comp.spv",
-            .descriptorSetsLayouts = { cullingLayouts, std::size(cullingLayouts) },
+            .descriptorSetsLayouts = cullingLayouts,
         });
     _frustumCullingCS = _computeShaderManager.store(std::move(cullingComputeShader), std::move(cullingComputeLayout));
 
@@ -425,8 +425,8 @@ VulkanRHI::VulkanRHI(const Window& Window)
             .fragmentShaderPath = NH3D_DIR "src/rendering/shaders/default_gbuffer_deferred.frag.spv",
             .colorAttachmentFormats = { colorAttachmentInfos, std::size(colorAttachmentInfos) },
             .depthAttachmentFormat = VK_FORMAT_D32_SFLOAT,
-            .descriptorSetsLayouts = { gbufferLayouts, std::size(gbufferLayouts) },
-            .pushConstantRanges = { &pushConstantRange, 1 },
+            .descriptorSetsLayouts = gbufferLayouts,
+            .pushConstantRanges = pushConstantRange,
         });
     _gbufferShader = _shaderManager.store(std::move(gbufferShader), std::move(gbufferPipelineLayout));
 
@@ -437,11 +437,22 @@ VulkanRHI::VulkanRHI(const Window& Window)
     auto [deferredShadingShader, deferredShadingPipelineLayout] = VulkanComputeShader::create(_device,
         {
             .computeShaderPath = NH3D_DIR "src/rendering/shaders/deferred_shading.comp.spv",
-            .descriptorSetsLayouts = { deferredShadingLayouts, std::size(deferredShadingLayouts) },
+            .descriptorSetsLayouts = deferredShadingLayouts,
         });
     _deferredShadingCS = _computeShaderManager.store(std::move(deferredShadingShader), std::move(deferredShadingPipelineLayout));
 
-    _debugDrawer = std::make_unique<VulkanDebugDrawer>(this, VkExtent2D { Window.getWidth(), Window.getHeight() }, surfaceFormat);
+    std::array<Handle<Texture>, MaxFramesInFlight> depthTextures;
+    for (int i = 0; i < MaxFramesInFlight; ++i) {
+        depthTextures[i] = _gbufferRTs[i].depthRT;
+    }
+
+    _debugDrawer = std::make_unique<VulkanDebugDrawer>(this,
+        DebugDrawSetupData {
+            .extent = { Window.getWidth(), Window.getHeight() },
+            .attachmentFormat = surfaceFormat,
+            .transformDataBuffers = _cullingTransformBuffers,
+            .objectAABBsBuffers = _cullingAABBsBuffers,
+        });
 }
 
 VulkanRHI::~VulkanRHI()
@@ -638,8 +649,6 @@ void VulkanRHI::render(Scene& scene) const
 
     void* visibleFlagsPtr = VulkanBuffer::getMappedAddress(*this, visibleFlagStagingAllocation);
     std::memcpy(visibleFlagsPtr, scene.getRawVisibleFlags(), visibleFlagsBufferSize);
-    VulkanBuffer::insertMemoryBarrier(commandBuffer, visibleFlagBuffer.buffer, VK_ACCESS_2_SHADER_READ_BIT,
-        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT);
     VulkanBuffer::copyBuffer(commandBuffer, visibleFlagStagingBuffer.buffer, visibleFlagBuffer.buffer, visibleFlagsBufferSize);
     VulkanBuffer::insertMemoryBarrier(commandBuffer, visibleFlagBuffer.buffer, VK_ACCESS_2_TRANSFER_WRITE_BIT,
         VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_SHADER_READ_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
@@ -680,8 +689,7 @@ void VulkanRHI::render(Scene& scene) const
         VulkanBindGroup::getUpdatedDescriptorSet(_device, _bindGroupManager.get<DescriptorSets>(_drawRecordBindGroup), frameInFlightId),
     };
 
-    VulkanBindGroup::bind(
-        commandBuffer, { cullingDescriptorSets, std::size(cullingDescriptorSets) }, VK_PIPELINE_BIND_POINT_COMPUTE, cullingPipelineLayout);
+    VulkanBindGroup::bind(commandBuffer, cullingDescriptorSets, VK_PIPELINE_BIND_POINT_COMPUTE, cullingPipelineLayout);
 
     const vec3i cullingKernelSize { std::ceil(objectCount / 64.f), 1, 1 };
     VulkanComputeShader::dispatch(commandBuffer, cullingPipeline, cullingKernelSize);
@@ -703,8 +711,7 @@ void VulkanRHI::render(Scene& scene) const
         VulkanBindGroup::getUpdatedDescriptorSet(_device, _bindGroupManager.get<DescriptorSets>(_albedoTextureBindGroup), frameInFlightId),
         VulkanBindGroup::getUpdatedDescriptorSet(_device, _bindGroupManager.get<DescriptorSets>(_drawRecordBindGroup), frameInFlightId),
     };
-    VulkanBindGroup::bind(
-        commandBuffer, { graphicsDescriptorSets, std::size(graphicsDescriptorSets) }, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsLayout);
+    VulkanBindGroup::bind(commandBuffer, graphicsDescriptorSets, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsLayout);
 
     const auto& albedoRTImageViewData = _textureManager.get<ImageView>(_gbufferRTs[frameInFlightId].albedoRT);
     const auto& albedoRTMetadata = _textureManager.get<TextureMetadata>(_gbufferRTs[frameInFlightId].albedoRT);
@@ -756,16 +763,18 @@ void VulkanRHI::render(Scene& scene) const
     NH3D_ASSERT(objectCount
             < _bufferManager.get<BufferAllocationInfo>(_drawIndirectBuffers[frameInFlightId]).allocatedSize / sizeof(VkDrawIndirectCommand),
         "Draw indirect buffer too small for the number of objects");
-    VulkanShader::draw(commandBuffer, graphicsPipeline, {
+    VulkanShader::multiDrawIndirect(commandBuffer, graphicsPipeline, {
                 .drawIndirectBuffer = drawIndirectBuffer.buffer,
                 .drawIndirectCountBuffer = drawCountBuffer,
                 .maxDrawCount = objectCount, // Good enough for now
-                .extent = { albedoRTMetadata.extent.width, albedoRTMetadata.extent.height },
-                .colorAttachments = { colorAttachmentsInfo, std::size(colorAttachmentsInfo) },
-                .depthAttachment = {
-                    .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-                    .imageView = depthRTViewData.view,
-                    .imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                .drawParams = { 
+                    .extent = { albedoRTMetadata.extent.width, albedoRTMetadata.extent.height },
+                    .colorAttachments = colorAttachmentsInfo,
+                    .depthAttachment = {
+                        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+                        .imageView = depthRTViewData.view,
+                        .imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                    },
                 },
             });
 
@@ -775,10 +784,20 @@ void VulkanRHI::render(Scene& scene) const
     VulkanTexture::insertMemoryBarrier(commandBuffer, albedoRTImageViewData.image, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
         VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_SHADER_READ_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
         VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+    constexpr bool EnableDebugDraw = true;
+    VkAccessFlags2 depthRtDstAccess = VK_ACCESS_2_SHADER_READ_BIT;
+    VkPipelineStageFlags2 depthRtDstStage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    if (EnableDebugDraw) {
+        // If debug drawing is enabled, we need to transition the depth RT back to depth attachment layout for the AABB drawer
+        // Note: assumes read only depth
+        depthRtDstAccess |= VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+        depthRtDstStage |= VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+    }
+
     VulkanTexture::insertMemoryBarrier(commandBuffer, depthRTViewData.image, VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-        VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT, VK_ACCESS_2_SHADER_READ_BIT,
-        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-        true);
+        VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT, depthRtDstAccess, depthRtDstStage,
+        VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, true);
 
     // Clearing is not necessary I believe
     const auto& finalRTImageViewData = _textureManager.get<ImageView>(_finalRTs[frameInFlightId]);
@@ -794,8 +813,7 @@ void VulkanRHI::render(Scene& scene) const
         VulkanBindGroup::getUpdatedDescriptorSet(
             _device, _bindGroupManager.get<DescriptorSets>(_deferredShadingBindGroup), frameInFlightId),
     };
-    VulkanBindGroup::bind(commandBuffer, { shadingDescriptorSets, std::size(shadingDescriptorSets) }, VK_PIPELINE_BIND_POINT_COMPUTE,
-        deferredShadingPipelineLayout);
+    VulkanBindGroup::bind(commandBuffer, shadingDescriptorSets, VK_PIPELINE_BIND_POINT_COMPUTE, deferredShadingPipelineLayout);
     const vec3i shadingKernelSize { std::ceil(finalRTMetadata.extent.width / 8.f), std::ceil(finalRTMetadata.extent.height / 8.f), 1 };
 
     VulkanComputeShader::dispatch(commandBuffer, deferredShadingPipeline, shadingKernelSize);
@@ -810,15 +828,27 @@ void VulkanRHI::render(Scene& scene) const
         VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_BLIT_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     VulkanTexture::blit(commandBuffer, finalRTImageViewData.image, finalRTMetadata.extent, scImageViewData.image, scMetadata.extent);
 
-    VulkanTexture::insertMemoryBarrier(commandBuffer, scImageViewData.image, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_BLIT_BIT,
-        VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    if (EnableDebugDraw) {
+        VulkanTexture::insertMemoryBarrier(commandBuffer, scImageViewData.image, VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_BLIT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        _debugDrawer->renderAABBs(commandBuffer, frameInFlightId, projectionMatrix, viewMatrix, objectCount,
+            _gbufferRTs[frameInFlightId].depthRT, _swapchainTextures[swapchainImageId]);
 
-    _debugDrawer->renderDebugUI(commandBuffer, frameInFlightId, _swapchainTextures[swapchainImageId]);
+        VulkanTexture::insertMemoryBarrier(commandBuffer, scImageViewData.image, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        _debugDrawer->renderDebugUI(commandBuffer, frameInFlightId, _swapchainTextures[swapchainImageId]);
 
-    VulkanTexture::insertMemoryBarrier(commandBuffer, scImageViewData.image, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-        VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_NONE, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        VulkanTexture::insertMemoryBarrier(commandBuffer, scImageViewData.image, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_NONE, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    } else {
+        VulkanTexture::insertMemoryBarrier(commandBuffer, scImageViewData.image, VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_BLIT_BIT, VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_NONE, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    }
 
     vkEndCommandBuffer(commandBuffer);
     submitCommandBuffer(_graphicsQueue, makeSemaphoreSubmitInfo(_presentSemaphores[frameInFlightId], VK_PIPELINE_STAGE_2_BLIT_BIT),

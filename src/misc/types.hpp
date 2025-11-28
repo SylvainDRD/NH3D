@@ -41,8 +41,60 @@ template <typename T>
 concept NonVoid = !std::is_void_v<T>;
 
 template <NonVoid T> struct ArrayWrapper {
-    const T* ptr;
+    const T* const data;
     const uint32 size; // element count
+
+    ArrayWrapper()
+        : data { nullptr }
+        , size { 0 }
+    {
+    }
+
+    template <size_t N>
+    ArrayWrapper(const std::array<T, N>& arr)
+        : data { arr.data() }
+        , size { static_cast<uint32>(arr.size()) }
+    {
+    }
+
+    ArrayWrapper(const std::vector<T>& vec)
+        : data { vec.data() }
+        , size { static_cast<uint32>(vec.size()) }
+    {
+    }
+
+    ArrayWrapper(const T& value)
+        : data { &value }
+        , size { 1 }
+    {
+    }
+
+    ArrayWrapper(const T* const p, const uint32 size)
+        : data { p }
+        , size { size }
+    {
+    }
+
+    template <size_t N>
+    ArrayWrapper(const T (&arr)[N])
+        : data { arr }
+        , size { static_cast<uint32>(N) }
+    {
+    }
+
+    [[nodiscard]] inline bool isValid() const { return data != nullptr && size > 0; }
+
+    T& operator[](const uint32 index)
+    {
+        NH3D_ASSERT(index < size, "ArrayWrapper index out of bounds");
+        return data[index];
+    }
+
+    const T& operator[](const uint32 index) const
+    {
+        NH3D_ASSERT(index < size, "ArrayWrapper index out of bounds");
+        return data[index];
+    }
 };
 
 struct VertexData {

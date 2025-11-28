@@ -24,9 +24,9 @@ VkPipelineLayout VulkanPipeline::createPipelineLayout(VkDevice device, const Arr
     const VkPipelineLayoutCreateInfo layoutCreateInfo {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .setLayoutCount = static_cast<uint32_t>(descriptorSetsLayouts.size),
-        .pSetLayouts = descriptorSetsLayouts.ptr,
+        .pSetLayouts = descriptorSetsLayouts.data,
         .pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size),
-        .pPushConstantRanges = pushConstantRanges.ptr,
+        .pPushConstantRanges = pushConstantRanges.data,
     };
 
     VkPipelineLayout pipelineLayout;

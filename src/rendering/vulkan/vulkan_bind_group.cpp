@@ -20,7 +20,7 @@ namespace NH3D {
     std::memset(bindingFlags.data(), 0, bindingFlags.size() * sizeof(VkDescriptorBindingFlags));
 
     for (uint32 i = 0; i < info.bindingTypes.size; ++i) {
-        const VkDescriptorType descriptorType = info.bindingTypes.ptr[i];
+        const VkDescriptorType descriptorType = info.bindingTypes.data[i];
 
         descriptorBindings[i] = VkDescriptorSetLayoutBinding {
             .binding = i, .descriptorType = descriptorType, .descriptorCount = 1, .stageFlags = info.stageFlags
@@ -63,7 +63,7 @@ namespace NH3D {
     for (auto [descriptorType, count] : descriptorTypeCounts) {
         poolSizes.emplace_back(VkDescriptorPoolSize { descriptorType, IRHI::MaxFramesInFlight * count });
 
-        if (info.finalBindingCount > 1 && descriptorType == info.bindingTypes.ptr[info.bindingTypes.size - 1]) {
+        if (info.finalBindingCount > 1 && descriptorType == info.bindingTypes.data[info.bindingTypes.size - 1]) {
             poolSizes.back().descriptorCount *= info.finalBindingCount;
         }
     }
@@ -141,7 +141,7 @@ bool VulkanBindGroup::valid(const DescriptorSets& descriptorSets, const BindGrou
 void VulkanBindGroup::bind(VkCommandBuffer commandBuffer, const ArrayWrapper<VkDescriptorSet> descriptorSets,
     const VkPipelineBindPoint bindPoint, const VkPipelineLayout pipelineLayout)
 {
-    vkCmdBindDescriptorSets(commandBuffer, bindPoint, pipelineLayout, 0, descriptorSets.size, descriptorSets.ptr, 0, nullptr);
+    vkCmdBindDescriptorSets(commandBuffer, bindPoint, pipelineLayout, 0, descriptorSets.size, descriptorSets.data, 0, nullptr);
 }
 
 }

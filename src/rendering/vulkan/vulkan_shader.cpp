@@ -9,9 +9,9 @@ namespace NH3D {
     const VkPipelineVertexInputStateCreateInfo vertexCI {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
         .vertexBindingDescriptionCount = shaderInfo.vertexInputInfo.bindingDescriptions.size,
-        .pVertexBindingDescriptions = shaderInfo.vertexInputInfo.bindingDescriptions.ptr,
+        .pVertexBindingDescriptions = shaderInfo.vertexInputInfo.bindingDescriptions.data,
         .vertexAttributeDescriptionCount = shaderInfo.vertexInputInfo.attributeDescriptions.size,
-        .pVertexAttributeDescriptions = shaderInfo.vertexInputInfo.attributeDescriptions.ptr,
+        .pVertexAttributeDescriptions = shaderInfo.vertexInputInfo.attributeDescriptions.data,
     };
 
     const VkPipelineInputAssemblyStateCreateInfo iasCI {
@@ -43,10 +43,14 @@ namespace NH3D {
         .alphaToOneEnable = VK_FALSE,
     };
 
+    if (shaderInfo.depthAttachmentFormat == VK_FORMAT_UNDEFINED && shaderInfo.enableDepthWrite) {
+        NH3D_ABORT("Depth write enabled but no depth attachment format specified");
+    }
+
     const VkPipelineDepthStencilStateCreateInfo depthStencilCI {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
         .depthTestEnable = shaderInfo.depthAttachmentFormat != VK_FORMAT_UNDEFINED ? VK_TRUE : VK_FALSE,
-        .depthWriteEnable = shaderInfo.depthAttachmentFormat != VK_FORMAT_UNDEFINED ? VK_TRUE : VK_FALSE,
+        .depthWriteEnable = shaderInfo.depthAttachmentFormat != VK_FORMAT_UNDEFINED && shaderInfo.enableDepthWrite ? VK_TRUE : VK_FALSE,
         .depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL, // reverse Z?
         .depthBoundsTestEnable = VK_FALSE,
         .stencilTestEnable = VK_FALSE,
@@ -61,14 +65,14 @@ namespace NH3D {
 
     for (uint32 i = 0; i < shaderInfo.colorAttachmentFormats.size; ++i) {
         blendAttachments[i] = VkPipelineColorBlendAttachmentState {
-            .blendEnable = shaderInfo.colorAttachmentFormats.ptr[i].blendEnable,
-            .srcColorBlendFactor = shaderInfo.colorAttachmentFormats.ptr[i].srcColorBlendFactor,
-            .dstColorBlendFactor = shaderInfo.colorAttachmentFormats.ptr[i].dstColorBlendFactor,
-            .colorBlendOp = shaderInfo.colorAttachmentFormats.ptr[i].colorBlendOp,
-            .srcAlphaBlendFactor = shaderInfo.colorAttachmentFormats.ptr[i].srcAlphaBlendFactor,
-            .dstAlphaBlendFactor = shaderInfo.colorAttachmentFormats.ptr[i].dstAlphaBlendFactor,
-            .alphaBlendOp = shaderInfo.colorAttachmentFormats.ptr[i].alphaBlendOp,
-            .colorWriteMask = shaderInfo.colorAttachmentFormats.ptr[i].colorWriteMask,
+            .blendEnable = shaderInfo.colorAttachmentFormats.data[i].blendEnable,
+            .srcColorBlendFactor = shaderInfo.colorAttachmentFormats.data[i].srcColorBlendFactor,
+            .dstColorBlendFactor = shaderInfo.colorAttachmentFormats.data[i].dstColorBlendFactor,
+            .colorBlendOp = shaderInfo.colorAttachmentFormats.data[i].colorBlendOp,
+            .srcAlphaBlendFactor = shaderInfo.colorAttachmentFormats.data[i].srcAlphaBlendFactor,
+            .dstAlphaBlendFactor = shaderInfo.colorAttachmentFormats.data[i].dstAlphaBlendFactor,
+            .alphaBlendOp = shaderInfo.colorAttachmentFormats.data[i].alphaBlendOp,
+            .colorWriteMask = shaderInfo.colorAttachmentFormats.data[i].colorWriteMask,
         };
     }
 
@@ -111,7 +115,7 @@ namespace NH3D {
 
     std::array<VkFormat, 4> colorAttachmentFormats {};
     for (uint32 i = 0; i < shaderInfo.colorAttachmentFormats.size; ++i) {
-        colorAttachmentFormats[i] = shaderInfo.colorAttachmentFormats.ptr[i].format;
+        colorAttachmentFormats[i] = shaderInfo.colorAttachmentFormats.data[i].format;
     }
 
     const VkPipelineRenderingCreateInfo renderCI {
@@ -156,16 +160,16 @@ void VulkanShader::release(const IRHI& rhi, VkPipeline& pipeline, VkPipelineLayo
 
 bool VulkanShader::valid(const VkPipeline pipeline, const VkPipelineLayout layout) { return pipeline != nullptr && layout != nullptr; }
 
-void VulkanShader::draw(VkCommandBuffer commandBuffer, const VkPipeline pipeline, const DrawParameters& params)
+void VulkanShader::multiDrawIndirect(VkCommandBuffer commandBuffer, const VkPipeline pipeline, const MultiDrawParameters& params)
 {
     const VkRenderingInfo renderingInfo {
         .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-        .renderArea = VkRect2D { {}, params.extent },
+        .renderArea = VkRect2D { {}, params.drawParams.extent },
         .layerCount = 1,
-        .colorAttachmentCount = static_cast<uint32_t>(params.colorAttachments.size),
-        .pColorAttachments = params.colorAttachments.ptr,
-        .pDepthAttachment = params.depthAttachment.imageView != nullptr ? &params.depthAttachment : nullptr,
-        .pStencilAttachment = params.stencilAttachment.imageView != nullptr ? &params.stencilAttachment : nullptr,
+        .colorAttachmentCount = static_cast<uint32_t>(params.drawParams.colorAttachments.size),
+        .pColorAttachments = params.drawParams.colorAttachments.data,
+        .pDepthAttachment = params.drawParams.depthAttachment.imageView != nullptr ? &params.drawParams.depthAttachment : nullptr,
+        .pStencilAttachment = params.drawParams.stencilAttachment.imageView != nullptr ? &params.drawParams.stencilAttachment : nullptr,
     };
 
     vkCmdBeginRendering(commandBuffer, &renderingInfo);
@@ -174,8 +178,8 @@ void VulkanShader::draw(VkCommandBuffer commandBuffer, const VkPipeline pipeline
     const VkViewport viewport = {
         .x = 0,
         .y = 0,
-        .width = float(params.extent.width),
-        .height = float(params.extent.height),
+        .width = float(params.drawParams.extent.width),
+        .height = float(params.drawParams.extent.height),
         .minDepth = 0.f,
         .maxDepth = 1.f,
     };
@@ -183,13 +187,50 @@ void VulkanShader::draw(VkCommandBuffer commandBuffer, const VkPipeline pipeline
     vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
     const VkRect2D scissor = {
-        .extent = params.extent,
+        .extent = params.drawParams.extent,
     };
 
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
     vkCmdDrawIndirectCount(
         commandBuffer, params.drawIndirectBuffer, 0, params.drawIndirectCountBuffer, 0, params.maxDrawCount, sizeof(VkDrawIndirectCommand));
+
+    vkCmdEndRendering(commandBuffer);
+}
+
+void VulkanShader::instancedDraw(const VkCommandBuffer commandBuffer, const VkPipeline pipeline, const InstancedDrawParameters& params)
+{
+    const VkRenderingInfo renderingInfo {
+        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+        .renderArea = VkRect2D { {}, params.drawParams.extent },
+        .layerCount = 1,
+        .colorAttachmentCount = static_cast<uint32_t>(params.drawParams.colorAttachments.size),
+        .pColorAttachments = params.drawParams.colorAttachments.data,
+        .pDepthAttachment = params.drawParams.depthAttachment.imageView != nullptr ? &params.drawParams.depthAttachment : nullptr,
+        .pStencilAttachment = params.drawParams.stencilAttachment.imageView != nullptr ? &params.drawParams.stencilAttachment : nullptr,
+    };
+
+    vkCmdBeginRendering(commandBuffer, &renderingInfo);
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+
+    const VkViewport viewport = {
+        .x = 0,
+        .y = 0,
+        .width = float(params.drawParams.extent.width),
+        .height = float(params.drawParams.extent.height),
+        .minDepth = 0.f,
+        .maxDepth = 1.f,
+    };
+
+    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+    const VkRect2D scissor = {
+        .extent = params.drawParams.extent,
+    };
+
+    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+    vkCmdDraw(commandBuffer, params.indexCount, params.instanceCount, 0, 0);
 
     vkCmdEndRendering(commandBuffer);
 }

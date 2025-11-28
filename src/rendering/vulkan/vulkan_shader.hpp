@@ -39,6 +39,7 @@ struct VulkanShader : public VulkanPipeline {
         const VkFormat stencilAttachmentFormat;
         const ArrayWrapper<VkDescriptorSetLayout> descriptorSetsLayouts;
         const ArrayWrapper<VkPushConstantRange> pushConstantRanges;
+        const bool enableDepthWrite = true;
     };
 
     /// "Constructor"
@@ -50,15 +51,28 @@ struct VulkanShader : public VulkanPipeline {
     static bool valid(const VkPipeline pipeline, const VkPipelineLayout layout);
 
     struct DrawParameters {
-        const VkBuffer drawIndirectBuffer;
-        const VkBuffer drawIndirectCountBuffer;
-        const uint32 maxDrawCount;
         const VkExtent2D extent;
         const ArrayWrapper<VkRenderingAttachmentInfo> colorAttachments;
         const VkRenderingAttachmentInfo depthAttachment;
         const VkRenderingAttachmentInfo stencilAttachment;
     };
-    static void draw(const VkCommandBuffer commandBuffer, const VkPipeline pipeline, const DrawParameters& params);
+
+    struct MultiDrawParameters {
+        const VkBuffer drawIndirectBuffer;
+        const VkBuffer drawIndirectCountBuffer;
+        const uint32 maxDrawCount;
+        const DrawParameters& drawParams;
+    };
+
+    static void multiDrawIndirect(const VkCommandBuffer commandBuffer, const VkPipeline pipeline, const MultiDrawParameters& params);
+
+    struct InstancedDrawParameters {
+        const uint32 instanceCount;
+        const uint32 indexCount;
+        const DrawParameters& drawParams;
+    };
+
+    static void instancedDraw(const VkCommandBuffer commandBuffer, const VkPipeline pipeline, const InstancedDrawParameters& params);
 };
 
 }

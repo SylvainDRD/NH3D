@@ -93,7 +93,7 @@ uint32 channelCount(const VkFormat format)
     }
 
     // TODO: handle initial data/texture size mismatch for other formats? (see below)
-    if (info.initialData.ptr != nullptr
+    if (info.initialData.data != nullptr
         && info.initialData.size == info.extent.width * info.extent.height * info.extent.depth * channelCount(info.format)) {
         auto [stagingBuffer, stagingAllocation] = VulkanBuffer::create(rhi,
             {
@@ -101,7 +101,7 @@ uint32 channelCount(const VkFormat format)
                 .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                 .memoryUsage = VMA_MEMORY_USAGE_CPU_ONLY,
                 .initialData = {
-                    info.initialData.ptr,
+                    info.initialData.data,
                     info.initialData.size,
                 },
             });

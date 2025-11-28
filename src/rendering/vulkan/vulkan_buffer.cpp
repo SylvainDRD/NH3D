@@ -25,13 +25,13 @@ std::pair<GPUBuffer, BufferAllocationInfo> VulkanBuffer::create(const VulkanRHI&
         NH3D_ABORT_VK("Vulkan buffer creation failed");
     }
 
-    if (info.initialData.ptr != nullptr && info.initialData.size > 0) {
+    if (info.initialData.data != nullptr && info.initialData.size > 0) {
         if (allocationInfo.pMappedData != nullptr) {
             if (info.initialData.size > info.size) {
                 NH3D_WARN("Initial data size is larger than buffer size, truncating data copy.");
             }
 
-            std::memcpy(allocationInfo.pMappedData, info.initialData.ptr, std::min(info.initialData.size, info.size));
+            std::memcpy(allocationInfo.pMappedData, info.initialData.data, std::min(info.initialData.size, info.size));
             if (info.memoryUsage != VMA_MEMORY_USAGE_CPU_ONLY) {
                 vmaFlushAllocation(rhi.getAllocator(), allocation, 0, info.size);
             }

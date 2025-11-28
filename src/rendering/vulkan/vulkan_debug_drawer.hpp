@@ -14,15 +14,25 @@ namespace NH3D {
 
 class VulkanRHI;
 
+struct DebugDrawSetupData {
+    VkExtent2D extent;
+    VkFormat attachmentFormat;
+    const FrameResource<Handle<Buffer>>& transformDataBuffers;
+    const FrameResource<Handle<Buffer>>& objectAABBsBuffers;
+};
+
 // Encapsulate ImGui debug draw and probably other debug draw stuff in the future
 class VulkanDebugDrawer {
     NH3D_NO_COPY_MOVE(VulkanDebugDrawer)
 public:
     VulkanDebugDrawer() = delete;
 
-    VulkanDebugDrawer(VulkanRHI* const rhi, const VkExtent2D extent, const VkFormat attachmentFormat);
+    VulkanDebugDrawer(VulkanRHI* const rhi, const DebugDrawSetupData& setupData);
 
     ~VulkanDebugDrawer();
+
+    void renderAABBs(VkCommandBuffer commandBuffer, const uint32_t frameInFlightId, const mat4& viewMatrix, const mat4& projectionMatrix,
+        const uint32 objectCount, const Handle<Texture> depthTexture, const Handle<Texture> renderTarget);
 
     void renderDebugUI(VkCommandBuffer commandBuffer, const uint32 frameInFlightId, const Handle<Texture> renderTarget);
 
@@ -38,15 +48,12 @@ private:
     Handle<BindGroup> _fontBindGroup = InvalidHandle<BindGroup>;
     Handle<Shader> _uiShader = InvalidHandle<Shader>;
 
-    Handle<Shader> _lineShader = InvalidHandle<Shader>;
-    // TODO: figure out descriptors needed
+    Handle<Shader> _aabbShader = InvalidHandle<Shader>;
+    Handle<BindGroup> _objectDataBindGroup = InvalidHandle<BindGroup>;
 
-    // Not per frame, because constant and instanced (& scaled!) many times
-    Handle<Buffer> _lineVertexBuffer = InvalidHandle<Buffer>;
-    Handle<Buffer> _lineIndexBuffer = InvalidHandle<Buffer>;
-
-    FrameResource<Handle<Buffer>> _vertexBuffers;
-    FrameResource<Handle<Buffer>> _indexBuffers;
+    // Per-frame buffers
+    FrameResource<Handle<Buffer>> _uiVertexBuffers;
+    FrameResource<Handle<Buffer>> _uiIndexBuffers;
 };
 
 }
