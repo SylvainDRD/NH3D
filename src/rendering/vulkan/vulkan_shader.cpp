@@ -16,7 +16,7 @@ namespace NH3D {
 
     const VkPipelineInputAssemblyStateCreateInfo iasCI {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-        .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+        .topology = shaderInfo.primitiveTopology,
         .primitiveRestartEnable = VK_FALSE,
     };
 
@@ -78,7 +78,7 @@ namespace NH3D {
 
     const VkPipelineColorBlendStateCreateInfo blendCI {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-        .logicOpEnable = VK_FALSE, // TODO: mmmmh
+        .logicOpEnable = VK_FALSE,
         .logicOp = VK_LOGIC_OP_COPY,
         .attachmentCount = shaderInfo.colorAttachmentFormats.size,
         .pAttachments = blendAttachments.data(),

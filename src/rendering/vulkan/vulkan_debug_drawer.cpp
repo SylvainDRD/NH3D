@@ -13,6 +13,11 @@ struct ImGuiPushConstants {
     vec2 translate;
 };
 
+struct AABBPushConstants {
+    mat4 projectionMatrix;
+    mat4 viewMatrix;
+};
+
 VulkanDebugDrawer::VulkanDebugDrawer(VulkanRHI* const rhi, const DebugDrawSetupData& setupData)
     : _rhi(rhi)
 {
@@ -174,7 +179,7 @@ VulkanDebugDrawer::VulkanDebugDrawer(VulkanRHI* const rhi, const DebugDrawSetupD
         {
             .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
             .offset = 0,
-            .size = 2 * sizeof(mat4),
+            .size = sizeof(AABBPushConstants),
         },
     };
 
@@ -197,11 +202,6 @@ VulkanDebugDrawer::~VulkanDebugDrawer()
     ImGui::DestroyContext();
     vkDestroySampler(_rhi->getVkDevice(), _fontSampler, nullptr);
 }
-
-struct AABBPushConstants {
-    mat4 projectionMatrix;
-    mat4 viewMatrix;
-};
 
 void VulkanDebugDrawer::renderAABBs(VkCommandBuffer commandBuffer, const uint32_t frameInFlightId, const mat4& viewMatrix,
     const mat4& projectionMatrix, const uint32 objectCount, const Handle<Texture> depthTexture, const Handle<Texture> renderTarget)
@@ -228,8 +228,8 @@ void VulkanDebugDrawer::renderAABBs(VkCommandBuffer commandBuffer, const uint32_
     VulkanShader::instancedDraw(commandBuffer,
         pipeline,
         {
-            .instanceCount = 24, // 12 lines per AABB
-            .indexCount = objectCount,
+            .instanceCount = objectCount,
+            .indexCount = 24, // 12 lines per AABB
             .drawParams = {
                 .extent = { rtMetadata.extent.width, rtMetadata.extent.height },
                 .colorAttachments = {

@@ -832,7 +832,7 @@ void VulkanRHI::render(Scene& scene) const
         VulkanTexture::insertMemoryBarrier(commandBuffer, scImageViewData.image, VK_ACCESS_2_TRANSFER_WRITE_BIT,
             VK_PIPELINE_STAGE_2_BLIT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-        _debugDrawer->renderAABBs(commandBuffer, frameInFlightId, projectionMatrix, viewMatrix, objectCount,
+        _debugDrawer->renderAABBs(commandBuffer, frameInFlightId, viewMatrix, projectionMatrix, objectCount,
             _gbufferRTs[frameInFlightId].depthRT, _swapchainTextures[swapchainImageId]);
 
         VulkanTexture::insertMemoryBarrier(commandBuffer, scImageViewData.image, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,

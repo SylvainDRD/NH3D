@@ -3,15 +3,15 @@
 #include "structs.inc.glsl"
 #include "common.inc.glsl"
 
-layout(set = 0, binding = 0) readonly buffer ObjectTransformsBuffer {
+layout(set = 0, binding = 0, scalar) readonly buffer ObjectTransformsBuffer {
     TransformData transforms[];
 } objectTransforms;
 
-layout(set = 0, binding = 1) readonly buffer ObjectAABBsBuffer {
+layout(set = 0, binding = 1, scalar) readonly buffer ObjectAABBsBuffer {
     AABB aabb[];
 } objectAABBs;
 
-layout(push_constant) uniform PushConstants {
+layout(push_constant, scalar) uniform PushConstants {
     mat4 projectionMatrix;
     mat4 viewMatrix;
 } pushConstants;
