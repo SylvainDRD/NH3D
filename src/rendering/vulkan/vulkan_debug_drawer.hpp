@@ -18,7 +18,7 @@ class VulkanDebugDrawer {
 public:
     VulkanDebugDrawer() = delete;
 
-    VulkanDebugDrawer(VulkanRHI* rhi, const VkExtent2D extent, const VkFormat attachmentFormat);
+    VulkanDebugDrawer(VulkanRHI* const rhi, const VkExtent2D extent, const VkFormat attachmentFormat);
 
     ~VulkanDebugDrawer();
 
@@ -29,12 +29,20 @@ private:
     void updateBuffers(const uint32 bufferId);
 
 private:
-    VulkanRHI* _rhi;
+    VulkanRHI* const _rhi;
 
     VkSampler _fontSampler;
 
     Handle<BindGroup> _fontBindGroup = InvalidHandle<BindGroup>;
-    Handle<Shader> _fontShader = InvalidHandle<Shader>;
+    Handle<Shader> _uiShader = InvalidHandle<Shader>;
+
+    Handle<Shader> _lineShader = InvalidHandle<Shader>;
+    Handle<Buffer> _lineVertexBuffer = InvalidHandle<Buffer>;
+    Handle<Buffer> _lineIndexBuffer = InvalidHandle<Buffer>;
+    Handle<ComputeShader> _lineCullingCS = InvalidHandle<ComputeShader>;
+    Handle<BindGroup> _cullingFrameDataBindGroup = InvalidHandle<BindGroup>;
+    Handle<BindGroup> _lineCullingBindGroup = InvalidHandle<BindGroup>;
+    Handle<Buffer> _cullingDrawCounterBuffer = InvalidHandle<Buffer>;
 
     std::array<Handle<Buffer>, IRHI::MaxFramesInFlight> _vertexBuffers;
     std::array<Handle<Buffer>, IRHI::MaxFramesInFlight> _indexBuffers;

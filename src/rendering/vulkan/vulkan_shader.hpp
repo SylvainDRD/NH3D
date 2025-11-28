@@ -33,6 +33,7 @@ struct VulkanShader : public VulkanPipeline {
         const std::filesystem::path& fragmentShaderPath;
         const VertexInputInfo vertexInputInfo;
         const VkCullModeFlags cullMode = VK_CULL_MODE_BACK_BIT;
+        const VkPrimitiveTopology primitiveTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
         const ArrayWrapper<ColorAttachmentInfo> colorAttachmentFormats;
         const VkFormat depthAttachmentFormat;
         const VkFormat stencilAttachmentFormat;

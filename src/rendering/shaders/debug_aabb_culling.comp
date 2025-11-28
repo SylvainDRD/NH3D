@@ -1,0 +1,117 @@
+#version 460
+#extension GL_EXT_shader_explicit_arithmetic_types_int8 : require
+
+#include "structs.inc.glsl"
+#include "culling.inc.glsl"
+
+layout(local_size_x = 64) in;
+
+// Reusing RenderData even though we only need the AABB because the buffer is already there
+// + access perf not relevant because it's a debug shader
+layout(set = 0, binding = 0, scalar) readonly buffer RenderDataBuffer {
+    RenderData objects[];
+} renderData;
+
+layout(set = 0, binding = 1, scalar) readonly buffer VisibleFlags {
+    uint flags[];
+} visibleFlags;
+
+// TODO: Move to push constants
+layout(set = 1, binding = 0, scalar) readonly uniform CullingParametersData
+{
+    CullingParameters parameters;
+} cullingData;
+
+// TODO: move into render data
+layout(set = 1, binding = 1, scalar) readonly buffer TransformBuffer {
+    TransformData transforms[];
+} transformBuffer;
+
+layout(set = 1, binding = 2, scalar) buffer DrawCounter {
+    uint count;
+} drawCounter;
+
+struct VkDrawIndexedIndirectCommand {
+    uint indexCount;
+    uint instanceCount;
+    uint firstIndex;
+    int vertexOffset;
+    uint firstInstance;
+};
+
+layout(set = 2, binding = 0, scalar) buffer DrawIndexedIndirectCommandBuffer {
+    VkDrawIndexedIndirectCommand commands[];
+} drawIndexedIndirectCommands;
+
+layout(set = 3, binding = 0, scalar) buffer VertexOnlyBuffer {
+    vec3 vertices[];
+};
+
+layout(set = 3, binding = 1, scalar) buffer Index8Buffer {
+    uint8_t indices[];
+};
+
+void main()
+{
+    uint index = gl_GlobalInvocationID.x;
+
+    if (index >= cullingData.parameters.objectCount) {
+        return;
+    }
+
+    if (!isVisibleFlagSet(visibleFlags.flags, index)) {
+        return;
+    }
+
+    RenderData obj = renderData.objects[index];
+
+    mat4 viewSpaceTransform = cullingData.parameters.viewMatrix * computeTransform(transformBuffer.transforms[index]);
+
+    AABB viewAABB = computeViewAABB(viewSpaceTransform, obj.mesh.objectAABB);
+
+    if (inFrustum(viewAABB, cullingData.parameters)) {
+        uint drawIndex = atomicAdd(drawCounter.count, 1); // To be reset by CPU before dispatch
+        int vertexOffset = drawIndex * 8; // 8 vertices per AABB
+        uint indexOffset = drawIndex * 24; // 24 indices per AABB (12 edges * 2)
+
+        drawIndexedIndirectCommands.commands[drawIndex].indexCount = 24;
+        drawIndexedIndirectCommands.commands[drawIndex].instanceCount = 1;
+        drawIndexedIndirectCommands.commands[drawIndex].firstIndex = indexOffset;
+        drawIndexedIndirectCommands.commands[drawIndex].vertexOffset = vertexOffset;
+        drawIndexedIndirectCommands.commands[drawIndex].firstInstance = 0;
+
+        pushConstants.vertexBuffer[vertexOffset + 0] = viewAABB.min;
+        pushConstants.vertexBuffer[vertexOffset + 1] = vec3(viewAABB.max.x, viewAABB.min.y, viewAABB.min.z);
+        pushConstants.vertexBuffer[vertexOffset + 2] = vec3(viewAABB.max.x, viewAABB.max.y, viewAABB.min.z);
+        pushConstants.vertexBuffer[vertexOffset + 3] = vec3(viewAABB.min.x, viewAABB.max.y, viewAABB.min.z);
+        pushConstants.vertexBuffer[vertexOffset + 4] = vec3(viewAABB.min.x, viewAABB.min.y, viewAABB.max.z);
+        pushConstants.vertexBuffer[vertexOffset + 5] = vec3(viewAABB.max.x, viewAABB.min.y, viewAABB.max.z);
+        pushConstants.vertexBuffer[vertexOffset + 6] = viewAABB.max;
+        pushConstants.vertexBuffer[vertexOffset + 7] = vec3(viewAABB.min.x, viewAABB.max.y, viewAABB.max.z);
+
+        pushConstants.indexBuffer[indexOffset + 0] = 0;
+        pushConstants.indexBuffer[indexOffset + 1] = 1;
+        pushConstants.indexBuffer[indexOffset + 2] = 1;
+        pushConstants.indexBuffer[indexOffset + 3] = 2;
+        pushConstants.indexBuffer[indexOffset + 4] = 2;
+        pushConstants.indexBuffer[indexOffset + 5] = 3;
+        pushConstants.indexBuffer[indexOffset + 6] = 3;
+        pushConstants.indexBuffer[indexOffset + 7] = 0;
+        pushConstants.indexBuffer[indexOffset + 8] = 4;
+        pushConstants.indexBuffer[indexOffset + 9] = 5;
+        pushConstants.indexBuffer[indexOffset + 10] = 5;
+        pushConstants.indexBuffer[indexOffset + 11] = 6;
+        pushConstants.indexBuffer[indexOffset + 12] = 6;
+        pushConstants.indexBuffer[indexOffset + 13] = 7;
+        pushConstants.indexBuffer[indexOffset + 14] = 7;
+        pushConstants.indexBuffer[indexOffset + 15] = 4;
+        pushConstants.indexBuffer[indexOffset + 16] = 0;
+        pushConstants.indexBuffer[indexOffset + 17] = 4;
+        pushConstants.indexBuffer[indexOffset + 18] = 1;
+        pushConstants.indexBuffer[indexOffset + 19] = 5;
+        pushConstants.indexBuffer[indexOffset + 20] = 2;
+        pushConstants.indexBuffer[indexOffset + 21] = 6;
+        pushConstants.indexBuffer[indexOffset + 22] = 3;
+        pushConstants.indexBuffer[indexOffset + 23] = 7;
+    }
+}
