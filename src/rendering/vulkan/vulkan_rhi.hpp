@@ -7,6 +7,7 @@
 #include <rendering/core/bind_group.hpp>
 #include <rendering/core/buffer.hpp>
 #include <rendering/core/compute_shader.hpp>
+#include <rendering/core/frame_resource.hpp>
 #include <rendering/core/handle.hpp>
 #include <rendering/core/material.hpp>
 #include <rendering/core/resource_manager.hpp>
@@ -79,7 +80,6 @@ private:
         VkDeviceAddress vertexBuffer;
         VkDeviceAddress indexBuffer;
         Material material;
-        AABB objectAABB;
     };
 
     struct RenderData {
@@ -101,8 +101,6 @@ private:
     };
 
 private:
-    VkCommandBuffer getFrameCommandBuffer() const;
-
     VkInstance createVkInstance(std::vector<const char*>&& requiredWindowExtensions) const;
 
     VkDebugUtilsMessengerEXT createDebugMessenger(const VkInstance instance) const;
@@ -161,10 +159,9 @@ private:
     VkCommandBuffer _immediateCommandBuffer;
     VkFence _immediateCommandFence;
 
-    std::array<VkCommandBuffer, MaxFramesInFlight> _commandBuffers;
-    std::array<VkFence, MaxFramesInFlight> _frameFences;
-
-    std::array<VkSemaphore, MaxFramesInFlight> _presentSemaphores;
+    FrameResource<VkCommandBuffer> _commandBuffers;
+    FrameResource<VkFence> _frameFences;
+    FrameResource<VkSemaphore> _presentSemaphores;
     std::vector<VkSemaphore> _renderSemaphores;
 
     VkSampler _linearSampler;
@@ -174,38 +171,37 @@ private:
     mutable ResourceManager<VulkanShader> _shaderManager;
     mutable ResourceManager<VulkanComputeShader> _computeShaderManager;
     mutable ResourceManager<VulkanBindGroup> _bindGroupManager;
-
     Handle<ComputeShader> _frustumCullingCS = InvalidHandle<ComputeShader>;
     // Vertices/Indices/Material/AABB + visible flags
     Handle<BindGroup> _cullingRenderDataBindGroup = InvalidHandle<BindGroup>;
-    Handle<Buffer> _cullingRenderDataBuffer = InvalidHandle<Buffer>;
-    Handle<Buffer> _cullingRenderDataStagingBuffer = InvalidHandle<Buffer>;
-    Handle<Buffer> _cullingVisibleFlagBuffer = InvalidHandle<Buffer>;
-    std::array<Handle<Buffer>, MaxFramesInFlight> _cullingVisibleFlagStagingBuffer
-        = { InvalidHandle<Buffer>, InvalidHandle<Buffer> }; // Init only helps for MaxFramesInFlight == 2
+    FrameResource<Handle<Buffer>> _cullingRenderDataBuffers = {};
+    FrameResource<Handle<Buffer>> _cullingRenderDataStagingBuffers = {};
+    FrameResource<Handle<Buffer>> _cullingVisibleFlagBuffers = {};
+    FrameResource<Handle<Buffer>> _cullingAABBsBuffers = {};
+    FrameResource<Handle<Buffer>> _cullingVisibleFlagStagingBuffers = {};
     Handle<BindGroup> _cullingFrameDataBindGroup = InvalidHandle<BindGroup>;
-    Handle<Buffer> _cullingParametersBuffer = InvalidHandle<Buffer>; // Update via vkCmdUpdateBuffer
-    Handle<Buffer> _cullingTransformBuffer = InvalidHandle<Buffer>;
-    Handle<Buffer> _cullingTransformStagingBuffer = InvalidHandle<Buffer>;
-    Handle<Buffer> _cullingDrawCounterBuffer = InvalidHandle<Buffer>; // vkCmdFillBuffer
+    FrameResource<Handle<Buffer>> _cullingParametersBuffers = {}; // Update via vkCmdUpdateBuffer
+    FrameResource<Handle<Buffer>> _cullingTransformBuffers = {};
+    FrameResource<Handle<Buffer>> _cullingTransformStagingBuffers = {};
+    FrameResource<Handle<Buffer>> _cullingDrawCounterBuffers = {}; // vkCmdFillBuffer
 
     struct GBuffer {
         Handle<Texture> normalRT;
         Handle<Texture> albedoRT;
         Handle<Texture> depthRT;
     };
-    std::array<GBuffer, MaxFramesInFlight> _gbufferRTs;
+    FrameResource<GBuffer> _gbufferRTs;
 
     Handle<Shader> _gbufferShader;
     Handle<BindGroup> _drawIndirectCommandBindGroup;
-    Handle<Buffer> _drawIndirectBuffer; // GPU written
+    FrameResource<Handle<Buffer>> _drawIndirectBuffers; // GPU written
     Handle<BindGroup> _drawRecordBindGroup;
-    Handle<Buffer> _drawRecordBuffer; // GPU written
+    FrameResource<Handle<Buffer>> _drawRecordBuffers; // GPU written
     Handle<BindGroup> _albedoTextureBindGroup;
 
     Handle<ComputeShader> _deferredShadingCS;
     Handle<BindGroup> _deferredShadingBindGroup;
-    std::array<Handle<Texture>, MaxFramesInFlight> _finalRTs;
+    FrameResource<Handle<Texture>> _finalRTs;
 
     Uptr<VulkanDebugDrawer> _debugDrawer;
 

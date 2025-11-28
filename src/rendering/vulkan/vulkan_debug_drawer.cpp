@@ -123,7 +123,7 @@ VulkanDebugDrawer::VulkanDebugDrawer(VulkanRHI* const rhi, const VkExtent2D exte
     const VkDescriptorSetLayout bindingLayouts[] = {
         _rhi->getBindGroupManager().get<BindGroupMetadata>(_fontBindGroup).layout,
     };
-    const VkPushConstantRange pushConstantRange[] = {
+    const VkPushConstantRange uiPushConstantRange[] = {
         {
             .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
             .offset = 0,
@@ -139,7 +139,7 @@ VulkanDebugDrawer::VulkanDebugDrawer(VulkanRHI* const rhi, const VkExtent2D exte
             .cullMode = VK_CULL_MODE_NONE,
             .colorAttachmentFormats = { colorAttachmentInfo, std::size(colorAttachmentInfo) },
             .descriptorSetsLayouts = { bindingLayouts, std::size(bindingLayouts) },
-            .pushConstantRanges = { pushConstantRange, std::size(pushConstantRange) },
+            .pushConstantRanges = { uiPushConstantRange, std::size(uiPushConstantRange) },
         });
     _uiShader = _rhi->getShaderManager().store(std::move(uiPipeline), std::move(uiPipelineLayout));
 
@@ -159,18 +159,25 @@ VulkanDebugDrawer::VulkanDebugDrawer(VulkanRHI* const rhi, const VkExtent2D exte
         .format = VK_FORMAT_R32G32B32_SFLOAT,
         .offset = 0,
     };
+    const VkPushConstantRange aabbPushConstantRange[] = {
+        {
+            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+            .offset = 0,
+            .size = sizeof(mat4), // TODO
+        },
+    };
     auto [linePipeline, linePipelineLayout] = VulkanShader::create(_rhi->getVkDevice(),
         VulkanShader::ShaderInfo {
-            .vertexShaderPath = NH3D_DIR "src/rendering/shaders/debug_line.vert.spv",
-            .fragmentShaderPath = NH3D_DIR "src/rendering/shaders/debug_line.frag.spv",
+            .vertexShaderPath = NH3D_DIR "src/rendering/shaders/debug_aabb.vert.spv",
+            .fragmentShaderPath = NH3D_DIR "src/rendering/shaders/debug_aabb.frag.spv",
             .vertexInputInfo = VulkanShader::VertexInputInfo {
                 .bindingDescriptions = { &lineBindingDesc, 1 },
                 .attributeDescriptions = { &lineAttributeDesc, 1 },
             },
             .cullMode = VK_CULL_MODE_NONE,
             .colorAttachmentFormats = { colorAttachmentInfo, std::size(colorAttachmentInfo) },
-            .descriptorSetsLayouts = { bindingLayouts, std::size(bindingLayouts) },
-            .pushConstantRanges = { pushConstantRange, std::size(pushConstantRange) },
+            .descriptorSetsLayouts = { nullptr, 0 }, // TODO
+            .pushConstantRanges = { aabbPushConstantRange, std::size(aabbPushConstantRange) },
         });
     _lineShader = _rhi->getShaderManager().store(std::move(linePipeline), std::move(linePipelineLayout));
 
@@ -191,78 +198,66 @@ VulkanDebugDrawer::VulkanDebugDrawer(VulkanRHI* const rhi, const VkExtent2D exte
         });
     _lineIndexBuffer = bufferManager.store(std::move(indexBuffer), std::move(indexBufferAllocation));
 
-    // Culling stuff
-    auto [cullingDrawCounterBuffer, cullingDrawCounterAllocation] = VulkanBuffer::create(*_rhi,
-        {
-            .size = sizeof(uint32),
-            .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
-            .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
-        });
+    // auto& frameDataDescriptorSets = _bindGroupManager.get<DescriptorSets>(_cullingFrameDataBindGroup);
+    // for (int i = 0; i < IRHI::MaxFramesInFlight; ++i) {
+    //     VulkanBindGroup::updateDescriptorSet(_rhi->getVkDevice(), frameDataDescriptorSets.sets[i],
+    //         VkDescriptorBufferInfo {
+    //             .buffer = cullingParametersBuffer.buffer,
+    //             .offset = 0,
+    //             .range = VK_WHOLE_SIZE,
+    //         },
+    //         VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0);
+    //     VulkanBindGroup::updateDescriptorSet(_device, frameDataDescriptorSets.sets[i],
+    //         VkDescriptorBufferInfo {
+    //             .buffer = cullingTransformBuffer.buffer,
+    //             .offset = 0,
+    //             .range = VK_WHOLE_SIZE,
+    //         },
+    //         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1);
+    //     VulkanBindGroup::updateDescriptorSet(_device, frameDataDescriptorSets.sets[i],
+    //         VkDescriptorBufferInfo {
+    //             .buffer = cullingDrawCounterBuffer.buffer,
+    //             .offset = 0,
+    //             .range = VK_WHOLE_SIZE,
+    //         },
+    //         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2);
+    // }
 
-    _cullingDrawCounterBuffer
-        = _rhi->getBufferManager().store(std::move(cullingDrawCounterBuffer), std::move(cullingDrawCounterAllocation));
+    // const VkDescriptorType drawIndirectTypes[] = { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
+    // _drawIndirectCommandBindGroup = createBindGroup({
+    //     .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+    //     .bindingTypes = { drawIndirectTypes, std::size(drawIndirectTypes) },
+    // });
 
-    auto& frameDataDescriptorSets = _bindGroupManager.get<DescriptorSets>(_cullingFrameDataBindGroup);
-    for (int i = 0; i < IRHI::MaxFramesInFlight; ++i) {
-        VulkanBindGroup::updateDescriptorSet(_rhi->getVkDevice(), frameDataDescriptorSets.sets[i],
-            VkDescriptorBufferInfo {
-                .buffer = cullingParametersBuffer.buffer,
-                .offset = 0,
-                .range = VK_WHOLE_SIZE,
-            },
-            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0);
-        VulkanBindGroup::updateDescriptorSet(_device, frameDataDescriptorSets.sets[i],
-            VkDescriptorBufferInfo {
-                .buffer = cullingTransformBuffer.buffer,
-                .offset = 0,
-                .range = VK_WHOLE_SIZE,
-            },
-            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1);
-        VulkanBindGroup::updateDescriptorSet(_device, frameDataDescriptorSets.sets[i],
-            VkDescriptorBufferInfo {
-                .buffer = cullingDrawCounterBuffer.buffer,
-                .offset = 0,
-                .range = VK_WHOLE_SIZE,
-            },
-            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2);
-    }
+    // auto [drawIndirectBuffer, drawIndirectAllocation] = VulkanBuffer::create(*this,
+    //     {
+    //         .size = MaxObjects * sizeof(VkDrawIndirectCommand),
+    //         .usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+    //         .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
+    //     });
+    // _drawIndirectBuffer = _bufferManager.store(std::move(drawIndirectBuffer), std::move(drawIndirectAllocation));
 
-    const VkDescriptorType drawIndirectTypes[] = { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
-    _drawIndirectCommandBindGroup = createBindGroup({
-        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-        .bindingTypes = { drawIndirectTypes, std::size(drawIndirectTypes) },
-    });
+    // VkPhysicalDeviceProperties properties;
+    // vkGetPhysicalDeviceProperties(_gpu, &properties);
+    // NH3D_ASSERT(drawIndirectAllocation.allocatedSize / sizeof(VkDrawIndirectCommand) < properties.limits.maxDrawIndirectCount,
+    //     "Insufficient max indirect draw count");
 
-    auto [drawIndirectBuffer, drawIndirectAllocation] = VulkanBuffer::create(*this,
-        {
-            .size = MaxObjects * sizeof(VkDrawIndirectCommand),
-            .usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-            .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
-        });
-    _drawIndirectBuffer = _bufferManager.store(std::move(drawIndirectBuffer), std::move(drawIndirectAllocation));
-
-    VkPhysicalDeviceProperties properties;
-    vkGetPhysicalDeviceProperties(_gpu, &properties);
-    NH3D_ASSERT(drawIndirectAllocation.allocatedSize / sizeof(VkDrawIndirectCommand) < properties.limits.maxDrawIndirectCount,
-        "Insufficient max indirect draw count");
-
-    auto& drawIndirectDescriptorSets = _bindGroupManager.get<DescriptorSets>(_drawIndirectCommandBindGroup);
-    for (int i = 0; i < IRHI::MaxFramesInFlight; ++i) {
-        VulkanBindGroup::updateDescriptorSet(_device, drawIndirectDescriptorSets.sets[i],
-            VkDescriptorBufferInfo {
-                .buffer = drawIndirectBuffer.buffer,
-                .offset = 0,
-                .range = VK_WHOLE_SIZE,
-            },
-            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
-    }
+    // auto& drawIndirectDescriptorSets = _bindGroupManager.get<DescriptorSets>(_drawIndirectCommandBindGroup);
+    // for (int i = 0; i < IRHI::MaxFramesInFlight; ++i) {
+    //     VulkanBindGroup::updateDescriptorSet(_device, drawIndirectDescriptorSets.sets[i],
+    //         VkDescriptorBufferInfo {
+    //             .buffer = drawIndirectBuffer.buffer,
+    //             .offset = 0,
+    //             .range = VK_WHOLE_SIZE,
+    //         },
+    //         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
+    // }
 }
 
 VulkanDebugDrawer::~VulkanDebugDrawer()
 {
     ImGui::DestroyContext();
     vkDestroySampler(_rhi->getVkDevice(), _fontSampler, nullptr);
-    _rhi = nullptr;
 }
 
 void VulkanDebugDrawer::renderDebugUI(VkCommandBuffer commandBuffer, const uint32_t frameInFlightId, const Handle<Texture> renderTarget)

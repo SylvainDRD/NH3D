@@ -27,7 +27,6 @@ struct MeshData {
     VertexBuffer vertexBuffer;
     IndexBuffer indexBuffer;
     Material material;
-    AABB objectAABB;
 };
 
 struct RenderData {
@@ -76,8 +75,6 @@ mat4 computeTransform(TransformData t) {
 }
 
 bool inFrustum(AABB viewAABB, CullingParameters cullingParams) {
-    return true; // TODO: remove
-
     // Near
     if (viewAABB.max.z < 0.0) {
         return false;

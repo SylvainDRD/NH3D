@@ -15,6 +15,10 @@ layout(set = 0, binding = 1, scalar) readonly buffer VisibleFlags {
     uint flags[];
 } visibleFlags;
 
+layout(set = 0, binding = 2, scalar) readonly buffer AABBBuffer {
+    AABB aabb[];
+} objectAABBs;
+
 // TODO: Move to push constants
 layout(set = 1, binding = 0, scalar) readonly uniform CullingParametersData
 {
@@ -61,9 +65,10 @@ void main()
 
     mat4 viewSpaceTransform = cullingData.parameters.viewMatrix * computeTransform(transformBuffer.transforms[index]);
 
-    AABB viewAABB = computeViewAABB(viewSpaceTransform, obj.mesh.objectAABB);
+    AABB viewAABB = computeViewAABB(viewSpaceTransform, objectAABBs.aabb[index]);
 
-    if (inFrustum(viewAABB, cullingData.parameters)) {
+    // if (inFrustum(viewAABB, cullingData.parameters)) {
+    if (true) { // TODO: remove
         uint drawIndex = atomicAdd(drawCounter.count, 1); // To be reset by CPU before dispatch
 
         drawIndirectCommands.commands[drawIndex].vertexCount = obj.indexCount;

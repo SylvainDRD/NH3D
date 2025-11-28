@@ -3,6 +3,8 @@
 #include <misc/types.hpp>
 #include <misc/utils.hpp>
 #include <rendering/core/bind_group.hpp>
+#include <rendering/core/compute_shader.hpp>
+#include <rendering/core/frame_resource.hpp>
 #include <rendering/core/rhi.hpp>
 #include <rendering/core/shader.hpp>
 #include <rendering/core/texture.hpp>
@@ -37,15 +39,14 @@ private:
     Handle<Shader> _uiShader = InvalidHandle<Shader>;
 
     Handle<Shader> _lineShader = InvalidHandle<Shader>;
+    // TODO: figure out descriptors needed
+
+    // Not per frame, because constant and instanced (& scaled!) many times
     Handle<Buffer> _lineVertexBuffer = InvalidHandle<Buffer>;
     Handle<Buffer> _lineIndexBuffer = InvalidHandle<Buffer>;
-    Handle<ComputeShader> _lineCullingCS = InvalidHandle<ComputeShader>;
-    Handle<BindGroup> _cullingFrameDataBindGroup = InvalidHandle<BindGroup>;
-    Handle<BindGroup> _lineCullingBindGroup = InvalidHandle<BindGroup>;
-    Handle<Buffer> _cullingDrawCounterBuffer = InvalidHandle<Buffer>;
 
-    std::array<Handle<Buffer>, IRHI::MaxFramesInFlight> _vertexBuffers;
-    std::array<Handle<Buffer>, IRHI::MaxFramesInFlight> _indexBuffers;
+    FrameResource<Handle<Buffer>> _vertexBuffers;
+    FrameResource<Handle<Buffer>> _indexBuffers;
 };
 
 }
