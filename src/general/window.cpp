@@ -20,8 +20,8 @@ Window::Window()
 
     int width, height;
     SDL_GetWindowSizeInPixels(_window, &width, &height);
-    _width = static_cast<uint32_t>(width);
-    _height = static_cast<uint32_t>(height);
+    _width = static_cast<uint32>(width);
+    _height = static_cast<uint32>(height);
 
     NH3D_LOG("Window creation completed");
 }

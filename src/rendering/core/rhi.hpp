@@ -1,5 +1,6 @@
 #pragma once
 
+#include <misc/types.hpp>
 #include <misc/utils.hpp>
 #include <rendering/core/buffer.hpp>
 #include <rendering/core/handle.hpp>
@@ -11,11 +12,10 @@ class Scene;
 class RenderGraph;
 class Window;
 
-// TODO: singleton
 class IRHI {
     NH3D_NO_COPY_MOVE(IRHI)
 public:
-    static constexpr uint32_t MaxFramesInFlight = 2;
+    static constexpr uint32 MaxFramesInFlight = 2;
 
 public:
     IRHI() = default;

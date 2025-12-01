@@ -1,6 +1,5 @@
 #pragma once
 
-#include <array>
 #include <core/aabb.hpp>
 #include <cstdint>
 #include <misc/utils.hpp>

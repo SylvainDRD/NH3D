@@ -18,42 +18,26 @@ int main()
     Scene& scene = engine.getMainScene();
     IRHI& rhi = engine.getRHI();
 
-    const std::vector<VertexData> vertexData = {
-        {
-            .position = vec3 { -1.f, -1.f, 0.0f },
-            .normal = vec3 { 0.0f, 0.0f, -1.0f },
-            .uv = vec2 { 1.0f, 0.0f },
-        },
-        {
-            .position = vec3 { 1.f, -1.f, 0.0f },
-            .normal = vec3 { 0.0f, 0.0f, -1.0f },
-            .uv = vec2 { 0.0f, 0.0f },
-        },
-        {
-            .position = vec3 { 0.f, 1.f, 0.0f },
-            .normal = vec3 { 0.0f, 0.0f, -1.0f },
-            .uv = vec2 { 0.5f, 1.0f },
-        },
-    };
-    const std::vector<uint32> indices = { 0, 1, 2 };
+    auto& resourceMapper = engine.getResourceMapper();
+    const auto& [cubeVertexData, cubeIndices] = resourceMapper.loadMesh(NH3D_DIR "cube.glb");
 
     Mesh meshData {
-        .vertexBuffer = rhi.createBuffer({ .size = static_cast<uint32>(vertexData.size() * sizeof(VertexData)),
+        .vertexBuffer = rhi.createBuffer({ .size = static_cast<uint32>(cubeVertexData.size() * sizeof(VertexData)),
             .usageFlags = BufferUsageFlagBits::STORAGE_BUFFER_BIT | BufferUsageFlagBits::DST_TRANSFER_BIT,
             .memoryUsage = BufferMemoryUsage::GPU_ONLY,
             .initialData
-            = { reinterpret_cast<const byte*>(vertexData.data()), static_cast<uint32>(vertexData.size() * sizeof(VertexData)) } }),
-        .indexBuffer = rhi.createBuffer({ .size = static_cast<uint32>(indices.size() * sizeof(uint32)),
+            = { reinterpret_cast<const byte*>(cubeVertexData.data()), static_cast<uint32>(cubeVertexData.size() * sizeof(VertexData)) } }),
+        .indexBuffer = rhi.createBuffer({ .size = static_cast<uint32>(cubeIndices.size() * sizeof(uint32)),
             .usageFlags = BufferUsageFlagBits::INDEX_BUFFER_BIT | BufferUsageFlagBits::DST_TRANSFER_BIT,
             .memoryUsage = BufferMemoryUsage::GPU_ONLY,
-            .initialData = { reinterpret_cast<const byte*>(indices.data()), static_cast<uint32>(indices.size() * sizeof(uint32)) } }),
-        .objectAABB = AABB::fromMesh(vertexData, indices),
+            .initialData
+            = { reinterpret_cast<const byte*>(cubeIndices.data()), static_cast<uint32>(cubeIndices.size() * sizeof(uint32)) } }),
+        .objectAABB = AABB::fromMesh(cubeVertexData, cubeIndices),
     };
 
-    engine.getResourceMapper().storeMesh("basic triangle", meshData);
+    // resourceMapper.storeMesh("...", meshData);
 
-    // Debug only
-    scene.create(CameraComponent {}, TransformComponent { { -4.2f, 2.25f, -0.88f }, quat { vec3 { 0.3f, 0.75f, 0.05f } } });
+    scene.create(CameraComponent {}, TransformComponent {});
     scene.create(
         RenderComponent { meshData, Material { .albedo = color3 { 1.0f, 0.0f, 0.0f } } }, TransformComponent { { 0.0f, 0.0f, 10.0f } });
 
