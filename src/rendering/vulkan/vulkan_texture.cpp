@@ -260,7 +260,7 @@ void VulkanTexture::insertMemoryBarrier(VkCommandBuffer commandBuffer, const VkI
         .newLayout = newLayout,
         .image = image,
         .subresourceRange = {
-            .aspectMask = isDepth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT,
+            .aspectMask = static_cast<VkImageAspectFlags>(isDepth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT),
             .baseMipLevel = baseMipLevel,
             .levelCount = mipLevels,
             .layerCount = VK_REMAINING_ARRAY_LAYERS,

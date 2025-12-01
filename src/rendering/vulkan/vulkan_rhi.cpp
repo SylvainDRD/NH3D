@@ -609,7 +609,7 @@ void VulkanRHI::render(Scene& scene) const
     TransformComponent* transformDataPtr
         = reinterpret_cast<TransformComponent*>(VulkanBuffer::getMappedAddress(*this, transformStagingAllocation));
 
-    uint objectCount = 0;
+    uint32 objectCount = 0;
     // TODO: track dirty state properly
     static bool dirtyRenderingData = true;
     if (dirtyRenderingData) {

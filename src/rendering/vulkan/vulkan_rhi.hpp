@@ -88,7 +88,7 @@ private:
 
     struct RenderData {
         MeshData mesh;
-        uint indexCount;
+        uint32 indexCount;
     };
 
     struct FrustumPlanes {
@@ -101,7 +101,7 @@ private:
     struct CullingParameters {
         mat4 viewMatrix;
         FrustumPlanes frustumPlanes; // small optimization: consider infinite far plane and assume d=0 for near plane
-        uint objectCount;
+        uint32 objectCount;
     };
 
 private:

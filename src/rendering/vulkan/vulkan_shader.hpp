@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <filesystem>
 #include <misc/types.hpp>
 #include <misc/utils.hpp>

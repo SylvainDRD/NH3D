@@ -131,7 +131,7 @@ bool VulkanBindGroup::valid(const DescriptorSets& descriptorSets, const BindGrou
 {
     NH3D_ASSERT(frameInFlightId < IRHI::MaxFramesInFlight, "Requested out of bound descriptor set");
 
-    vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorSets.updates[frameInFlightId].size()),
+    vkUpdateDescriptorSets(device, static_cast<uint32>(descriptorSets.updates[frameInFlightId].size()),
         descriptorSets.updates[frameInFlightId].data(), 0, nullptr);
     descriptorSets.updates[frameInFlightId].clear();
 

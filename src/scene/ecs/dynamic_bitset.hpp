@@ -17,7 +17,6 @@ public:
 
     inline void setFlag(const size_t index, const bool flag)
     {
-        // TODO: msvc equivalent
         const size_t dataIndex = index >> __builtin_ctz(sizeof(uint32) * 8);
         const size_t bitIndex = index & ((sizeof(uint32) * 8) - 1);
 
@@ -28,7 +27,6 @@ public:
 
     [[nodiscard]] inline bool operator[](const size_t index) const
     {
-        // TODO: msvc equivalent
         const size_t dataIndex = index >> __builtin_ctz(sizeof(uint32) * 8);
         const size_t bitIndex = index & ((sizeof(uint32) * 8) - 1);
         NH3D_ASSERT(dataIndex < _data.size(), "Out of bound DynamicBitset access");
