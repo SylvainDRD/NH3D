@@ -2,6 +2,7 @@
 
 #include <core/aabb.hpp>
 #include <cstdint>
+#include <functional>
 #include <misc/utils.hpp>
 #include <rendering/core/bind_group.hpp>
 #include <rendering/core/buffer.hpp>
@@ -50,6 +51,10 @@ public:
     [[nodiscard]] inline ResourceManager<VulkanComputeShader>& getComputeShaderManager() { return _computeShaderManager; }
 
     [[nodiscard]] inline ResourceManager<VulkanBindGroup>& getBindGroupManager() { return _bindGroupManager; }
+
+    void recordBufferUploadCommands(const std::function<void(VkCommandBuffer)>& recordFunction) const;
+
+    void flushUploadCommands() const;
 
     void executeImmediateCommandBuffer(const std::function<void(VkCommandBuffer)>& recordFunction) const;
 
@@ -156,7 +161,10 @@ private:
     VkCommandPool _commandPool;
     VkCommandPool _immediateCommandPool;
     VkCommandBuffer _immediateCommandBuffer;
-    VkFence _immediateCommandFence;
+    VkCommandPool _uploadCommandPool;
+    VkCommandBuffer _uploadCommandBuffer;
+    mutable bool _uploadsToBeFlushed = false;
+    VkFence _immediateAndUploadFence; // Used for immediate command buffer submission & beginning of frame uploads
 
     FrameResource<VkCommandBuffer> _commandBuffers;
     FrameResource<VkFence> _frameFences;

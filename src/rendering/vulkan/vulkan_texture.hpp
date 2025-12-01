@@ -40,7 +40,7 @@ struct VulkanTexture {
     };
 
     /// "Constructors / Destructors"
-    [[nodiscard]] static std::pair<ImageView, TextureMetadata> create(const VulkanRHI& rhi, const CreateInfo& info);
+    [[nodiscard]] static std::pair<ImageView, TextureMetadata> create(VulkanRHI& rhi, const CreateInfo& info);
 
     [[nodiscard]] static std::pair<ImageView, TextureMetadata> wrapSwapchainImage(
         const VulkanRHI& rhi, const VkImage image, const VkFormat format, const VkExtent3D extent, const VkImageAspectFlags aspect);

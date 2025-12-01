@@ -73,7 +73,11 @@ VulkanRHI::VulkanRHI(const Window& Window)
 
     _immediateCommandPool = createCommandPool(_device, queues.GraphicsQueueFamilyID);
     allocateCommandBuffers(_device, _immediateCommandPool, 1, &_immediateCommandBuffer);
-    _immediateCommandFence = createFence(_device, false);
+    _immediateAndUploadFence = createFence(_device, false);
+
+    _uploadCommandPool = createCommandPool(_device, queues.GraphicsQueueFamilyID);
+    allocateCommandBuffers(_device, _uploadCommandPool, 1, &_uploadCommandBuffer);
+    beginCommandBuffer(_uploadCommandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
     _renderSemaphores.resize(swapchainImageCount);
     for (uint32_t i = 0; i < _renderSemaphores.size(); ++i) {
@@ -84,7 +88,6 @@ VulkanRHI::VulkanRHI(const Window& Window)
     const VkFormat normalRTFormat = VK_FORMAT_A2B10G10R10_UNORM_PACK32;
     // Fairly low precision acceptable for cartoonish rendering
     const VkFormat albedoRTFormat = VK_FORMAT_B10G11R11_UFLOAT_PACK32;
-    // const VkFormat albedoRTFormat = VK_FORMAT_R32_UINT; <---- To be used to prevent oversampling
 
     for (int i = 0; i < MaxFramesInFlight; ++i) {
         _presentSemaphores[i] = createSemaphore(_device);
@@ -119,7 +122,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
         });
     }
 
-    constexpr uint32 MaxObjects = 100000;
+    constexpr uint32 MaxObjects = 640'000;
 
     const VkDescriptorType objectDataTypes[] = {
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, // RenderData buffer
@@ -478,7 +481,8 @@ VulkanRHI::~VulkanRHI()
         vkDestroySemaphore(_device, _renderSemaphores[i], nullptr);
     }
 
-    vkDestroyFence(_device, _immediateCommandFence, nullptr);
+    vkDestroyFence(_device, _immediateAndUploadFence, nullptr);
+    vkDestroyCommandPool(_device, _uploadCommandPool, nullptr);
     vkDestroyCommandPool(_device, _immediateCommandPool, nullptr);
     vkDestroyCommandPool(_device, _commandPool, nullptr);
 
@@ -499,6 +503,27 @@ VulkanRHI::~VulkanRHI()
     NH3D_LOG("Vulkan objects cleanup completed");
 }
 
+void VulkanRHI::recordBufferUploadCommands(const std::function<void(VkCommandBuffer)>& recordFunction) const
+{
+    _uploadsToBeFlushed = true;
+    recordFunction(_uploadCommandBuffer);
+}
+
+void VulkanRHI::flushUploadCommands() const
+{
+    vkEndCommandBuffer(_uploadCommandBuffer);
+    submitCommandBuffer(_graphicsQueue, {}, {}, _uploadCommandBuffer, _immediateAndUploadFence);
+
+    vkWaitForFences(_device, 1, &_immediateAndUploadFence, VK_TRUE, NH3D_MAX_T(uint64_t));
+    vkResetFences(_device, 1, &_immediateAndUploadFence);
+
+    NH3D_DEBUGLOG("Flushed upload commands");
+    VulkanBuffer::flushedUploadCommands();
+    _uploadsToBeFlushed = false;
+
+    beginCommandBuffer(_uploadCommandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+}
+
 void VulkanRHI::executeImmediateCommandBuffer(const std::function<void(VkCommandBuffer)>& recordFunction) const
 {
     beginCommandBuffer(_immediateCommandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -506,11 +531,10 @@ void VulkanRHI::executeImmediateCommandBuffer(const std::function<void(VkCommand
     recordFunction(_immediateCommandBuffer);
 
     vkEndCommandBuffer(_immediateCommandBuffer);
-    submitCommandBuffer(_graphicsQueue, {}, {}, _immediateCommandBuffer, _immediateCommandFence);
+    submitCommandBuffer(_graphicsQueue, {}, {}, _immediateCommandBuffer, _immediateAndUploadFence);
 
-    vkWaitForFences(_device, 1, &_immediateCommandFence, VK_TRUE, NH3D_MAX_T(uint64_t));
-    vkResetFences(_device, 1, &_immediateCommandFence);
-    vkResetCommandBuffer(_immediateCommandBuffer, 0);
+    vkWaitForFences(_device, 1, &_immediateAndUploadFence, VK_TRUE, NH3D_MAX_T(uint64_t));
+    vkResetFences(_device, 1, &_immediateAndUploadFence);
 }
 
 Handle<Texture> VulkanRHI::createTexture(const Texture::CreateInfo& info)
@@ -549,9 +573,13 @@ Handle<Buffer> VulkanRHI::createBuffer(const Buffer::CreateInfo& info)
 
 void VulkanRHI::destroyBuffer(const Handle<Buffer> handle) { _bufferManager.release(*this, handle); }
 
-// TODO: cache command buffer
+// TODO: cache command buffer?
 void VulkanRHI::render(Scene& scene) const
 {
+    if (_uploadsToBeFlushed) {
+        flushUploadCommands();
+    }
+
     if (scene.getMainCamera() == InvalidEntity) {
         return;
     }
@@ -583,8 +611,10 @@ void VulkanRHI::render(Scene& scene) const
 
     uint objectCount = 0;
     // TODO: track dirty state properly
-    constexpr bool dirtyRenderingData = true;
+    static bool dirtyRenderingData = true;
     if (dirtyRenderingData) {
+        dirtyRenderingData = _frameId < MaxFramesInFlight;
+
         const GPUBuffer& objectDataStagingBuffer = _bufferManager.get<GPUBuffer>(_cullingRenderDataStagingBuffers[frameInFlightId]);
         const BufferAllocationInfo& objectDataStagingAllocation
             = _bufferManager.get<BufferAllocationInfo>(_cullingRenderDataStagingBuffers[frameInFlightId]);
@@ -760,8 +790,8 @@ void VulkanRHI::render(Scene& scene) const
         },
     };
 
-    NH3D_ASSERT(objectCount
-            < _bufferManager.get<BufferAllocationInfo>(_drawIndirectBuffers[frameInFlightId]).allocatedSize / sizeof(VkDrawIndirectCommand),
+    NH3D_ASSERT(objectCount <= _bufferManager.get<BufferAllocationInfo>(_drawIndirectBuffers[frameInFlightId]).allocatedSize
+                / sizeof(VkDrawIndirectCommand),
         "Draw indirect buffer too small for the number of objects");
     VulkanShader::multiDrawIndirect(commandBuffer, graphicsPipeline, {
                 .drawIndirectBuffer = drawIndirectBuffer.buffer,
@@ -832,13 +862,13 @@ void VulkanRHI::render(Scene& scene) const
         VulkanTexture::insertMemoryBarrier(commandBuffer, scImageViewData.image, VK_ACCESS_2_TRANSFER_WRITE_BIT,
             VK_PIPELINE_STAGE_2_BLIT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-        _debugDrawer->renderAABBs(commandBuffer, frameInFlightId, viewMatrix, projectionMatrix, objectCount,
-            _gbufferRTs[frameInFlightId].depthRT, _swapchainTextures[swapchainImageId]);
+        // _debugDrawer->renderAABBs(commandBuffer, frameInFlightId, viewMatrix, projectionMatrix, objectCount,
+        //     _gbufferRTs[frameInFlightId].depthRT, _swapchainTextures[swapchainImageId]);
 
-        VulkanTexture::insertMemoryBarrier(commandBuffer, scImageViewData.image, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        // VulkanTexture::insertMemoryBarrier(commandBuffer, scImageViewData.image, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+        //     VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+        //     VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        //     VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
         _debugDrawer->renderDebugUI(commandBuffer, frameInFlightId, _swapchainTextures[swapchainImageId]);
 
         VulkanTexture::insertMemoryBarrier(commandBuffer, scImageViewData.image, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
@@ -1349,5 +1379,4 @@ VulkanRHI::FrustumPlanes VulkanRHI::getFrustumPlanes(const mat4& projectionMatri
 
     return frustumPlanes;
 }
-
 }

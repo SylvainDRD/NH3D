@@ -1,3 +1,4 @@
+#include "general/resource_mapper.hpp"
 #include <general/engine.hpp>
 #include <imgui.h>
 #include <misc/types.hpp>
@@ -7,7 +8,6 @@
 #include <scene/ecs/components/render_component.hpp>
 #include <scene/ecs/components/transform_component.hpp>
 #include <scene/scene.hpp>
-#include <vector>
 
 using namespace NH3D;
 
@@ -18,28 +18,20 @@ int main()
     Scene& scene = engine.getMainScene();
     IRHI& rhi = engine.getRHI();
 
-    auto& resourceMapper = engine.getResourceMapper();
-    const auto& [cubeVertexData, cubeIndices] = resourceMapper.loadMesh(NH3D_DIR "cube.glb");
-
-    Mesh meshData {
-        .vertexBuffer = rhi.createBuffer({ .size = static_cast<uint32>(cubeVertexData.size() * sizeof(VertexData)),
-            .usageFlags = BufferUsageFlagBits::STORAGE_BUFFER_BIT | BufferUsageFlagBits::DST_TRANSFER_BIT,
-            .memoryUsage = BufferMemoryUsage::GPU_ONLY,
-            .initialData
-            = { reinterpret_cast<const byte*>(cubeVertexData.data()), static_cast<uint32>(cubeVertexData.size() * sizeof(VertexData)) } }),
-        .indexBuffer = rhi.createBuffer({ .size = static_cast<uint32>(cubeIndices.size() * sizeof(uint32)),
-            .usageFlags = BufferUsageFlagBits::INDEX_BUFFER_BIT | BufferUsageFlagBits::DST_TRANSFER_BIT,
-            .memoryUsage = BufferMemoryUsage::GPU_ONLY,
-            .initialData
-            = { reinterpret_cast<const byte*>(cubeIndices.data()), static_cast<uint32>(cubeIndices.size() * sizeof(uint32)) } }),
-        .objectAABB = AABB::fromMesh(cubeVertexData, cubeIndices),
-    };
-
-    // resourceMapper.storeMesh("...", meshData);
-
     scene.create(CameraComponent {}, TransformComponent {});
-    scene.create(
-        RenderComponent { meshData, Material { .albedo = color3 { 1.0f, 0.0f, 0.0f } } }, TransformComponent { { 0.0f, 0.0f, 10.0f } });
+
+    auto& resourceMapper = engine.getResourceMapper();
+
+    for (int i = 0; i < 40; ++i) {
+        for (int j = 0; j < 40; ++j) {
+            for (int k = 0; k < 400; ++k) {
+                MeshData meshData;
+                (void)resourceMapper.loadModel(rhi, NH3D_DIR "src/editor/assets/cube.glb", meshData); // Simulate 640'000 unique meshes
+                scene.create(RenderComponent { meshData.mesh, meshData.material },
+                    TransformComponent { { 8.0f * i - 160.0f, 8.0f * j - 160.0f, 8.0f * k - 1600.0f } });
+            }
+        }
+    }
 
     const Window& window = engine.getWindow();
 
@@ -80,11 +72,11 @@ int main()
         ImGui::PlotLines("Overall Frame Time (ms)", frameTimes.data(), frameTimes.size(), (frameTimesIndex + 1) & (frameTimes.size() - 1),
             nullptr, 0.0f, 16.0f, ImVec2(0, 80));
 
-        for (const auto& [e, _, transform] : scene.makeView<const RenderComponent&, TransformComponent&>()) {
-            vec3 position = transform.position();
-            ImGui::SliderFloat3("Position", &position.x, -10.0f, 10.0f);
-            transform.setPosition(scene, e, position);
-        }
+        // for (const auto& [e, _, transform] : scene.makeView<const RenderComponent&, TransformComponent&>()) {
+        //     vec3 position = transform.position();
+        //     ImGui::SliderFloat3("Position", &position.x, -10.0f, 10.0f);
+        //     transform.setPosition(scene, e, position);
+        // }
 
         ImGui::End();
         ImGui::Render();

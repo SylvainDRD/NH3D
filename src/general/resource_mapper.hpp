@@ -1,11 +1,13 @@
 #pragma once
 
+#include "rendering/core/material.hpp"
 #include <filesystem>
 #include <misc/types.hpp>
 #include <misc/utils.hpp>
 #include <rendering/core/buffer.hpp>
 #include <rendering/core/handle.hpp>
 #include <rendering/core/mesh.hpp>
+#include <rendering/core/rhi.hpp>
 #include <rendering/core/shader.hpp>
 #include <rendering/core/texture.hpp>
 #include <unordered_map>
@@ -13,9 +15,8 @@
 namespace NH3D {
 
 struct MeshData {
-    std::vector<VertexData> vertexData;
-    std::vector<uint32> indices;
-    uint32 materialIndex;
+    Mesh mesh;
+    Material material;
 };
 
 class ResourceMapper {
@@ -24,12 +25,9 @@ public:
     ResourceMapper() = default;
     ~ResourceMapper() = default;
 
-    // TODO: support multiple index types and return AABB
-    // TODO: pass RV as parameters and give the reponsibility of memory management to the caller (right now the vectors are static, bad
-    // things will happen if called multiple times)
+    // TODO: support multiple index types
     [[nodiscard]]
-    std::pair<const std::vector<VertexData>&, const std::vector<uint32>&> loadMesh(
-        const std::filesystem::path& path, const vec3u swizzle = { 0, 2, 1 }) const;
+    bool loadModel(IRHI& rhi, const std::filesystem::path& path, MeshData& meshData, const vec3u swizzle = { 0, 2, 1 }) const;
 
     void storeMesh(const std::string& name, const Mesh& mesh);
     [[nodiscard]] Mesh getMesh(const std::string& name) const;

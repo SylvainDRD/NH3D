@@ -1,10 +1,17 @@
 #include "vulkan_buffer.hpp"
+#include "misc/utils.hpp"
+#include "rendering/core/enums.hpp"
+#include "rendering/core/handle.hpp"
 #include <rendering/vulkan/vulkan_rhi.hpp>
 #include <vulkan/vulkan_core.h>
 
 namespace NH3D {
 
-std::pair<GPUBuffer, BufferAllocationInfo> VulkanBuffer::create(const VulkanRHI& rhi, const CreateInfo& info)
+size_t VulkanBuffer::stagingBufferWriteOffset = 0;
+GPUBuffer VulkanBuffer::stagingBuffer = { nullptr };
+BufferAllocationInfo VulkanBuffer::stagingBufferAllocation;
+
+std::pair<GPUBuffer, BufferAllocationInfo> VulkanBuffer::create(VulkanRHI& rhi, const CreateInfo& info)
 {
     // TODO: see if this works out in the future
     const VkBufferUsageFlags updatedUsageFlags = info.usage | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
@@ -36,20 +43,32 @@ std::pair<GPUBuffer, BufferAllocationInfo> VulkanBuffer::create(const VulkanRHI&
                 vmaFlushAllocation(rhi.getAllocator(), allocation, 0, info.size);
             }
         } else {
-            // TODO: reuse staging buffers for multiple uploads
-            auto [stagingBuffer, stagingAllocation] = VulkanBuffer::create(rhi,
-                {
-                    .size = info.size,
-                    .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                    .memoryUsage = VMA_MEMORY_USAGE_CPU_ONLY,
-                    .initialData = info.initialData,
+            if (stagingBuffer.buffer == VK_NULL_HANDLE) {
+                Handle<Buffer> stagingBufferHandle = rhi.createBuffer({
+                    .size = VulkanBuffer::maxGuaranteedStagingBufferSize,
+                    .usageFlags = BufferUsageFlagBits::SRC_TRANSFER_BIT,
+                    .memoryUsage = BufferMemoryUsage::CPU_ONLY,
                 });
 
-            rhi.executeImmediateCommandBuffer([&info, stagingBuffer, buffer](VkCommandBuffer cmdBuffer) {
-                VulkanBuffer::copyBuffer(cmdBuffer, stagingBuffer.buffer, buffer, info.size);
-            });
+                auto& bufferManager = rhi.getBufferManager();
+                VulkanBuffer::stagingBuffer = bufferManager.get<GPUBuffer>(stagingBufferHandle);
+                VulkanBuffer::stagingBufferAllocation = bufferManager.get<BufferAllocationInfo>(stagingBufferHandle);
+            }
 
-            VulkanBuffer::release(rhi, stagingBuffer, stagingAllocation);
+            if (info.size > maxGuaranteedStagingBufferSize) {
+                NH3D_ABORT("Initial data size is larger than maximum guaranteed staging buffer size.");
+            }
+
+            if (stagingBufferWriteOffset + info.size > VulkanBuffer::maxGuaranteedStagingBufferSize) {
+                rhi.flushUploadCommands();
+            }
+            void* mappedAddress = VulkanBuffer::stagingBufferAllocation.allocationInfo.pMappedData;
+            std::memcpy(static_cast<byte*>(mappedAddress) + stagingBufferWriteOffset, info.initialData.data, info.size);
+
+            rhi.recordBufferUploadCommands([&info, buffer](VkCommandBuffer cmdBuffer) {
+                VulkanBuffer::copyBuffer(cmdBuffer, VulkanBuffer::stagingBuffer.buffer, buffer, info.size, stagingBufferWriteOffset);
+            });
+            stagingBufferWriteOffset += info.size;
         }
     }
 
@@ -87,13 +106,18 @@ void VulkanBuffer::flush(const VulkanRHI& rhi, const BufferAllocationInfo& alloc
     return allocation.allocationInfo.pMappedData;
 }
 
-void VulkanBuffer::copyBuffer(VkCommandBuffer commandBuffer, const VkBuffer srcBuffer, const VkBuffer dstBuffer, const size_t size)
+void VulkanBuffer::copyBuffer(VkCommandBuffer commandBuffer, const VkBuffer srcBuffer, const VkBuffer dstBuffer, const size_t size,
+    const size_t srcOffset, const size_t dstOffset)
 {
     if (size == 0) {
         return;
     }
 
-    const VkBufferCopy copyRegion { .size = size };
+    const VkBufferCopy copyRegion {
+        .srcOffset = srcOffset,
+        .dstOffset = dstOffset,
+        .size = size,
+    };
     vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
 }
 

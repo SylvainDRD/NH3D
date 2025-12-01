@@ -3,7 +3,6 @@
 #include <rendering/vulkan/vulkan_rhi.hpp>
 #include <scene/ecs/components/render_component.hpp>
 #include <scene/scene.hpp>
-#include <vector>
 
 namespace NH3D {
 

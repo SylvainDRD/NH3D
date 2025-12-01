@@ -46,7 +46,7 @@ uint32 channelCount(const VkFormat format)
     }
 }
 
-[[nodiscard]] std::pair<ImageView, TextureMetadata> VulkanTexture::create(const VulkanRHI& rhi, const CreateInfo& info)
+[[nodiscard]] std::pair<ImageView, TextureMetadata> VulkanTexture::create(VulkanRHI& rhi, const CreateInfo& info)
 {
     VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
     const VkImageCreateInfo imageCreateInfo {

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstdint>
 #include <misc/types.hpp>
 #include <misc/utils.hpp>
 #include <rendering/core/bind_group.hpp>
