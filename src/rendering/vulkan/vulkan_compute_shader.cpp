@@ -1,19 +1,26 @@
 #include "vulkan_compute_shader.hpp"
+#include <rendering/vulkan/vulkan_rhi.hpp>
 
 namespace NH3D {
 
-[[nodiscard]] std::pair<VkPipeline, VkPipelineLayout> VulkanComputeShader::create(const VkDevice device, const CreateInfo& info)
+[[nodiscard]] std::pair<VkPipeline, VkPipelineLayout> VulkanComputeShader::create(const IRHI& rhi, const CreateInfo& info)
 {
+    const VkDevice device = static_cast<const VulkanRHI&>(rhi).getVkDevice();
+
     const VkPipelineLayout pipelineLayout = createPipelineLayout(device, info.descriptorSetsLayouts, info.pushConstantRanges);
 
     const VkShaderModule shaderModule = loadShaderModule(device, info.computeShaderPath);
-    VkPipelineShaderStageCreateInfo stageCreateInfo { .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+    const VkPipelineShaderStageCreateInfo stageCreateInfo {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
         .stage = VK_SHADER_STAGE_COMPUTE_BIT,
         .module = shaderModule,
-        .pName = "main" };
+        .pName = "main",
+    };
 
-    VkComputePipelineCreateInfo pipelineCreateInfo {
-        .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO, .stage = stageCreateInfo, .layout = pipelineLayout
+    const VkComputePipelineCreateInfo pipelineCreateInfo {
+        .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+        .stage = stageCreateInfo,
+        .layout = pipelineLayout,
     };
 
     VkPipeline pipeline;

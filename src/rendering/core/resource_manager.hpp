@@ -16,6 +16,7 @@ public:
     using HotType = typename T::HotType;
     using ColdType = typename T::ColdType;
     using HandleType = Handle<typename T::ResourceType>;
+    using CreateInfoType = typename T::CreateInfo;
 
     ResourceManager() = delete;
 
@@ -25,7 +26,7 @@ public:
 
     template <typename U> [[nodiscard]] inline U& get(HandleType handle);
 
-    [[nodiscard]] inline HandleType store(HotType&& hotData, ColdType&& coldData);
+    [[nodiscard]] inline HandleType create(IRHI& rhi, const CreateInfoType& createInfo);
 
     inline void release(const IRHI& rhi, HandleType handle);
 
@@ -57,19 +58,22 @@ template <typename T> template <typename U> [[nodiscard]] inline U& ResourceMana
     }
 }
 
-template <typename T> [[nodiscard]] inline ResourceManager<T>::HandleType ResourceManager<T>::store(HotType&& hotData, ColdType&& coldData)
+template <typename T>
+[[nodiscard]] inline ResourceManager<T>::HandleType ResourceManager<T>::create(IRHI& rhi, const CreateInfoType& createInfo)
 {
+    auto [hotData, coldData] = T::create(rhi, createInfo);
+
     HandleType handle;
     if (!_availableHandles.empty()) {
         handle = _availableHandles.back();
         _availableHandles.pop_back();
 
-        _hot[handle.index] = std::forward<HotType>(hotData);
-        _cold[handle.index] = std::forward<ColdType>(coldData);
+        _hot[handle.index] = std::move(hotData);
+        _cold[handle.index] = std::move(coldData);
     } else {
         handle = { static_cast<uint32>(_hot.size()) };
-        _hot.emplace_back(std::forward<HotType>(hotData));
-        _cold.emplace_back(std::forward<ColdType>(coldData));
+        _hot.emplace_back(std::move(hotData));
+        _cold.emplace_back(std::move(coldData));
     }
 
     return handle;

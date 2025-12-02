@@ -4,9 +4,11 @@
 
 namespace NH3D {
 
-[[nodiscard]] std::pair<DescriptorSets, BindGroupMetadata> VulkanBindGroup::create(const VkDevice device, const CreateInfo& info)
+[[nodiscard]] std::pair<DescriptorSets, BindGroupMetadata> VulkanBindGroup::create(const IRHI& rhi, const CreateInfo& info)
 {
     NH3D_ASSERT(info.bindingTypes.size != 0, "Binding types list cannot be empty");
+
+    const VkDevice device = static_cast<const VulkanRHI&>(rhi).getVkDevice();
 
     static std::vector<VkDescriptorSetLayoutBinding> descriptorBindings {};
     descriptorBindings.resize(info.bindingTypes.size);

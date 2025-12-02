@@ -11,8 +11,10 @@ size_t VulkanBuffer::stagingBufferWriteOffset = 0;
 GPUBuffer VulkanBuffer::stagingBuffer = { nullptr };
 BufferAllocationInfo VulkanBuffer::stagingBufferAllocation;
 
-std::pair<GPUBuffer, BufferAllocationInfo> VulkanBuffer::create(VulkanRHI& rhi, const CreateInfo& info)
+std::pair<GPUBuffer, BufferAllocationInfo> VulkanBuffer::create(IRHI& rhi, const CreateInfo& info)
 {
+    VulkanRHI& vrhi = static_cast<VulkanRHI&>(rhi);
+
     // TODO: see if this works out in the future
     const VkBufferUsageFlags updatedUsageFlags = info.usage | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
@@ -27,7 +29,7 @@ std::pair<GPUBuffer, BufferAllocationInfo> VulkanBuffer::create(VulkanRHI& rhi, 
     VkBuffer buffer;
     VmaAllocation allocation;
     VmaAllocationInfo allocationInfo;
-    if (vmaCreateBuffer(rhi.getAllocator(), &bufferCreateInfo, &allocationCreateInfo, &buffer, &allocation, &allocationInfo)
+    if (vmaCreateBuffer(vrhi.getAllocator(), &bufferCreateInfo, &allocationCreateInfo, &buffer, &allocation, &allocationInfo)
         != VK_SUCCESS) {
         NH3D_ABORT_VK("Vulkan buffer creation failed");
     }
@@ -40,17 +42,18 @@ std::pair<GPUBuffer, BufferAllocationInfo> VulkanBuffer::create(VulkanRHI& rhi, 
 
             std::memcpy(allocationInfo.pMappedData, info.initialData.data, std::min(info.initialData.size, info.size));
             if (info.memoryUsage != VMA_MEMORY_USAGE_CPU_ONLY) {
-                vmaFlushAllocation(rhi.getAllocator(), allocation, 0, info.size);
+                vmaFlushAllocation(vrhi.getAllocator(), allocation, 0, info.size);
             }
         } else {
             if (stagingBuffer.buffer == VK_NULL_HANDLE) {
-                Handle<Buffer> stagingBufferHandle = rhi.createBuffer({
-                    .size = VulkanBuffer::maxGuaranteedStagingBufferSize,
-                    .usageFlags = BufferUsageFlagBits::SRC_TRANSFER_BIT,
-                    .memoryUsage = BufferMemoryUsage::CPU_ONLY,
-                });
+                auto& bufferManager = vrhi.getBufferManager();
+                Handle<Buffer> stagingBufferHandle = bufferManager.create(vrhi,
+                    {
+                        .size = VulkanBuffer::maxGuaranteedStagingBufferSize,
+                        .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                        .memoryUsage = VMA_MEMORY_USAGE_CPU_ONLY,
+                    });
 
-                auto& bufferManager = rhi.getBufferManager();
                 VulkanBuffer::stagingBuffer = bufferManager.get<GPUBuffer>(stagingBufferHandle);
                 VulkanBuffer::stagingBufferAllocation = bufferManager.get<BufferAllocationInfo>(stagingBufferHandle);
             }
@@ -60,12 +63,12 @@ std::pair<GPUBuffer, BufferAllocationInfo> VulkanBuffer::create(VulkanRHI& rhi, 
             }
 
             if (stagingBufferWriteOffset + info.size > VulkanBuffer::maxGuaranteedStagingBufferSize) {
-                rhi.flushUploadCommands();
+                vrhi.flushUploadCommands();
             }
             void* mappedAddress = VulkanBuffer::stagingBufferAllocation.allocationInfo.pMappedData;
             std::memcpy(static_cast<byte*>(mappedAddress) + stagingBufferWriteOffset, info.initialData.data, info.size);
 
-            rhi.recordBufferUploadCommands([&info, buffer](VkCommandBuffer cmdBuffer) {
+            vrhi.recordBufferUploadCommands([&info, buffer](VkCommandBuffer cmdBuffer) {
                 VulkanBuffer::copyBuffer(cmdBuffer, VulkanBuffer::stagingBuffer.buffer, buffer, info.size, stagingBufferWriteOffset);
             });
             stagingBufferWriteOffset += info.size;

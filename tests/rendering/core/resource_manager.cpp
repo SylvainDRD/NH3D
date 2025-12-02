@@ -22,6 +22,17 @@ struct VulkanTexture {
 
     using ColdType = TextureColdType;
 
+    struct CreateInfo {
+        int hotValue;
+        std::string coldValue;
+    };
+    using CreateInfo = CreateInfo;
+
+    [[nodiscard]] static inline std::pair<TextureHotType, TextureColdType> create(const IRHI& rhi, const CreateInfo& info)
+    {
+        return { { info.hotValue }, { info.coldValue } };
+    }
+
     [[nodiscard]] static inline bool valid(const HotType& hot, const ColdType& cold) { return true; }
 
     static void release(const IRHI& rhi, HotType& hot, ColdType& cold) { }
@@ -43,6 +54,17 @@ struct VulkanBuffer {
 
     using ColdType = BufferColdType;
 
+    struct CreateInfo {
+        HotType hotValue;
+        ColdType coldValue;
+    };
+    using CreateInfo = CreateInfo;
+
+    [[nodiscard]] static inline std::pair<BufferHotType, BufferColdType> create(const IRHI& rhi, const CreateInfo& info)
+    {
+        return { info.hotValue, info.coldValue };
+    }
+
     [[nodiscard]] static inline bool valid(const BufferHotType& hot, const ColdType& cold) { return hot.valid; }
 
     static void release(const IRHI& rhi, BufferHotType& hot, ColdType& cold) { hot.valid = false; }
@@ -58,7 +80,8 @@ TEST(ResourceManagerTests, GeneralTest)
 {
     ResourceManager<VulkanTexture> resourceManager { 100, 10 };
 
-    Handle<Texture> textureHandle = resourceManager.store({ 1337 }, { "Hello there!" });
+    MockRHI rhi;
+    Handle<Texture> textureHandle = resourceManager.create(rhi, { 1337, { "Hello there!" } });
 
     EXPECT_EQ(resourceManager.get<TextureHotType>(textureHandle).hotValue, 1337);
     EXPECT_EQ(resourceManager.get<TextureColdType>(textureHandle).coldValue, "Hello there!");
@@ -71,9 +94,9 @@ TEST(ResourceManagerTests, ReleaseTest)
 {
     ResourceManager<VulkanBuffer> resourceManager { 100, 10 };
 
-    Handle<Buffer> bufferHandle = resourceManager.store({ "Hello there too!", true }, { 42 });
-
     MockRHI rhi;
+    Handle<Buffer> bufferHandle = resourceManager.create(rhi, { { "Hello there too!", true }, { 42 } });
+
     resourceManager.release(rhi, bufferHandle);
     // Assertion only present on cold getter for debug performance
     EXPECT_FALSE(VulkanBuffer::valid(resourceManager.get<BufferHotType>(bufferHandle), { 42 }));
@@ -83,9 +106,9 @@ TEST(ResourceManagerTests, ClearTest)
 {
     ResourceManager<VulkanBuffer> resourceManager { 100, 10 };
 
-    Handle<Buffer> bufferHandle = resourceManager.store({ "Hello there too!", true }, { 42 });
-
     MockRHI rhi;
+    Handle<Buffer> bufferHandle = resourceManager.create(rhi, { { "Hello there too!", true }, { 42 } });
+
     resourceManager.clear(rhi);
 
     EXPECT_DEATH((void)resourceManager.get<BufferHotType>(bufferHandle), ".*FATAL.*");
@@ -98,7 +121,7 @@ TEST(ResourceManagerTests, ReleaseInvalidHandleTest)
     ResourceManager<VulkanBuffer> resourceManager { 100, 10 };
     MockRHI rhi;
 
-    const Handle<Buffer> handle = resourceManager.store({ "Hello there!", true }, { 7 });
+    const Handle<Buffer> handle = resourceManager.create(rhi, { { "Hello there!", true }, { 7 } });
     resourceManager.release(rhi, handle);
     EXPECT_DEATH(resourceManager.release(rhi, handle), ".*FATAL.*");
 }
@@ -108,12 +131,11 @@ TEST(ResourceManagerTests, StoreReusesReleasedSlot)
     ResourceManager<VulkanBuffer> resourceManager { 100, 10 };
     MockRHI rhi;
 
-    const Handle<Buffer> first = resourceManager.store({ "A", true }, { 1 });
-    const Handle<Buffer> second = resourceManager.store({ "B", true }, { 2 });
+    const Handle<Buffer> first = resourceManager.create(rhi, { { "A", true }, { 1 } });
+    const Handle<Buffer> second = resourceManager.create(rhi, { { "B", true }, { 2 } });
 
     resourceManager.release(rhi, first);
-    const Handle<Buffer> reused = resourceManager.store({ "C", true }, { 3 });
-
+    const Handle<Buffer> reused = resourceManager.create(rhi, { { "C", true }, { 3 } });
     EXPECT_EQ(reused.index, first.index);
     EXPECT_EQ(resourceManager.get<BufferHotType>(reused).hotValue, "C");
 

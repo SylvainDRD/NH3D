@@ -45,8 +45,11 @@ public:
         const VmaMemoryUsage memoryUsage;
         const ArrayWrapper<byte> initialData;
     };
+    using CreateInfo = CreateInfo;
+
+    // Used generically by the ResourceManager, must be API agnostic
     [[nodiscard]]
-    static std::pair<GPUBuffer, BufferAllocationInfo> create(VulkanRHI& rhi, const CreateInfo& info);
+    static std::pair<GPUBuffer, BufferAllocationInfo> create(IRHI& rhi, const CreateInfo& info);
 
     // Used generically by the ResourceManager, must be API agnostic, non-const ref for invalidation
     static void release(const IRHI& rhi, GPUBuffer& buffer, BufferAllocationInfo& allocation);

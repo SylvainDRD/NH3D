@@ -60,8 +60,6 @@ public:
 
     virtual Handle<Texture> createTexture(const Texture::CreateInfo& info) override;
 
-    Handle<Texture> createTexture(const VulkanTexture::CreateInfo& info);
-
     virtual void destroyTexture(const Handle<Texture> handle) override;
 
     virtual Handle<Buffer> createBuffer(const Buffer::CreateInfo& info) override;
@@ -69,8 +67,6 @@ public:
     virtual void destroyBuffer(const Handle<Buffer> handle) override;
 
     virtual void render(Scene& scene) const override;
-
-    Handle<BindGroup> createBindGroup(const VulkanBindGroup::CreateInfo& info);
 
 private:
     struct PhysicalDeviceQueueFamilyID {

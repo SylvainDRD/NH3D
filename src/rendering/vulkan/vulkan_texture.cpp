@@ -1,4 +1,5 @@
 #include "vulkan_texture.hpp"
+#include "rendering/core/rhi.hpp"
 #include <misc/utils.hpp>
 #include <rendering/vulkan/vulkan_rhi.hpp>
 #include <vulkan/vulkan_core.h>
@@ -46,8 +47,14 @@ uint32 channelCount(const VkFormat format)
     }
 }
 
-[[nodiscard]] std::pair<ImageView, TextureMetadata> VulkanTexture::create(VulkanRHI& rhi, const CreateInfo& info)
+[[nodiscard]] std::pair<ImageView, TextureMetadata> VulkanTexture::create(IRHI& rhi, const CreateInfo& info)
 {
+    VulkanRHI& vrhi = static_cast<VulkanRHI&>(rhi);
+
+    if (info.image != VK_NULL_HANDLE) {
+        return wrapSwapchainImage(vrhi, info.image, info.format, info.extent, info.aspectFlags);
+    }
+
     VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
     const VkImageCreateInfo imageCreateInfo {
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -70,7 +77,7 @@ uint32 channelCount(const VkFormat format)
 
     VkImage image;
     VmaAllocation allocation;
-    if (vmaCreateImage(rhi.getAllocator(), &imageCreateInfo, &allocCreateInfo, &image, &allocation, nullptr) != VK_SUCCESS) {
+    if (vmaCreateImage(vrhi.getAllocator(), &imageCreateInfo, &allocCreateInfo, &image, &allocation, nullptr) != VK_SUCCESS) {
         NH3D_ABORT_VK("VMA image creation failed");
     }
 
@@ -88,7 +95,7 @@ uint32 channelCount(const VkFormat format)
     };
 
     VkImageView view;
-    if (vkCreateImageView(rhi.getVkDevice(), &viewCreateInfo, nullptr, &view) != VK_SUCCESS) {
+    if (vkCreateImageView(vrhi.getVkDevice(), &viewCreateInfo, nullptr, &view) != VK_SUCCESS) {
         NH3D_ABORT_VK("Failed to create Vulkan image view");
     }
 
@@ -106,7 +113,7 @@ uint32 channelCount(const VkFormat format)
                 },
             });
         // TODO: I'm writing bytes but what if the format is not 8-bit based? Might need to adjust that
-        rhi.executeImmediateCommandBuffer([&](VkCommandBuffer commandBuffer) {
+        vrhi.executeImmediateCommandBuffer([&](VkCommandBuffer commandBuffer) {
             VulkanTexture::insertMemoryBarrier(commandBuffer, image, VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_NONE,
                 VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                 VK_IMAGE_LAYOUT_UNDEFINED, false, 0, 1);

@@ -16,9 +16,10 @@ struct VulkanComputeShader : public VulkanPipeline {
         const ArrayWrapper<VkDescriptorSetLayout> descriptorSetsLayouts;
         const ArrayWrapper<VkPushConstantRange> pushConstantRanges;
     };
+    using CreateInfo = CreateInfo;
 
-    /// "Constructor"
-    [[nodiscard]] static std::pair<VkPipeline, VkPipelineLayout> create(const VkDevice device, const CreateInfo& info);
+    /// "Constructor": used generically by the ResourceManager, must be API agnostic
+    [[nodiscard]] static std::pair<VkPipeline, VkPipelineLayout> create(const IRHI& rhi, const CreateInfo& info);
 
     // "Destructor": used generically by the ResourceManager, must be API agnostic, non-const ref for invalidation
     static void release(const IRHI& rhi, VkPipeline& pipeline, VkPipelineLayout& pipelineLayout);

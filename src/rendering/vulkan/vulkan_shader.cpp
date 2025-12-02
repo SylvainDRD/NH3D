@@ -1,9 +1,12 @@
 #include "vulkan_shader.hpp"
+#include <rendering/vulkan/vulkan_rhi.hpp>
 
 namespace NH3D {
 
-[[nodiscard]] std::pair<VkPipeline, VkPipelineLayout> VulkanShader::create(VkDevice device, const ShaderInfo& shaderInfo)
+[[nodiscard]] std::pair<VkPipeline, VkPipelineLayout> VulkanShader::create(const IRHI& rhi, const ShaderInfo& shaderInfo)
 {
+    const VkDevice device = static_cast<const VulkanRHI&>(rhi).getVkDevice();
+
     const VkPipelineLayout pipelineLayout = createPipelineLayout(device, shaderInfo.descriptorSetsLayouts, shaderInfo.pushConstantRanges);
 
     const VkPipelineVertexInputStateCreateInfo vertexCI {

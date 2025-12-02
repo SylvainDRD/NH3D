@@ -37,9 +37,10 @@ struct VulkanBindGroup {
         const ArrayWrapper<VkDescriptorType> bindingTypes;
         const uint32 finalBindingCount = 1;
     };
+    using CreateInfo = CreateInfo;
 
     /// "Constructor / Destructor": finalBindingCount is used to determine if we are using variable descriptor count
-    [[nodiscard]] static std::pair<DescriptorSets, BindGroupMetadata> create(VkDevice device, const CreateInfo& info);
+    [[nodiscard]] static std::pair<DescriptorSets, BindGroupMetadata> create(const IRHI& rhi, const CreateInfo& info);
 
     // Used generically by the ResourceManager, must be API agnostic, non-const ref for invalidation
     static void release(const IRHI& rhi, DescriptorSets& descriptorSets, BindGroupMetadata& metadata);

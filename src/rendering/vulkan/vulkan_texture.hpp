@@ -31,6 +31,7 @@ struct VulkanTexture {
     using ColdType = TextureMetadata;
 
     struct CreateInfo {
+        const VkImage image; // If not VK_NULL_HANDLE, wraps this image instead of creating a new one
         const VkFormat format;
         const VkExtent3D extent;
         const VkImageUsageFlags usageFlags;
@@ -38,12 +39,10 @@ struct VulkanTexture {
         const ArrayWrapper<byte> initialData;
         const bool generateMipMaps : 1;
     };
+    using CreateInfo = CreateInfo;
 
-    /// "Constructors / Destructors"
-    [[nodiscard]] static std::pair<ImageView, TextureMetadata> create(VulkanRHI& rhi, const CreateInfo& info);
-
-    [[nodiscard]] static std::pair<ImageView, TextureMetadata> wrapSwapchainImage(
-        const VulkanRHI& rhi, const VkImage image, const VkFormat format, const VkExtent3D extent, const VkImageAspectFlags aspect);
+    /// "Constructors / Destructors": used generically by the ResourceManager, must be API agnostic
+    [[nodiscard]] static std::pair<ImageView, TextureMetadata> create(IRHI& rhi, const CreateInfo& info);
 
     // Used generically by the ResourceManager, must be API agnostic, non-const ref for invalidation
     static void release(const IRHI& rhi, ImageView& imageViewData, TextureMetadata& metadata);
@@ -63,6 +62,10 @@ struct VulkanTexture {
 
     static void blit(
         VkCommandBuffer commandBuffer, const VkImage srcImage, const VkExtent3D srcExtent, VkImage dstImage, const VkExtent3D dstExtent);
+
+private:
+    [[nodiscard]] static std::pair<ImageView, TextureMetadata> wrapSwapchainImage(
+        const VulkanRHI& rhi, const VkImage image, const VkFormat format, const VkExtent3D extent, const VkImageAspectFlags aspect);
 };
 
 }

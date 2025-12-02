@@ -37,13 +37,15 @@ VulkanDebugDrawer::VulkanDebugDrawer(VulkanRHI* const rhi, const DebugDrawSetupD
     io.Fonts->GetTexDataAsRGBA32(&fontData, &fontTexWidth, &fontTexHeight);
     const uint32 uploadSize = 4 * fontTexWidth * fontTexHeight * sizeof(byte);
 
-    const Handle<Texture> fontTexture = _rhi->createTexture(VulkanTexture::CreateInfo {
-        .format = VK_FORMAT_R8G8B8A8_UNORM,
-        .extent = VkExtent3D { static_cast<uint32>(fontTexWidth), static_cast<uint32>(fontTexHeight), 1 },
-        .usageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-        .aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
-        .initialData = { fontData, uploadSize },
-    });
+    auto& textureManager = _rhi->getTextureManager();
+    const Handle<Texture> fontTexture = textureManager.create(*_rhi,
+        {
+            .format = VK_FORMAT_R8G8B8A8_UNORM,
+            .extent = VkExtent3D { static_cast<uint32>(fontTexWidth), static_cast<uint32>(fontTexHeight), 1 },
+            .usageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+            .aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
+            .initialData = { fontData, uploadSize },
+        });
 
     const VkSamplerCreateInfo samplerInfo {
         .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
@@ -60,12 +62,14 @@ VulkanDebugDrawer::VulkanDebugDrawer(VulkanRHI* const rhi, const DebugDrawSetupD
     }
 
     const VkDescriptorType bindingTypes[] = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER };
-    _fontBindGroup = _rhi->createBindGroup(VulkanBindGroup::CreateInfo {
-        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-        .bindingTypes = bindingTypes,
-    });
+    auto& bindGroupManager = _rhi->getBindGroupManager();
+    _fontBindGroup = bindGroupManager.create(*_rhi,
+        {
+            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .bindingTypes = bindingTypes,
+        });
 
-    const auto& descriptorSets = _rhi->getBindGroupManager().get<DescriptorSets>(_fontBindGroup);
+    const auto& descriptorSets = bindGroupManager.get<DescriptorSets>(_fontBindGroup);
     for (int i = 0; i < IRHI::MaxFramesInFlight; ++i) {
         const VkDescriptorImageInfo fontImageInfo {
             .sampler = _fontSampler,
@@ -133,8 +137,9 @@ VulkanDebugDrawer::VulkanDebugDrawer(VulkanRHI* const rhi, const DebugDrawSetupD
         },
     };
 
-    auto [uiPipeline, uiPipelineLayout] = VulkanShader::create(_rhi->getVkDevice(),
-        VulkanShader::ShaderInfo {
+    auto& shaderManager = _rhi->getShaderManager();
+    _uiShader = shaderManager.create(*_rhi,
+        {
             .vertexShaderPath = NH3D_DIR "src/rendering/shaders/debug_ui.vert.spv",
             .fragmentShaderPath = NH3D_DIR "src/rendering/shaders/debug_ui.frag.spv",
             .vertexInputInfo = vertexInputInfo,
@@ -144,13 +149,13 @@ VulkanDebugDrawer::VulkanDebugDrawer(VulkanRHI* const rhi, const DebugDrawSetupD
             .pushConstantRanges = uiPushConstantRange,
             .enableDepthWrite = false,
         });
-    _uiShader = _rhi->getShaderManager().store(std::move(uiPipeline), std::move(uiPipelineLayout));
 
     const VkDescriptorType aabbBindingTypes[] = { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
-    _objectDataBindGroup = _rhi->createBindGroup(VulkanBindGroup::CreateInfo {
-        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-        .bindingTypes = aabbBindingTypes,
-    });
+    _objectDataBindGroup = bindGroupManager.create(*_rhi,
+        {
+            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+            .bindingTypes = aabbBindingTypes,
+        });
 
     const auto& aabbDescriptorSets = _rhi->getBindGroupManager().get<DescriptorSets>(_objectDataBindGroup);
     auto& bufferManager = _rhi->getBufferManager();
@@ -183,8 +188,8 @@ VulkanDebugDrawer::VulkanDebugDrawer(VulkanRHI* const rhi, const DebugDrawSetupD
         },
     };
 
-    auto [linePipeline, linePipelineLayout] = VulkanShader::create(_rhi->getVkDevice(),
-        VulkanShader::ShaderInfo {
+    _aabbShader = shaderManager.create(*_rhi,
+        {
             .vertexShaderPath = NH3D_DIR "src/rendering/shaders/debug_aabb.vert.spv",
             .fragmentShaderPath = NH3D_DIR "src/rendering/shaders/debug_aabb.frag.spv",
             .cullMode = VK_CULL_MODE_NONE,
@@ -194,7 +199,6 @@ VulkanDebugDrawer::VulkanDebugDrawer(VulkanRHI* const rhi, const DebugDrawSetupD
             .descriptorSetsLayouts = aabbBindingLayouts,
             .pushConstantRanges = aabbPushConstantRange,
         });
-    _aabbShader = _rhi->getShaderManager().store(std::move(linePipeline), std::move(linePipelineLayout));
 }
 
 VulkanDebugDrawer::~VulkanDebugDrawer()
