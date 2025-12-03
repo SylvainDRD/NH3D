@@ -11,7 +11,7 @@ layout(location = 1) in vec2 inUV;
 layout(location = 2) flat in Material inMaterial;
 
 layout(location = 0) out vec4 outNormal;
-layout(location = 1) out vec3 outAlbedo; // TODO: only store material ID?
+layout(location = 1) out vec3 outAlbedo;
 
 // Reference: https://johnwhite3d.blogspot.com/2017/10/signed-octahedron-normal-encoding.html
 vec3 signedOctEncode(vec3 n)
@@ -27,6 +27,8 @@ vec3 signedOctEncode(vec3 n)
     return normal;
 }
 
+// In scenarios with a lot of overlapping objects, albedo texture lookups become costly
+// In a realistic scenario, this is probably not significant enough to justify a new GBuffer target with UVs and ddx/dyy
 void main()
 {
     vec3 encodedNormal = signedOctEncode(normalize(inNormal));
