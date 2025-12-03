@@ -29,6 +29,7 @@ vec3 signedOctEncode(vec3 n)
 
 // In scenarios with a lot of overlapping objects, albedo texture lookups become costly
 // In a realistic scenario, this is probably not significant enough to justify a new GBuffer target with UVs and ddx/dyy
+// Although, in my test scene, I was expecting early Z rejection to help a lot more, this might still be worth investigating
 void main()
 {
     vec3 encodedNormal = signedOctEncode(normalize(inNormal));
