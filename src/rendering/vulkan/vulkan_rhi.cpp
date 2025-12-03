@@ -604,8 +604,6 @@ void VulkanRHI::render(Scene& scene) const
     TransformComponent* transformDataPtr
         = reinterpret_cast<TransformComponent*>(VulkanBuffer::getMappedAddress(*this, transformAllocation));
 
-    auto start = std::chrono::high_resolution_clock::now();
-
     uint32 objectCount = 0;
     // TODO: track dirty state properly
     const bool dirtyRenderingData = _frameId < MaxFramesInFlight;
@@ -655,10 +653,6 @@ void VulkanRHI::render(Scene& scene) const
         }
     }
     VulkanBuffer::flush(*this, transformAllocation);
-
-    auto end = std::chrono::high_resolution_clock::now();
-    const auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-    NH3D_LOG("Updated rendering data for in " << duration / 1000.0f << " ms");
 
     // Reset the culling draw counter
     const VkBuffer drawCountBuffer = _bufferManager.get<GPUBuffer>(_cullingDrawCounterBuffers[frameInFlightId]).buffer;
