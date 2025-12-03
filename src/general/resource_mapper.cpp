@@ -173,7 +173,7 @@ naughtyshit:
         .objectAABB = AABB::fromMesh(vertexData, indices),
     };
     // TODO: load texture
-    meshData.material = Material { .albedo = color3 { 0.6f, 0.0f, 0.0f } };
+    meshData.material = Material { .albedoTexture = InvalidHandle<Texture> };
 
     return true;
 }

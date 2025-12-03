@@ -14,15 +14,10 @@ struct CullingParameters {
     uint objectCount;
 };
 
-// It's fine to put buffers here because I'm not expecting much instancing (if any)
-struct MeshData {
+struct RenderData {
     VertexBuffer vertexBuffer;
     IndexBuffer indexBuffer;
     Material material;
-};
-
-struct RenderData {
-    MeshData mesh;
     uint indexCount;
 };
 

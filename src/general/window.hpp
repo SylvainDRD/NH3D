@@ -1,7 +1,6 @@
 #pragma once
 
 #include <SDL3/SDL.h>
-#include <functional>
 #include <misc/types.hpp>
 #include <misc/utils.hpp>
 #include <vector>

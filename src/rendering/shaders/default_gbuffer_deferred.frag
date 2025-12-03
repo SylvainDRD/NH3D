@@ -19,7 +19,8 @@ void main()
         outAlbedo = texture(sampler2D(textures[inMaterial.albedoTexture], linearSampler), inUV).rgb;
     }
     else {
-        outAlbedo = inMaterial.albedo;
+        // Default bright magenta for missing textures
+        outAlbedo = vec3(1.0, 0.0, 1.0);
     }
 
     outNormal = inNormal; // TODO: octahedral encoding

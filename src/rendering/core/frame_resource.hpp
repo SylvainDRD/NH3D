@@ -16,7 +16,7 @@ concept ResourceType = std::is_same_v<T, std::remove_cvref_t<T>>;
 
 // Helper to store per-frame resources
 template <ResourceType T> struct FrameResource {
-    std::array<T, IRHI::MaxFramesInFlight> resources;
+    std::array<T, IRHI::MaxFramesInFlight> resources = {};
 
     FrameResource()
     {

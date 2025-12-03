@@ -77,9 +77,9 @@ void main()
         drawIndirectCommands.commands[drawIndex].instanceCount = 1;
         drawIndirectCommands.commands[drawIndex].firstVertex = 0;
         drawIndirectCommands.commands[drawIndex].firstInstance = 0;
-        drawRecordBuffer.drawRecords[drawIndex].vertexBuffer = obj.mesh.vertexBuffer;
-        drawRecordBuffer.drawRecords[drawIndex].indexBuffer = obj.mesh.indexBuffer;
-        drawRecordBuffer.drawRecords[drawIndex].material = obj.mesh.material;
+        drawRecordBuffer.drawRecords[drawIndex].vertexBuffer = obj.vertexBuffer;
+        drawRecordBuffer.drawRecords[drawIndex].indexBuffer = obj.indexBuffer;
+        drawRecordBuffer.drawRecords[drawIndex].material = obj.material;
 
         mat4x3 modelViewMatrix;
         modelViewMatrix[0] = vec3(viewSpaceTransform[0]);

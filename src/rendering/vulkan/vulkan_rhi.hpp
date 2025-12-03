@@ -3,6 +3,7 @@
 #include <core/aabb.hpp>
 #include <cstdint>
 #include <functional>
+#include <misc/types.hpp>
 #include <misc/utils.hpp>
 #include <rendering/core/bind_group.hpp>
 #include <rendering/core/buffer.hpp>
@@ -76,15 +77,18 @@ private:
         bool isValid() const { return GraphicsQueueFamilyID != NH3D_MAX_T(uint32_t) && PresentQueueFamilyID != NH3D_MAX_T(uint32_t); }
     };
 
-    struct MeshData {
+    struct RenderData {
         VkDeviceAddress vertexBuffer;
         VkDeviceAddress indexBuffer;
         Material material;
+        uint32 indexCount;
     };
 
-    struct RenderData {
-        MeshData mesh;
-        uint32 indexCount;
+    struct DrawRecord {
+        VkDeviceAddress vertexBuffer;
+        VkDeviceAddress indexBuffer;
+        Material material;
+        mat4x3 modelViewMatrix;
     };
 
     struct FrustumPlanes {
@@ -96,7 +100,7 @@ private:
 
     struct CullingParameters {
         mat4 viewMatrix;
-        FrustumPlanes frustumPlanes; // small optimization: consider infinite far plane and assume d=0 for near plane
+        FrustumPlanes frustumPlanes; // small optimization: assumes infinite far plane and assume d=0 for near plane
         uint32 objectCount;
     };
 

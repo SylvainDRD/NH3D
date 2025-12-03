@@ -1,4 +1,5 @@
 #include "general/resource_mapper.hpp"
+#include "rendering/core/enums.hpp"
 #include <general/engine.hpp>
 #include <imgui.h>
 #include <misc/types.hpp>
@@ -22,12 +23,34 @@ int main()
 
     auto& resourceMapper = engine.getResourceMapper();
 
+    std::vector<byte> textureData(256 * 256 * 4);
+    for (uint32 r = 0; r < 256; ++r) {
+        for (uint32 g = 0; g < 256; ++g) {
+            const size_t index = (static_cast<size_t>(r) * 256 + static_cast<size_t>(g)) * 4;
+            textureData[index + 0] = r;
+            textureData[index + 1] = g;
+            textureData[index + 2] = (r + g) >> 1;
+            textureData[index + 3] = 255;
+        }
+    }
+
+    Handle<Texture> textures[20]; // simulate 20 different textures
+    for (int i = 0; i < std::size(textures); ++i) {
+        textures[i] = rhi.createTexture({
+            .size = { 256, 256, 1 },
+            .format = TextureFormat::RGBA8_UNORM, // actual texture would be srgb
+            .aspect = TextureAspectFlagBits::ASPECT_COLOR_BIT,
+            .initialData = textureData,
+            .generateMipMaps = true,
+        });
+    }
+
     for (int i = 0; i < 40; ++i) {
         for (int j = 0; j < 40; ++j) {
             for (int k = 0; k < 400; ++k) {
                 MeshData meshData;
                 (void)resourceMapper.loadModel(rhi, NH3D_DIR "src/editor/assets/cube.glb", meshData); // Simulate 640'000 unique meshes
-                scene.create(RenderComponent { meshData.mesh, meshData.material },
+                scene.create(RenderComponent { meshData.mesh, { .albedoTexture = textures[k % std::size(textures)] } },
                     TransformComponent { { 8.0f * i - 160.0f, 8.0f * j - 160.0f, 8.0f * k - 1600.0f } });
             }
         }

@@ -6,6 +6,8 @@
 #include <misc/types.hpp>
 #include <misc/utils.hpp>
 #include <rendering/core/buffer.hpp>
+#include <rendering/core/handle.hpp>
+#include <rendering/core/material.hpp>
 #include <rendering/core/resource_manager.hpp>
 #include <rendering/vulkan/vulkan_bind_group.hpp>
 #include <rendering/vulkan/vulkan_buffer.hpp>
@@ -227,7 +229,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
 
         _cullingTransformBuffers[i] = _bufferManager.create(*this,
             {
-                .size = (sizeof(vec4) + sizeof(vec3) * 2) * MaxObjects,
+                .size = sizeof(TransformComponent) * MaxObjects,
                 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                 .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
             });
@@ -235,7 +237,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
 
         _cullingTransformStagingBuffers[i] = _bufferManager.create(*this,
             {
-                .size = (sizeof(vec4) + sizeof(vec3) * 2) * MaxObjects,
+                .size = sizeof(TransformComponent) * MaxObjects,
                 .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                 .memoryUsage = VMA_MEMORY_USAGE_CPU_ONLY,
             });
@@ -309,7 +311,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
 
         _drawRecordBuffers[i] = _bufferManager.create(*this,
             {
-                .size = (sizeof(VkDeviceAddress) * 2 + sizeof(Material) + sizeof(mat4x3)) * MaxObjects,
+                .size = sizeof(DrawRecord) * MaxObjects,
                 .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                 .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
             });
@@ -327,7 +329,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
     const VkDescriptorType textureBindingTypes[] = { VK_DESCRIPTOR_TYPE_SAMPLER, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE };
     _albedoTextureBindGroup = _bindGroupManager.create(*this,
         {
-            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT, // TODO: update for compute shaders
             .bindingTypes = textureBindingTypes,
             .finalBindingCount = 1000,
         });
@@ -541,7 +543,7 @@ void VulkanRHI::executeImmediateCommandBuffer(const std::function<void(VkCommand
 
 Handle<Texture> VulkanRHI::createTexture(const Texture::CreateInfo& info)
 {
-    return _textureManager.create(*this,
+    Handle<Texture> texture = _textureManager.create(*this,
         {
             .format = MapTextureFormat(info.format),
             .extent = { info.size.x, info.size.y, info.size.z },
@@ -550,6 +552,16 @@ Handle<Texture> VulkanRHI::createTexture(const Texture::CreateInfo& info)
             .initialData = info.initialData,
             .generateMipMaps = info.generateMipMaps,
         });
+
+    auto& descriptorSets = _bindGroupManager.get<DescriptorSets>(_albedoTextureBindGroup);
+    const VkDescriptorImageInfo imageInfo {
+        .sampler = VK_NULL_HANDLE,
+        .imageView = _textureManager.get<ImageView>(texture).view,
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    };
+    VulkanBindGroup::registerBufferedUpdate(descriptorSets, imageInfo, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, texture.index);
+
+    return texture;
 }
 
 void VulkanRHI::destroyTexture(const Handle<Texture> handle) { _textureManager.release(*this, handle); }
@@ -578,8 +590,7 @@ void VulkanRHI::render(Scene& scene) const
         return;
     }
 
-    const uint32_t frameInFlightId = _frameId % MaxFramesInFlight;
-
+    const uint32 frameInFlightId = _frameId % MaxFramesInFlight;
     if (vkWaitForFences(_device, 1, &_frameFences[frameInFlightId], VK_TRUE, NH3D_MAX_T(uint64)) != VK_SUCCESS) {
         NH3D_ABORT_VK("GPU stall detected");
     }
@@ -626,9 +637,9 @@ void VulkanRHI::render(Scene& scene) const
             const VkBuffer& indexBuffer = _bufferManager.get<GPUBuffer>(mesh.indexBuffer).buffer;
             // Buffers used as index/vertex buffers are assumed to be created with the exact size needed
             const uint32 indexBufferSize = _bufferManager.get<BufferAllocationInfo>(mesh.indexBuffer).allocatedSize;
-            objectData.mesh.vertexBuffer = VulkanBuffer::getDeviceAddress(*this, vertexBuffer);
-            objectData.mesh.indexBuffer = VulkanBuffer::getDeviceAddress(*this, indexBuffer);
-            objectData.mesh.material = renderComponent.getMaterial();
+            objectData.vertexBuffer = VulkanBuffer::getDeviceAddress(*this, vertexBuffer);
+            objectData.indexBuffer = VulkanBuffer::getDeviceAddress(*this, indexBuffer);
+            objectData.material = renderComponent.getMaterial();
             objectData.indexCount = indexBufferSize / sizeof(uint32);
 
             aabbDataPtr[objectCount] = mesh.objectAABB;
@@ -922,6 +933,13 @@ VkInstance VulkanRHI::createVkInstance(std::vector<const char*>&& requiredWindow
     requiredExtensions.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
     const char* validationLayerName = "VK_LAYER_KHRONOS_validation";
+
+    // VkValidationFeatureEnableEXT enables[]
+    //     = { VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT, VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT };
+    // VkValidationFeaturesEXT features = {};
+    // features.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
+    // features.enabledValidationFeatureCount = std::size(enables);
+    // features.pEnabledValidationFeatures = enables;
 #endif
 
     const VkInstanceCreateInfo vkInstanceCreateInfo {
@@ -1063,9 +1081,11 @@ VkDevice VulkanRHI::createLogicalDevice(const VkPhysicalDevice gpu, const Physic
         .descriptorIndexing = VK_TRUE,
         .descriptorBindingSampledImageUpdateAfterBind = VK_TRUE,
         .descriptorBindingStorageImageUpdateAfterBind = VK_TRUE,
+        .descriptorBindingPartiallyBound = VK_TRUE,
         .descriptorBindingVariableDescriptorCount = VK_TRUE,
         .runtimeDescriptorArray = VK_TRUE,
         .scalarBlockLayout = VK_TRUE,
+        .uniformBufferStandardLayout = VK_TRUE,
         .bufferDeviceAddress = VK_TRUE,
         // descriptorBindingUniformBufferUpdateAfterBind seems to be poorly supported, see
         // https://vulkan.gpuinfo.org/listfeaturescore12.php
@@ -1361,4 +1381,5 @@ VulkanRHI::FrustumPlanes VulkanRHI::getFrustumPlanes(const mat4& projectionMatri
 
     return frustumPlanes;
 }
+
 }

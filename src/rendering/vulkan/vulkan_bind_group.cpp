@@ -1,6 +1,8 @@
 #include "vulkan_bind_group.hpp"
 #include <cstring>
+#include <rendering/core/frame_resource.hpp>
 #include <rendering/vulkan/vulkan_rhi.hpp>
+#include <vulkan/vulkan_core.h>
 
 namespace NH3D {
 
@@ -34,7 +36,8 @@ namespace NH3D {
             NH3D_ASSERT(descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE || descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                 "Currently expect only combined image samplers to have variable descriptor count");
 
-            bindingFlags[i] = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
+            bindingFlags[i] = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT
+                | VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
             descriptorBindings[i].descriptorCount = info.finalBindingCount;
         }
     }
@@ -106,8 +109,17 @@ namespace NH3D {
     }
 
     DescriptorSets descriptorSets {};
-    if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.sets.data()) != VK_SUCCESS) {
+    if (vkAllocateDescriptorSets(device, &allocInfo, &descriptorSets.sets[0]) != VK_SUCCESS) {
         NH3D_ABORT_VK("Failed to allocate Vulkan descriptor sets");
+    }
+
+    FrameResource<VkDescriptorImageInfo> textureInfos;
+    FrameResource<VkDescriptorBufferInfo> bufferInfos;
+    for (uint32 i = 0; i < IRHI::MaxFramesInFlight; ++i) {
+
+        descriptorSets.updates[i] = new VkWriteDescriptorSet[MaxRegisteredBindingUpdates * 2];
+        descriptorSets.textureInfos[i] = new VkDescriptorImageInfo[MaxRegisteredBindingUpdates];
+        descriptorSets.bufferInfos[i] = new VkDescriptorBufferInfo[MaxRegisteredBindingUpdates];
     }
 
     return { { descriptorSets }, BindGroupMetadata { layout, pool } };
@@ -115,6 +127,16 @@ namespace NH3D {
 
 void VulkanBindGroup::release(const IRHI& rhi, DescriptorSets& descriptorSets, BindGroupMetadata& metadata)
 {
+    for (uint32 i = 0; i < IRHI::MaxFramesInFlight; ++i) {
+        delete[] descriptorSets.updates[i];
+        delete[] descriptorSets.textureInfos[i];
+        delete[] descriptorSets.bufferInfos[i];
+
+        descriptorSets.updateCounts[i] = 0;
+        descriptorSets.textureInfoCounts[i] = 0;
+        descriptorSets.bufferInfoCounts[i] = 0;
+    }
+
     const VulkanRHI& vrhi = static_cast<const VulkanRHI&>(rhi);
     vkDestroyDescriptorSetLayout(vrhi.getVkDevice(), metadata.layout, nullptr);
     metadata.layout = nullptr;
@@ -133,9 +155,15 @@ bool VulkanBindGroup::valid(const DescriptorSets& descriptorSets, const BindGrou
 {
     NH3D_ASSERT(frameInFlightId < IRHI::MaxFramesInFlight, "Requested out of bound descriptor set");
 
-    vkUpdateDescriptorSets(device, static_cast<uint32>(descriptorSets.updates[frameInFlightId].size()),
-        descriptorSets.updates[frameInFlightId].data(), 0, nullptr);
-    descriptorSets.updates[frameInFlightId].clear();
+    if (descriptorSets.updateCounts[frameInFlightId] == 0) {
+        return descriptorSets.sets[frameInFlightId];
+    }
+
+    vkUpdateDescriptorSets(
+        device, static_cast<uint32>(descriptorSets.updateCounts[frameInFlightId]), descriptorSets.updates[frameInFlightId], 0, nullptr);
+    descriptorSets.updateCounts[frameInFlightId] = 0;
+    descriptorSets.textureInfoCounts[frameInFlightId] = 0;
+    descriptorSets.bufferInfoCounts[frameInFlightId] = 0;
 
     return descriptorSets.sets[frameInFlightId];
 }
