@@ -35,8 +35,8 @@ public:
 
     template <NotHierarchyComponent T> [[nodiscard]] inline T& get(const Entity entity);
 
-    template <NotHierarchyComponent T, NotHierarchyComponent... Ts>
-    [[nodiscard]] inline ComponentView<T, Ts...> makeView(const std::vector<ComponentMask>& entityMasks);
+    template <bool IncludeLeadType, NotHierarchyComponent T, NotHierarchyComponent... Ts>
+    [[nodiscard]] inline ComponentView<IncludeLeadType, T, Ts...> makeView(const std::vector<ComponentMask>& entityMasks);
 
     template <NotHierarchyComponent... Ts> inline void add(const Entity entity, Ts&&... components);
 
@@ -98,11 +98,19 @@ template <NotHierarchyComponent... Ts> [[nodiscard]] inline ComponentMask Sparse
 
 template <NotHierarchyComponent T> [[nodiscard]] inline T& SparseSetMap::get(const Entity entity) { return getSet<T>().get(entity); }
 
-template <NotHierarchyComponent T, NotHierarchyComponent... Ts>
-[[nodiscard]] inline ComponentView<T, Ts...> SparseSetMap::makeView(const std::vector<ComponentMask>& entityMasks)
+template <bool IncludeLeadType, NotHierarchyComponent LeadType, NotHierarchyComponent... Ts>
+[[nodiscard]] inline ComponentView<IncludeLeadType, LeadType, Ts...> SparseSetMap::makeView(const std::vector<ComponentMask>& entityMasks)
 {
-    return ComponentView<T, Ts...> { entityMasks, std::tie(getSet<std::remove_cvref_t<T>>(), getSet<std::remove_cvref_t<Ts>>()...),
-        mask<T, Ts...>() };
+    ComponentMask filterMask;
+
+    if constexpr (IncludeLeadType) {
+        filterMask = mask<LeadType, Ts...>();
+    } else {
+        filterMask = mask<Ts...>();
+    }
+
+    return ComponentView<IncludeLeadType, LeadType, Ts...> { entityMasks,
+        std::tie(getSet<std::remove_cvref_t<LeadType>>(), getSet<std::remove_cvref_t<Ts>>()...), filterMask };
 }
 
 template <NotHierarchyComponent... Ts> inline void SparseSetMap::add(const Entity entity, Ts&&... component)

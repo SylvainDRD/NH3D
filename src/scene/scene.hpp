@@ -41,7 +41,11 @@ public:
 
     template <NotHierarchyComponent... Ts> inline void clearComponents(const Entity entity);
 
-    template <NotHierarchyComponent T, NotHierarchyComponent... Ts> [[nodiscard]] inline ComponentView<T, Ts...> makeView();
+    template <NotHierarchyComponent LeadType, NotHierarchyComponent... Ts>
+    [[nodiscard]] inline ComponentView<true, LeadType, Ts...> makeView();
+
+    template <NotHierarchyComponent LeadType, NotHierarchyComponent... Ts>
+    [[nodiscard]] inline ComponentView<false, LeadType, Ts...> makeQuickView();
 
     [[nodiscard]] bool isLeaf(const Entity entity) const;
 
@@ -127,9 +131,16 @@ template <NotHierarchyComponent... Ts> inline void Scene::clearComponents(const 
     _entityMasks[entity] ^= _setMap.mask<Ts...>();
 }
 
-template <NotHierarchyComponent T, NotHierarchyComponent... Ts> [[nodiscard]] inline ComponentView<T, Ts...> Scene::makeView()
+template <NotHierarchyComponent LeadType, NotHierarchyComponent... Ts>
+[[nodiscard]] inline ComponentView<true, LeadType, Ts...> Scene::makeView()
 {
-    return _setMap.makeView<T, Ts...>(_entityMasks);
+    return _setMap.makeView<true, LeadType, Ts...>(_entityMasks);
 }
 
+template <NotHierarchyComponent LeadType, NotHierarchyComponent... Ts>
+[[nodiscard]] inline ComponentView<false, LeadType, Ts...> Scene::makeQuickView()
+{
+    return _setMap.makeView<false, LeadType, Ts...>(_entityMasks);
 }
+
+} // namespace NH3D

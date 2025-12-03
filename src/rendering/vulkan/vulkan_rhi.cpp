@@ -603,12 +603,13 @@ void VulkanRHI::render(Scene& scene) const
     const BufferAllocationInfo& transformAllocation = _bufferManager.get<BufferAllocationInfo>(_cullingTransformBuffers[frameInFlightId]);
     TransformComponent* transformDataPtr
         = reinterpret_cast<TransformComponent*>(VulkanBuffer::getMappedAddress(*this, transformAllocation));
+
+    auto start = std::chrono::high_resolution_clock::now();
+
     uint32 objectCount = 0;
     // TODO: track dirty state properly
-    static bool dirtyRenderingData = true;
+    const bool dirtyRenderingData = _frameId < MaxFramesInFlight;
     if (dirtyRenderingData) {
-        dirtyRenderingData = _frameId < MaxFramesInFlight;
-
         const GPUBuffer& objectDataStagingBuffer = _bufferManager.get<GPUBuffer>(_cullingRenderDataStagingBuffers[frameInFlightId]);
         const BufferAllocationInfo& objectDataStagingAllocation
             = _bufferManager.get<BufferAllocationInfo>(_cullingRenderDataStagingBuffers[frameInFlightId]);
@@ -647,13 +648,17 @@ void VulkanRHI::render(Scene& scene) const
             VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_SHADER_READ_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
     } else {
         // Only update transforms
-        // TODO: remove the need for RenderComponent here, it should only be used to filter
-        for (const auto& [entity, _, transformComponent] : scene.makeView<RenderComponent, TransformComponent>()) {
+        // Note that quickView only really improves Debug performance, RelWithDebInfo saw pretty much no difference
+        for (const auto& [entity, transformComponent] : scene.makeQuickView<RenderComponent, TransformComponent>()) {
             transformDataPtr[objectCount] = transformComponent;
             objectCount++;
         }
     }
     VulkanBuffer::flush(*this, transformAllocation);
+
+    auto end = std::chrono::high_resolution_clock::now();
+    const auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    NH3D_LOG("Updated rendering data for in " << duration / 1000.0f << " ms");
 
     // Reset the culling draw counter
     const VkBuffer drawCountBuffer = _bufferManager.get<GPUBuffer>(_cullingDrawCounterBuffers[frameInFlightId]).buffer;

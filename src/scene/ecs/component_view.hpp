@@ -11,8 +11,8 @@ namespace NH3D {
 
 class Scene;
 
-template <typename T, typename... Ts> class ComponentView {
-    using TupleType = std::tuple<SparseSet<std::remove_cvref_t<T>>&, SparseSet<std::remove_cvref_t<Ts>>&...>;
+template <bool IncludeLeadType, typename LeadType, typename... Ts> class ComponentView {
+    using TupleType = std::tuple<SparseSet<std::remove_cvref_t<LeadType>>&, SparseSet<std::remove_cvref_t<Ts>>&...>;
 
 public:
     ComponentView() = delete;
@@ -25,7 +25,7 @@ public:
 
         Iterator& operator++()
         {
-            const auto& entities = std::get<SparseSet<std::remove_cvref_t<T>>&>(_sets).entities();
+            const auto& entities = std::get<SparseSet<std::remove_cvref_t<LeadType>>&>(_sets).entities();
 
             do {
                 ++_id;
@@ -38,12 +38,22 @@ public:
 
         bool operator!=(const Iterator& other) { return !(_id == other._id); }
 
-        std::tuple<Entity, T, Ts...> operator*()
+        std::tuple<Entity, LeadType, Ts...> operator*()
+            requires(IncludeLeadType)
         {
-            auto& leadSet = std::get<SparseSet<std::remove_cvref_t<T>>&>(_sets);
+            auto& leadSet = std::get<SparseSet<std::remove_cvref_t<LeadType>>&>(_sets);
             const Entity e = leadSet.entities()[_id];
 
             return std::tie(e, leadSet.getRaw(_id), std::get<SparseSet<std::remove_cvref_t<Ts>>&>(_sets).get(e)...);
+        }
+
+        std::tuple<Entity, Ts...> operator*()
+            requires(!IncludeLeadType)
+        {
+            auto& leadSet = std::get<SparseSet<std::remove_cvref_t<LeadType>>&>(_sets);
+            const Entity e = leadSet.entities()[_id];
+
+            return std::tie(e, std::get<SparseSet<std::remove_cvref_t<Ts>>&>(_sets).get(e)...);
         }
 
     private:
@@ -52,7 +62,7 @@ public:
             , _sets { sets }
             , _mask { mask }
         {
-            const auto& entities = std::get<SparseSet<std::remove_cvref_t<T>>&>(_sets).entities();
+            const auto& entities = std::get<SparseSet<std::remove_cvref_t<LeadType>>&>(_sets).entities();
 
             while (_id != entities.size() && !ComponentMasks::checkComponents(_entityMasks[entities[_id]], _mask)) {
                 ++_id;
@@ -66,7 +76,7 @@ public:
 
         uint32 _id = 0;
 
-        friend ComponentView<T, Ts...>;
+        friend ComponentView<IncludeLeadType, LeadType, Ts...>;
     };
 
     Iterator begin();
@@ -79,23 +89,26 @@ private:
     const ComponentMask _mask;
 };
 
-template <typename T, typename... Ts>
-ComponentView<T, Ts...>::ComponentView(const std::vector<ComponentMask>& entityMasks, TupleType sets, const ComponentMask mask)
+template <bool IncludeLeadType, typename LeadType, typename... Ts>
+ComponentView<IncludeLeadType, LeadType, Ts...>::ComponentView(
+    const std::vector<ComponentMask>& entityMasks, TupleType sets, const ComponentMask mask)
     : _entityMasks { entityMasks }
     , _sets { sets }
     , _mask { mask }
 {
 }
 
-template <typename T, typename... Ts> ComponentView<T, Ts...>::Iterator ComponentView<T, Ts...>::begin()
+template <bool IncludeLeadType, typename LeadType, typename... Ts>
+ComponentView<IncludeLeadType, LeadType, Ts...>::Iterator ComponentView<IncludeLeadType, LeadType, Ts...>::begin()
 {
-    return ComponentView<T, Ts...>::Iterator { _entityMasks, _sets, _mask };
+    return ComponentView<IncludeLeadType, LeadType, Ts...>::Iterator { _entityMasks, _sets, _mask };
 }
 
-template <typename T, typename... Ts> ComponentView<T, Ts...>::Iterator ComponentView<T, Ts...>::end()
+template <bool IncludeLeadType, typename LeadType, typename... Ts>
+ComponentView<IncludeLeadType, LeadType, Ts...>::Iterator ComponentView<IncludeLeadType, LeadType, Ts...>::end()
 {
-    auto it = ComponentView<T, Ts...>::Iterator { _entityMasks, _sets, _mask };
-    it._id = std::get<SparseSet<std::remove_cvref_t<T>>&>(_sets).size();
+    auto it = ComponentView<IncludeLeadType, LeadType, Ts...>::Iterator { _entityMasks, _sets, _mask };
+    it._id = std::get<SparseSet<std::remove_cvref_t<LeadType>>&>(_sets).size();
 
     return it;
 }
