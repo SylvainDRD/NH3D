@@ -29,7 +29,6 @@ struct DrawRecord {
     VertexBuffer vertexBuffer;
     IndexBuffer indexBuffer;
     Material material;
-    // uint padding;
     mat4x3 modelViewMatrix;
 };
 

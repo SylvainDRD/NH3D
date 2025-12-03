@@ -1,10 +1,8 @@
 #pragma once
 
 #include <filesystem>
-#include <fstream>
 #include <misc/utils.hpp>
 #include <rendering/core/rhi.hpp>
-#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace NH3D {

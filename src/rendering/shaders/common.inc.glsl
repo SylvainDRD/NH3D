@@ -46,20 +46,37 @@ AABB transformAABB(mat4 transform, AABB objectAABB) {
     // Not too sure how efficient this is on GPU TBH
     vec3 nmin, nmax;
     nmin = nmax = transform[3].xyz; // Translation part
+
+    vec3 oneVector = vec3(1.0);
+    mat3 transposedRotation = transpose(mat3(transform));
     for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            float a = transform[j][i] * objectAABB.min[j];
-            float b = transform[j][i] * objectAABB.max[j];
-            if (a < b) {
-                nmin[i] += a;
-                nmax[i] += b;
-            } else {
-                nmin[i] += b;
-                nmax[i] += a;
-            }
-        }
+        vec3 a = transposedRotation[i] * objectAABB.min;
+        vec3 b = transposedRotation[i] * objectAABB.max;
+
+        vec3 min = min(a, b);
+        vec3 max = max(a, b);
+        nmin[i] += dot(min, oneVector);
+        nmax[i] += dot(max, oneVector);
     }
 
+    // Naive version of the above, for reference
+    // vec3 nmin, nmax;
+    // nmin = nmax = transform[3].xyz; // Translation part
+    // for (int i = 0; i < 3; ++i) {
+    //     for (int j = 0; j < 3; ++j) {
+    //         float a = transform[j][i] * objectAABB.min[j];
+    //         float b = transform[j][i] * objectAABB.max[j];
+    //         if (a < b) {
+    //             nmin[i] += a;
+    //             nmax[i] += b;
+    //         } else {
+    //             nmin[i] += b;
+    //             nmax[i] += a;
+    //         }
+    //     }
+    // }
+
+    // Brute-force version, transforming all 8 points
     // vec3 points[8] = {
     //         objectAABB.min,
     //         objectAABB.max,

@@ -181,6 +181,13 @@ VulkanRHI::VulkanRHI(const Window& Window)
                 .memoryUsage = VMA_MEMORY_USAGE_CPU_TO_GPU,
             });
 
+        _cullingAABBsStagingBuffers[i] = _bufferManager.create(*this,
+            {
+                .size = sizeof(AABB) * MaxObjects,
+                .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                .memoryUsage = VMA_MEMORY_USAGE_CPU_ONLY,
+            });
+
         const VkBuffer cullingAABBsBuffer = _bufferManager.get<GPUBuffer>(_cullingAABBsBuffers[i]).buffer;
 
         auto& objectDataDescriptorSets = _bindGroupManager.get<DescriptorSets>(_cullingRenderDataBindGroup);
@@ -208,7 +215,6 @@ VulkanRHI::VulkanRHI(const Window& Window)
     }
 
     const VkDescriptorType frameDataTypes[] = {
-        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, // CullingParams buffer
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, // TransformData buffer
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, // DrawCounter buffer
     };
@@ -219,28 +225,13 @@ VulkanRHI::VulkanRHI(const Window& Window)
         });
 
     for (int i = 0; i < IRHI::MaxFramesInFlight; ++i) {
-        _cullingParametersBuffers[i] = _bufferManager.create(*this,
-            {
-                .size = sizeof(CullingParameters),
-                .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
-            });
-        const VkBuffer cullingParametersBuffer = _bufferManager.get<GPUBuffer>(_cullingParametersBuffers[i]).buffer;
-
         _cullingTransformBuffers[i] = _bufferManager.create(*this,
             {
                 .size = sizeof(TransformComponent) * MaxObjects,
-                .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                .memoryUsage = VMA_MEMORY_USAGE_GPU_ONLY,
+                .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                .memoryUsage = VMA_MEMORY_USAGE_CPU_TO_GPU,
             });
         const VkBuffer cullingTransformBuffer = _bufferManager.get<GPUBuffer>(_cullingTransformBuffers[i]).buffer;
-
-        _cullingTransformStagingBuffers[i] = _bufferManager.create(*this,
-            {
-                .size = sizeof(TransformComponent) * MaxObjects,
-                .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                .memoryUsage = VMA_MEMORY_USAGE_CPU_ONLY,
-            });
 
         _cullingDrawCounterBuffers[i] = _bufferManager.create(*this,
             {
@@ -252,25 +243,18 @@ VulkanRHI::VulkanRHI(const Window& Window)
         auto& frameDataDescriptorSets = _bindGroupManager.get<DescriptorSets>(_cullingFrameDataBindGroup);
         VulkanBindGroup::updateDescriptorSet(_device, frameDataDescriptorSets.sets[i],
             VkDescriptorBufferInfo {
-                .buffer = _bufferManager.get<GPUBuffer>(_cullingParametersBuffers[i]).buffer,
-                .offset = 0,
-                .range = VK_WHOLE_SIZE,
-            },
-            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0);
-        VulkanBindGroup::updateDescriptorSet(_device, frameDataDescriptorSets.sets[i],
-            VkDescriptorBufferInfo {
                 .buffer = _bufferManager.get<GPUBuffer>(_cullingTransformBuffers[i]).buffer,
                 .offset = 0,
                 .range = VK_WHOLE_SIZE,
             },
-            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1);
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
         VulkanBindGroup::updateDescriptorSet(_device, frameDataDescriptorSets.sets[i],
             VkDescriptorBufferInfo {
                 .buffer = _bufferManager.get<GPUBuffer>(_cullingDrawCounterBuffers[i]).buffer,
                 .offset = 0,
                 .range = VK_WHOLE_SIZE,
             },
-            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2);
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1);
     }
 
     const VkDescriptorType drawIndirectTypes[] = { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER };
@@ -395,6 +379,12 @@ VulkanRHI::VulkanRHI(const Window& Window)
             VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3);
     }
 
+    const VkPushConstantRange cullingPushConstantRange {
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        .offset = 0,
+        .size = sizeof(CullingParameters),
+    };
+
     const auto& objectDataMetadataLayout = _bindGroupManager.get<BindGroupMetadata>(_cullingRenderDataBindGroup).layout;
     const auto& frameDataMetadataLayout = _bindGroupManager.get<BindGroupMetadata>(_cullingFrameDataBindGroup).layout;
     const auto& drawIndirectMetadataLayout = _bindGroupManager.get<BindGroupMetadata>(_drawIndirectCommandBindGroup).layout;
@@ -410,9 +400,10 @@ VulkanRHI::VulkanRHI(const Window& Window)
         {
             .computeShaderPath = NH3D_DIR "src/rendering/shaders/culling.comp.spv",
             .descriptorSetsLayouts = cullingLayouts,
+            .pushConstantRanges = cullingPushConstantRange,
         });
 
-    const VkPushConstantRange pushConstantRange { .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .offset = 0, .size = sizeof(mat4) };
+    const VkPushConstantRange gbufferPushConstantRange { .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .offset = 0, .size = sizeof(mat4) };
 
     const VulkanShader::ColorAttachmentInfo colorAttachmentInfos[] = {
         {
@@ -435,7 +426,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
             .colorAttachmentFormats = { colorAttachmentInfos, std::size(colorAttachmentInfos) },
             .depthAttachmentFormat = VK_FORMAT_D32_SFLOAT,
             .descriptorSetsLayouts = gbufferLayouts,
-            .pushConstantRanges = pushConstantRange,
+            .pushConstantRanges = gbufferPushConstantRange,
         });
 
     const auto& deferredShadingMetadataLayout = _bindGroupManager.get<BindGroupMetadata>(_deferredShadingBindGroup).layout;
@@ -608,12 +599,10 @@ void VulkanRHI::render(Scene& scene) const
     beginCommandBuffer(commandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
     // Buffer updates
-    const GPUBuffer& transformStagingBuffer = _bufferManager.get<GPUBuffer>(_cullingTransformStagingBuffers[frameInFlightId]);
-    const BufferAllocationInfo& transformStagingAllocation
-        = _bufferManager.get<BufferAllocationInfo>(_cullingTransformStagingBuffers[frameInFlightId]);
+    const GPUBuffer& transformBuffer = _bufferManager.get<GPUBuffer>(_cullingTransformBuffers[frameInFlightId]);
+    const BufferAllocationInfo& transformAllocation = _bufferManager.get<BufferAllocationInfo>(_cullingTransformBuffers[frameInFlightId]);
     TransformComponent* transformDataPtr
-        = reinterpret_cast<TransformComponent*>(VulkanBuffer::getMappedAddress(*this, transformStagingAllocation));
-
+        = reinterpret_cast<TransformComponent*>(VulkanBuffer::getMappedAddress(*this, transformAllocation));
     uint32 objectCount = 0;
     // TODO: track dirty state properly
     static bool dirtyRenderingData = true;
@@ -625,9 +614,9 @@ void VulkanRHI::render(Scene& scene) const
             = _bufferManager.get<BufferAllocationInfo>(_cullingRenderDataStagingBuffers[frameInFlightId]);
         RenderData* objectDataPtr = reinterpret_cast<RenderData*>(VulkanBuffer::getMappedAddress(*this, objectDataStagingAllocation));
 
-        const GPUBuffer& aabbBuffer = _bufferManager.get<GPUBuffer>(_cullingAABBsBuffers[frameInFlightId]);
+        const GPUBuffer& aabbStagingBuffer = _bufferManager.get<GPUBuffer>(_cullingAABBsStagingBuffers[frameInFlightId]);
         AABB* aabbDataPtr = reinterpret_cast<AABB*>(
-            VulkanBuffer::getMappedAddress(*this, _bufferManager.get<BufferAllocationInfo>(_cullingAABBsBuffers[frameInFlightId])));
+            VulkanBuffer::getMappedAddress(*this, _bufferManager.get<BufferAllocationInfo>(_cullingAABBsStagingBuffers[frameInFlightId])));
 
         for (const auto& [entity, renderComponent, transformComponent] : scene.makeView<RenderComponent, TransformComponent>()) {
             RenderData objectData;
@@ -647,7 +636,9 @@ void VulkanRHI::render(Scene& scene) const
             transformDataPtr[objectCount] = transformComponent;
             objectCount++;
         }
-        VulkanBuffer::flush(*this, _bufferManager.get<BufferAllocationInfo>(_cullingAABBsBuffers[frameInFlightId]));
+
+        const GPUBuffer& aabbBuffer = _bufferManager.get<GPUBuffer>(_cullingAABBsBuffers[frameInFlightId]);
+        VulkanBuffer::copyBuffer(commandBuffer, aabbStagingBuffer.buffer, aabbBuffer.buffer, sizeof(AABB) * objectCount);
 
         const GPUBuffer& objectDataBuffer = _bufferManager.get<GPUBuffer>(_cullingRenderDataBuffers[frameInFlightId]);
         VulkanBuffer::copyBuffer(commandBuffer, objectDataStagingBuffer.buffer, objectDataBuffer.buffer, sizeof(RenderData) * objectCount);
@@ -662,18 +653,13 @@ void VulkanRHI::render(Scene& scene) const
             objectCount++;
         }
     }
+    VulkanBuffer::flush(*this, transformAllocation);
 
     // Reset the culling draw counter
     const VkBuffer drawCountBuffer = _bufferManager.get<GPUBuffer>(_cullingDrawCounterBuffers[frameInFlightId]).buffer;
     vkCmdFillBuffer(commandBuffer, drawCountBuffer, 0, sizeof(uint32), 0);
     VulkanBuffer::insertMemoryBarrier(commandBuffer, drawCountBuffer, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT,
         VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
-
-    const GPUBuffer& transformBuffer = _bufferManager.get<GPUBuffer>(_cullingTransformBuffers[frameInFlightId]);
-    VulkanBuffer::copyBuffer(
-        commandBuffer, transformStagingBuffer.buffer, transformBuffer.buffer, sizeof(TransformComponent) * objectCount);
-    VulkanBuffer::insertMemoryBarrier(commandBuffer, transformBuffer.buffer, VK_ACCESS_2_TRANSFER_WRITE_BIT,
-        VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_SHADER_READ_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
 
     // Update visible flags buffer
     const uint32 visibleFlagsBufferSize = (objectCount + (sizeof(uint32) << 3) - 1) / (sizeof(uint32) << 3) * sizeof(uint32);
@@ -698,19 +684,6 @@ void VulkanRHI::render(Scene& scene) const
     const mat4 projectionMatrix = perspective(cameraSettings.fovY, aspectRatio, cameraSettings.near, cameraSettings.far);
     const mat4 viewMatrix = inverse(mat4(cameraTransform)); // assumes scale is uniform and non-zero
 
-    const CullingParameters cullingParameters {
-        .viewMatrix = viewMatrix,
-        .frustumPlanes = getFrustumPlanes(projectionMatrix),
-        .objectCount = objectCount,
-    };
-
-    // Update culling parameters buffer
-    const VkBuffer cullingParametersBuffer = _bufferManager.get<GPUBuffer>(_cullingParametersBuffers[frameInFlightId]).buffer;
-    vkCmdUpdateBuffer(
-        commandBuffer, cullingParametersBuffer, 0, sizeof(CullingParameters), reinterpret_cast<const void*>(&cullingParameters));
-    VulkanBuffer::insertMemoryBarrier(commandBuffer, cullingParametersBuffer, VK_ACCESS_2_TRANSFER_WRITE_BIT,
-        VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_SHADER_READ_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
-
     // Frustum culling dispatch
     const auto cullingPipeline = _computeShaderManager.get<VkPipeline>(_frustumCullingCS);
     const auto cullingPipelineLayout = _computeShaderManager.get<VkPipelineLayout>(_frustumCullingCS);
@@ -725,6 +698,15 @@ void VulkanRHI::render(Scene& scene) const
     };
 
     VulkanBindGroup::bind(commandBuffer, cullingDescriptorSets, VK_PIPELINE_BIND_POINT_COMPUTE, cullingPipelineLayout);
+
+    // Update culling parameters buffer
+    const CullingParameters cullingParameters {
+        .viewMatrix = viewMatrix,
+        .frustumPlanes = getFrustumPlanes(projectionMatrix),
+        .objectCount = objectCount,
+    };
+
+    vkCmdPushConstants(commandBuffer, cullingPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(CullingParameters), &cullingParameters);
 
     const vec3i cullingKernelSize { std::ceil(objectCount / 64.f), 1, 1 };
     VulkanComputeShader::dispatch(commandBuffer, cullingPipeline, cullingKernelSize);

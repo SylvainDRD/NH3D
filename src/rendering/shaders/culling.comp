@@ -21,18 +21,11 @@ layout(set = 0, binding = 2, scalar) readonly buffer AABBBuffer {
     AABB aabb[];
 } objectAABBs;
 
-// TODO: Move to push constants
-layout(set = 1, binding = 0, scalar) readonly uniform CullingParametersData
-{
-    CullingParameters parameters;
-} cullingData;
-
-// TODO: move into render data
-layout(set = 1, binding = 1, scalar) readonly buffer TransformBuffer {
+layout(set = 1, binding = 0, scalar) readonly buffer TransformBuffer {
     TransformData transforms[];
 } transformBuffer;
 
-layout(set = 1, binding = 2, scalar) buffer DrawCounter {
+layout(set = 1, binding = 1, scalar) buffer DrawCounter {
     uint count;
 } drawCounter;
 
@@ -50,6 +43,11 @@ layout(set = 2, binding = 0, scalar) buffer DrawIndirectCommandBuffer {
 layout(set = 3, binding = 0, scalar) buffer DrawRecordBuffer {
     DrawRecord drawRecords[];
 } drawRecordBuffer;
+
+layout(push_constant) uniform CullingParametersData
+{
+    CullingParameters parameters;
+} cullingData;
 
 void main()
 {
@@ -70,7 +68,7 @@ void main()
     AABB viewAABB = transformAABB(viewSpaceTransform, objectAABBs.aabb[index]);
 
     // if (inFrustum(viewAABB, cullingData.parameters)) {
-    if (true) { // TODO: remove
+    if (true) { // TODO: remove after trying some optimizations
         uint drawIndex = atomicAdd(drawCounter.count, 1); // To be reset by CPU before dispatch
 
         drawIndirectCommands.commands[drawIndex].vertexCount = obj.indexCount;

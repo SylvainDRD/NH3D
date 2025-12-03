@@ -71,10 +71,10 @@ public:
 
 private:
     struct PhysicalDeviceQueueFamilyID {
-        uint32_t GraphicsQueueFamilyID = NH3D_MAX_T(uint32_t);
-        uint32_t PresentQueueFamilyID = NH3D_MAX_T(uint32_t);
+        uint32 GraphicsQueueFamilyID = NH3D_MAX_T(uint32);
+        uint32 PresentQueueFamilyID = NH3D_MAX_T(uint32);
 
-        bool isValid() const { return GraphicsQueueFamilyID != NH3D_MAX_T(uint32_t) && PresentQueueFamilyID != NH3D_MAX_T(uint32_t); }
+        bool isValid() const { return GraphicsQueueFamilyID != NH3D_MAX_T(uint32) && PresentQueueFamilyID != NH3D_MAX_T(uint32); }
     };
 
     struct RenderData {
@@ -184,12 +184,11 @@ private:
     FrameResource<Handle<Buffer>> _cullingRenderDataBuffers = {};
     FrameResource<Handle<Buffer>> _cullingRenderDataStagingBuffers = {};
     FrameResource<Handle<Buffer>> _cullingVisibleFlagBuffers = {};
-    FrameResource<Handle<Buffer>> _cullingAABBsBuffers = {};
     FrameResource<Handle<Buffer>> _cullingVisibleFlagStagingBuffers = {};
+    FrameResource<Handle<Buffer>> _cullingAABBsBuffers = {};
+    FrameResource<Handle<Buffer>> _cullingAABBsStagingBuffers = {};
     Handle<BindGroup> _cullingFrameDataBindGroup = InvalidHandle<BindGroup>;
-    FrameResource<Handle<Buffer>> _cullingParametersBuffers = {}; // Update via vkCmdUpdateBuffer
     FrameResource<Handle<Buffer>> _cullingTransformBuffers = {};
-    FrameResource<Handle<Buffer>> _cullingTransformStagingBuffers = {};
     FrameResource<Handle<Buffer>> _cullingDrawCounterBuffers = {}; // vkCmdFillBuffer
 
     struct GBuffer {
