@@ -1,5 +1,6 @@
 #pragma once
 
+#include "general/window.hpp"
 #include <core/aabb.hpp>
 #include <cstdint>
 #include <functional>
@@ -35,7 +36,8 @@ class VulkanRHI : public IRHI {
 public:
     VulkanRHI() = delete;
 
-    VulkanRHI(const Window& _window);
+    // Window used for surface creation
+    VulkanRHI(const Window& window);
 
     ~VulkanRHI();
 
@@ -67,7 +69,7 @@ public:
 
     virtual void destroyBuffer(const Handle<Buffer> handle) override;
 
-    virtual void render(Scene& scene) const override;
+    virtual void render(Scene& scene) override;
 
 private:
     struct PhysicalDeviceQueueFamilyID {
@@ -115,7 +117,7 @@ private:
     VkDevice createLogicalDevice(const VkPhysicalDevice gpu, const PhysicalDeviceQueueFamilyID queues) const;
 
     std::pair<VkSwapchainKHR, VkFormat> createSwapchain(const VkDevice device, const VkPhysicalDevice gpu, const VkSurfaceKHR surface,
-        const PhysicalDeviceQueueFamilyID queues, const VkExtent2D extent, const VkSwapchainKHR previousSwapchain = nullptr) const;
+        const PhysicalDeviceQueueFamilyID queues, const VkSwapchainKHR previousSwapchain = nullptr) const;
 
     VkCommandPool createCommandPool(const VkDevice device, const uint32_t queueFamilyIndex) const;
 
@@ -140,12 +142,17 @@ private:
 
     FrustumPlanes getFrustumPlanes(const mat4& projectionMatrix) const;
 
+    void handleResize();
+
+    void updateGBufferDescriptorSets();
+
 private:
     VkInstance _instance;
 #if NH3D_DEBUG
     VkDebugUtilsMessengerEXT _debugUtilsMessenger;
 #endif
     VkPhysicalDevice _gpu;
+    PhysicalDeviceQueueFamilyID _queues;
 
     VkSurfaceKHR _surface;
 
@@ -155,8 +162,8 @@ private:
     VkQueue _graphicsQueue;
     VkQueue _presentQueue;
 
-    VkSwapchainKHR _swapchain;
-    std::vector<Handle<Texture>> _swapchainTextures;
+    mutable VkSwapchainKHR _swapchain = {}; // Needs to be recreated on resize
+    mutable std::vector<Handle<Texture>> _swapchainTextures;
 
     VkCommandPool _commandPool;
     VkCommandPool _immediateCommandPool;
@@ -198,16 +205,16 @@ private:
     };
     FrameResource<GBuffer> _gbufferRTs;
 
-    Handle<Shader> _gbufferShader;
-    Handle<BindGroup> _drawIndirectCommandBindGroup;
-    FrameResource<Handle<Buffer>> _drawIndirectBuffers; // GPU written
-    Handle<BindGroup> _drawRecordBindGroup;
-    FrameResource<Handle<Buffer>> _drawRecordBuffers; // GPU written
-    Handle<BindGroup> _albedoTextureBindGroup;
+    Handle<Shader> _gbufferShader = InvalidHandle<Shader>;
+    Handle<BindGroup> _drawIndirectCommandBindGroup = InvalidHandle<BindGroup>;
+    FrameResource<Handle<Buffer>> _drawIndirectBuffers = {}; // GPU written
+    Handle<BindGroup> _drawRecordBindGroup = InvalidHandle<BindGroup>;
+    FrameResource<Handle<Buffer>> _drawRecordBuffers = {}; // GPU written
+    Handle<BindGroup> _albedoTextureBindGroup = InvalidHandle<BindGroup>;
 
-    Handle<ComputeShader> _deferredShadingCS;
-    Handle<BindGroup> _deferredShadingBindGroup;
-    FrameResource<Handle<Texture>> _finalRTs;
+    Handle<ComputeShader> _deferredShadingCS = InvalidHandle<ComputeShader>;
+    Handle<BindGroup> _deferredShadingBindGroup = InvalidHandle<BindGroup>;
+    FrameResource<Handle<Texture>> _finalRTs = {};
 
     Uptr<VulkanDebugDrawer> _debugDrawer;
 

@@ -1,5 +1,8 @@
 #include "window.hpp"
+#include "SDL3/SDL_events.h"
+#include "SDL3/SDL_video.h"
 #include <SDL3/SDL_vulkan.h>
+#include <general/engine.hpp>
 #include <misc/types.hpp>
 #include <misc/utils.hpp>
 #include <vector>
@@ -13,7 +16,7 @@ Window::Window()
         NH3D_ABORT("SDL init failed");
     }
 
-    _window = SDL_CreateWindow(NH3D_NAME, 1600, 800, 0);
+    _window = SDL_CreateWindow(NH3D_NAME, 1600, 800, SDL_WINDOW_RESIZABLE);
     if (!_window) {
         NH3D_ABORT("Window creation failed");
     }
@@ -44,6 +47,9 @@ Window::~Window()
         case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
             // Only return early if quitting, or mouse state will be outdated
             return true;
+        case SDL_EVENT_WINDOW_RESIZED:
+            // Nothing to do
+            break;
         default:
             break;
         }

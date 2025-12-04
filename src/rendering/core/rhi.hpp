@@ -30,7 +30,7 @@ public:
 
     virtual void destroyBuffer(const Handle<Buffer> handle) = 0;
 
-    virtual void render(Scene& scene) const = 0;
+    virtual void render(Scene& scene) = 0;
 };
 
 }

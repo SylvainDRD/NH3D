@@ -1,4 +1,5 @@
 #include "vulkan_rhi.hpp"
+#include "rendering/core/bind_group.hpp"
 #include <cmath>
 #include <cstdint>
 #include <general/window.hpp>
@@ -45,6 +46,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
 
     auto [gpu, queues] = selectPhysicalDevice(_instance, _surface);
     _gpu = gpu;
+    _queues = queues;
 
     _device = createLogicalDevice(_gpu, queues);
     _allocator = createVMAAllocator(_instance, _gpu, _device);
@@ -52,27 +54,8 @@ VulkanRHI::VulkanRHI(const Window& Window)
     vkGetDeviceQueue(_device, queues.GraphicsQueueFamilyID, 0, &_graphicsQueue);
     vkGetDeviceQueue(_device, queues.PresentQueueFamilyID, 0, &_presentQueue);
 
-    // The extent provided should match the surface, hopefully glfw does it right
-    auto [swapchain, surfaceFormat] = createSwapchain(_device, _gpu, _surface, queues, { Window.getWidth(), Window.getHeight() });
-    _swapchain = swapchain;
-
-    uint32 swapchainImageCount;
-    vkGetSwapchainImagesKHR(_device, _swapchain, &swapchainImageCount, nullptr);
-
-    std::vector<VkImage> swapchainImages;
-    swapchainImages.resize(swapchainImageCount);
-    _swapchainTextures.resize(swapchainImageCount);
-    vkGetSwapchainImagesKHR(_device, _swapchain, &swapchainImageCount, swapchainImages.data());
-
-    for (int i = 0; i < swapchainImageCount; ++i) {
-        _swapchainTextures[i] = _textureManager.create(*this,
-            {
-                .image = swapchainImages[i],
-                .format = surfaceFormat,
-                .extent = VkExtent3D { Window.getWidth(), Window.getHeight(), 1 },
-                .aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
-            });
-    }
+    // Creates the swapchain, get the images, create render/present semaphores, fences, gbuffer RTs and final RTs
+    handleResize();
 
     _commandPool = createCommandPool(_device, queues.GraphicsQueueFamilyID);
     allocateCommandBuffers(_device, _commandPool, MaxFramesInFlight, &_commandBuffers[0]);
@@ -84,53 +67,6 @@ VulkanRHI::VulkanRHI(const Window& Window)
     _uploadCommandPool = createCommandPool(_device, queues.GraphicsQueueFamilyID);
     allocateCommandBuffers(_device, _uploadCommandPool, 1, &_uploadCommandBuffer);
     beginCommandBuffer(_uploadCommandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-
-    _renderSemaphores.resize(swapchainImageCount);
-    for (uint32_t i = 0; i < _renderSemaphores.size(); ++i) {
-        _renderSemaphores[i] = createSemaphore(_device);
-    }
-
-    // Octahedron normal projection
-    const VkFormat normalRTFormat = VK_FORMAT_A2B10G10R10_UNORM_PACK32;
-    // Fairly low precision acceptable for cartoonish rendering
-    const VkFormat albedoRTFormat = VK_FORMAT_B10G11R11_UFLOAT_PACK32;
-
-    for (int i = 0; i < MaxFramesInFlight; ++i) {
-        _presentSemaphores[i] = createSemaphore(_device);
-        _frameFences[i] = createFence(_device, true);
-
-        _gbufferRTs[i].normalRT = _textureManager.create(*this,
-            {
-                .format = normalRTFormat,
-                .extent = { Window.getWidth(), Window.getHeight(), 1 },
-                .usageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-                .aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
-            });
-
-        _gbufferRTs[i].albedoRT = _textureManager.create(*this,
-            {
-                .format = albedoRTFormat,
-                .extent = { Window.getWidth(), Window.getHeight(), 1 },
-                .usageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-                .aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
-            });
-
-        _gbufferRTs[i].depthRT = _textureManager.create(*this,
-            {
-                .format = VK_FORMAT_D32_SFLOAT,
-                .extent = { Window.getWidth(), Window.getHeight(), 1 },
-                .usageFlags = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                .aspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT,
-            });
-
-        _finalRTs[i] = _textureManager.create(*this,
-            {
-                .format = VK_FORMAT_R16G16B16A16_SFLOAT, // Alpha?
-                .extent = { Window.getWidth(), Window.getHeight(), 1 },
-                .usageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-                .aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
-            });
-    }
 
     constexpr uint32 MaxObjects = 640'000;
 
@@ -341,43 +277,8 @@ VulkanRHI::VulkanRHI(const Window& Window)
             .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
             .bindingTypes = deferredShadingBindingTypes,
         });
-    auto& deferredShadingDescriptorSets = _bindGroupManager.get<DescriptorSets>(_deferredShadingBindGroup);
 
-    for (int i = 0; i < IRHI::MaxFramesInFlight; ++i) {
-        const auto& normalRTImageViewData = _textureManager.get<ImageView>(_gbufferRTs[i].normalRT);
-        const auto& albedoRTImageViewData = _textureManager.get<ImageView>(_gbufferRTs[i].albedoRT);
-        const auto& depthRTImageViewData = _textureManager.get<ImageView>(_gbufferRTs[i].depthRT);
-        const auto& finalRTImageViewData = _textureManager.get<ImageView>(_finalRTs[i]);
-
-        VulkanBindGroup::updateDescriptorSet(_device, deferredShadingDescriptorSets.sets[i],
-            VkDescriptorImageInfo {
-                .sampler = VK_NULL_HANDLE,
-                .imageView = normalRTImageViewData.view,
-                .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
-            },
-            VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 0);
-        VulkanBindGroup::updateDescriptorSet(_device, deferredShadingDescriptorSets.sets[i],
-            VkDescriptorImageInfo {
-                .sampler = VK_NULL_HANDLE,
-                .imageView = albedoRTImageViewData.view,
-                .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
-            },
-            VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1);
-        VulkanBindGroup::updateDescriptorSet(_device, deferredShadingDescriptorSets.sets[i],
-            VkDescriptorImageInfo {
-                .sampler = _nearestSampler,
-                .imageView = depthRTImageViewData.view,
-                .imageLayout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL,
-            },
-            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2);
-        VulkanBindGroup::updateDescriptorSet(_device, deferredShadingDescriptorSets.sets[i],
-            VkDescriptorImageInfo {
-                .sampler = VK_NULL_HANDLE,
-                .imageView = finalRTImageViewData.view,
-                .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
-            },
-            VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3);
-    }
+    updateGBufferDescriptorSets();
 
     const VkPushConstantRange cullingPushConstantRange {
         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
@@ -405,6 +306,8 @@ VulkanRHI::VulkanRHI(const Window& Window)
 
     const VkPushConstantRange gbufferPushConstantRange { .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, .offset = 0, .size = sizeof(mat4) };
 
+    const VkFormat normalRTFormat = _textureManager.get<TextureMetadata>(_gbufferRTs[0].normalRT).format;
+    const VkFormat albedoRTFormat = _textureManager.get<TextureMetadata>(_gbufferRTs[0].albedoRT).format;
     const VulkanShader::ColorAttachmentInfo colorAttachmentInfos[] = {
         {
             .format = normalRTFormat,
@@ -444,6 +347,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
         depthTextures[i] = _gbufferRTs[i].depthRT;
     }
 
+    VkFormat surfaceFormat = _textureManager.get<TextureMetadata>(_swapchainTextures[0]).format;
     _debugDrawer = std::make_unique<VulkanDebugDrawer>(this,
         DebugDrawSetupData {
             .extent = { Window.getWidth(), Window.getHeight() },
@@ -467,12 +371,12 @@ VulkanRHI::~VulkanRHI()
     _computeShaderManager.clear(*this);
     _bindGroupManager.clear(*this);
 
-    for (uint32_t i = 0; i < MaxFramesInFlight; ++i) {
+    for (int i = 0; i < MaxFramesInFlight; ++i) {
         vkDestroyFence(_device, _frameFences[i], nullptr);
         vkDestroySemaphore(_device, _presentSemaphores[i], nullptr);
     }
 
-    for (uint32_t i = 0; i < _renderSemaphores.size(); ++i) {
+    for (int i = 0; i < _renderSemaphores.size(); ++i) {
         vkDestroySemaphore(_device, _renderSemaphores[i], nullptr);
     }
 
@@ -571,7 +475,7 @@ Handle<Buffer> VulkanRHI::createBuffer(const Buffer::CreateInfo& info)
 void VulkanRHI::destroyBuffer(const Handle<Buffer> handle) { _bufferManager.release(*this, handle); }
 
 // TODO: cache command buffer?
-void VulkanRHI::render(Scene& scene) const
+void VulkanRHI::render(Scene& scene)
 {
     if (_uploadsToBeFlushed) {
         flushUploadCommands();
@@ -585,14 +489,19 @@ void VulkanRHI::render(Scene& scene) const
     if (vkWaitForFences(_device, 1, &_frameFences[frameInFlightId], VK_TRUE, NH3D_MAX_T(uint64)) != VK_SUCCESS) {
         NH3D_ABORT_VK("GPU stall detected");
     }
-    vkResetFences(_device, 1, &_frameFences[frameInFlightId]);
 
     uint32 swapchainImageId;
-    // TODO: handle resize
-    if (vkAcquireNextImageKHR(_device, _swapchain, NH3D_MAX_T(uint64), _presentSemaphores[frameInFlightId], nullptr, &swapchainImageId)
-        != VK_SUCCESS) {
-        NH3D_ABORT_VK("Failed to acquire next swapchain image");
-    }
+    VkResult swapchainImageAcquireResult;
+    do {
+        swapchainImageAcquireResult = vkAcquireNextImageKHR(
+            _device, _swapchain, NH3D_MAX_T(uint64), _presentSemaphores[frameInFlightId], nullptr, &swapchainImageId);
+        if (swapchainImageAcquireResult == VK_ERROR_OUT_OF_DATE_KHR || swapchainImageAcquireResult == VK_SUBOPTIMAL_KHR) {
+            handleResize();
+        } else if (swapchainImageAcquireResult != VK_SUCCESS) {
+            NH3D_ABORT_VK("Failed to acquire next swapchain image");
+        }
+    } while (swapchainImageAcquireResult != VK_SUCCESS);
+    vkResetFences(_device, 1, &_frameFences[frameInFlightId]);
 
     VkCommandBuffer commandBuffer = _commandBuffers[frameInFlightId];
 
@@ -1101,8 +1010,7 @@ VkDevice VulkanRHI::createLogicalDevice(const VkPhysicalDevice gpu, const Physic
 }
 
 std::pair<VkSwapchainKHR, VkFormat> VulkanRHI::createSwapchain(const VkDevice device, const VkPhysicalDevice gpu,
-    const VkSurfaceKHR surface, const PhysicalDeviceQueueFamilyID queues, const VkExtent2D extent,
-    const VkSwapchainKHR previousSwapchain) const
+    const VkSurfaceKHR surface, const PhysicalDeviceQueueFamilyID queues, const VkSwapchainKHR previousSwapchain) const
 {
     VkSurfaceCapabilitiesKHR surfaceCapabilities;
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu, surface, &surfaceCapabilities);
@@ -1154,7 +1062,7 @@ std::pair<VkSwapchainKHR, VkFormat> VulkanRHI::createSwapchain(const VkDevice de
             : surfaceCapabilities.minImageCount + 1,
         .imageFormat = preferredFormats[formatId],
         .imageColorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR,
-        .imageExtent = extent,
+        .imageExtent = surfaceCapabilities.currentExtent,
         .imageArrayLayers = 1,
         .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
         .preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
@@ -1177,6 +1085,10 @@ std::pair<VkSwapchainKHR, VkFormat> VulkanRHI::createSwapchain(const VkDevice de
     VkSwapchainKHR swapchain;
     if (vkCreateSwapchainKHR(device, &swapchainCreateInfo, nullptr, &swapchain) != VK_SUCCESS) {
         NH3D_ABORT_VK("Vulkan swapchain creation failed");
+    }
+
+    if (previousSwapchain != nullptr) {
+        vkDestroySwapchainKHR(_device, previousSwapchain, nullptr);
     }
 
     return { swapchain, preferredFormats[formatId] };
@@ -1361,6 +1273,150 @@ VulkanRHI::FrustumPlanes VulkanRHI::getFrustumPlanes(const mat4& projectionMatri
     };
 
     return frustumPlanes;
+}
+
+void VulkanRHI::handleResize()
+{
+    vkDeviceWaitIdle(_device);
+
+    // Cleanup
+    if (_swapchain != nullptr) {
+        for (const Handle<Texture> texture : _swapchainTextures) {
+            _textureManager.release(*this, texture);
+        }
+
+        for (VkSemaphore renderSemaphore : _renderSemaphores) {
+            vkDestroySemaphore(_device, renderSemaphore, nullptr);
+        }
+
+        for (int i = 0; i < MaxFramesInFlight; ++i) {
+            vkDestroySemaphore(_device, _presentSemaphores[i], nullptr);
+            vkDestroyFence(_device, _frameFences[i], nullptr);
+
+            _textureManager.release(*this, _gbufferRTs[i].albedoRT);
+            _textureManager.release(*this, _gbufferRTs[i].normalRT);
+            _textureManager.release(*this, _gbufferRTs[i].depthRT);
+            _textureManager.release(*this, _finalRTs[i]);
+        }
+    }
+
+    VkSurfaceCapabilitiesKHR surfaceCapabilities;
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(_gpu, _surface, &surfaceCapabilities);
+    const VkExtent2D framebufferExtent = surfaceCapabilities.currentExtent;
+
+    auto [swapchain, surfaceFormat] = createSwapchain(_device, _gpu, _surface, _queues, _swapchain);
+    _swapchain = swapchain;
+
+    uint32 swapchainImageCount;
+    vkGetSwapchainImagesKHR(_device, _swapchain, &swapchainImageCount, nullptr);
+
+    std::vector<VkImage> swapchainImages;
+    swapchainImages.resize(swapchainImageCount);
+    _swapchainTextures.resize(swapchainImageCount);
+    vkGetSwapchainImagesKHR(_device, _swapchain, &swapchainImageCount, swapchainImages.data());
+
+    for (int i = 0; i < swapchainImageCount; ++i) {
+        _swapchainTextures[i] = _textureManager.create(*this,
+            {
+                .image = swapchainImages[i],
+                .format = surfaceFormat,
+                .extent = VkExtent3D { framebufferExtent.width, framebufferExtent.height, 1 },
+                .aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
+            });
+    }
+
+    _renderSemaphores.resize(_swapchainTextures.size());
+    for (int i = 0; i < _renderSemaphores.size(); ++i) {
+        _renderSemaphores[i] = createSemaphore(_device);
+    }
+    for (int i = 0; i < MaxFramesInFlight; ++i) {
+        _presentSemaphores[i] = createSemaphore(_device);
+        _frameFences[i] = createFence(_device, true);
+    }
+
+    // Octahedron normal projection
+    const VkFormat normalRTFormat = VK_FORMAT_A2B10G10R10_UNORM_PACK32;
+    // Fairly low precision acceptable for cartoonish rendering
+    const VkFormat albedoRTFormat = VK_FORMAT_B10G11R11_UFLOAT_PACK32;
+
+    for (int i = 0; i < MaxFramesInFlight; ++i) {
+        _gbufferRTs[i].normalRT = _textureManager.create(*this,
+            {
+                .format = normalRTFormat,
+                .extent = { framebufferExtent.width, framebufferExtent.height, 1 },
+                .usageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+                .aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
+            });
+
+        _gbufferRTs[i].albedoRT = _textureManager.create(*this,
+            {
+                .format = albedoRTFormat,
+                .extent = { framebufferExtent.width, framebufferExtent.height, 1 },
+                .usageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+                .aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
+            });
+
+        _gbufferRTs[i].depthRT = _textureManager.create(*this,
+            {
+                .format = VK_FORMAT_D32_SFLOAT,
+                .extent = { framebufferExtent.width, framebufferExtent.height, 1 },
+                .usageFlags = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                .aspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT,
+            });
+
+        _finalRTs[i] = _textureManager.create(*this,
+            {
+                .format = VK_FORMAT_R16G16B16A16_SFLOAT, // Alpha?
+                .extent = { framebufferExtent.width, framebufferExtent.height, 1 },
+                .usageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+                .aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
+            });
+    }
+
+    if (_deferredShadingBindGroup != InvalidHandle<BindGroup>) {
+        updateGBufferDescriptorSets();
+    }
+}
+
+void VulkanRHI::updateGBufferDescriptorSets()
+{
+    auto& deferredShadingDescriptorSets = _bindGroupManager.get<DescriptorSets>(_deferredShadingBindGroup);
+
+    for (int i = 0; i < IRHI::MaxFramesInFlight; ++i) {
+        const auto& normalRTImageViewData = _textureManager.get<ImageView>(_gbufferRTs[i].normalRT);
+        const auto& albedoRTImageViewData = _textureManager.get<ImageView>(_gbufferRTs[i].albedoRT);
+        const auto& depthRTImageViewData = _textureManager.get<ImageView>(_gbufferRTs[i].depthRT);
+        const auto& finalRTImageViewData = _textureManager.get<ImageView>(_finalRTs[i]);
+
+        VulkanBindGroup::updateDescriptorSet(_device, deferredShadingDescriptorSets.sets[i],
+            VkDescriptorImageInfo {
+                .sampler = VK_NULL_HANDLE,
+                .imageView = normalRTImageViewData.view,
+                .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+            },
+            VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 0);
+        VulkanBindGroup::updateDescriptorSet(_device, deferredShadingDescriptorSets.sets[i],
+            VkDescriptorImageInfo {
+                .sampler = VK_NULL_HANDLE,
+                .imageView = albedoRTImageViewData.view,
+                .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+            },
+            VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1);
+        VulkanBindGroup::updateDescriptorSet(_device, deferredShadingDescriptorSets.sets[i],
+            VkDescriptorImageInfo {
+                .sampler = _nearestSampler,
+                .imageView = depthRTImageViewData.view,
+                .imageLayout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL,
+            },
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2);
+        VulkanBindGroup::updateDescriptorSet(_device, deferredShadingDescriptorSets.sets[i],
+            VkDescriptorImageInfo {
+                .sampler = VK_NULL_HANDLE,
+                .imageView = finalRTImageViewData.view,
+                .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+            },
+            VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3);
+    }
 }
 
 }

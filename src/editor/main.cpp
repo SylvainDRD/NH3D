@@ -125,7 +125,7 @@ int main()
             cameraTransform.translate(scene, cameraEntity, translation);
         }
 
-        const float moveSpeed = 5.0f;
+        const float moveSpeed = 8.0f;
         vec3 direction = {};
         if (window.isKeyPressed(SDL_SCANCODE_W)) {
             direction += forward;
