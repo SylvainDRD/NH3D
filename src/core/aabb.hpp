@@ -11,7 +11,7 @@ struct AABB {
     vec3 min;
     vec3 max;
 
-    [[nodiscard]] static AABB fromMesh(const std::vector<VertexData>& vertices, const std::vector<uint32>& indices);
+    [[nodiscard]] static AABB fromMesh(const std::vector<VertexData>& vertices, const std::vector<uint16>& indices);
 };
 
 } // namespace NH3D

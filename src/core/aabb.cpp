@@ -2,7 +2,7 @@
 
 namespace NH3D {
 
-[[nodiscard]] AABB AABB::fromMesh(const std::vector<VertexData>& vertices, const std::vector<uint32>& indices)
+[[nodiscard]] AABB AABB::fromMesh(const std::vector<VertexData>& vertices, const std::vector<uint16>& indices)
 {
     if (vertices.empty()) {
         return AABB { .min = vec3 { 0.0f }, .max = vec3 { 0.0f } };

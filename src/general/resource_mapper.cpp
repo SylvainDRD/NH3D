@@ -16,7 +16,7 @@ namespace NH3D {
 bool ResourceMapper::loadModel(IRHI& rhi, const std::filesystem::path& path, MeshData& meshData, const vec3u swizzle) const
 {
     static std::vector<VertexData> vertexData;
-    static std::vector<uint32> indices;
+    static std::vector<uint16> indices;
 
     // TODO: remove that
     static std::filesystem::path previousPath;
@@ -136,14 +136,15 @@ bool ResourceMapper::loadModel(IRHI& rhi, const std::filesystem::path& path, Mes
         switch (indexAccessor.componentType) {
         case TINYGLTF_PARAMETER_TYPE_UNSIGNED_INT: {
             const uint32* buffer = static_cast<const uint32*>(indexData);
-            memcpy(indices.data(), buffer, indexAccessor.count * sizeof(uint32)); // Can memcpy because both are uint32
+            for (size_t i = 0; i < indexAccessor.count; i++) {
+                NH3D_ASSERT(buffer[i] <= NH3D_MAX_T(uint16), "Index value exceeds uint16 max value");
+                indices[i] = buffer[i];
+            }
             break;
         }
         case TINYGLTF_PARAMETER_TYPE_UNSIGNED_SHORT: {
             const uint16* buffer = static_cast<const uint16*>(indexData);
-            for (size_t i = 0; i < indexAccessor.count; i++) {
-                indices[i] = buffer[i];
-            }
+            memcpy(indices.data(), buffer, indexAccessor.count * sizeof(uint16)); // Can memcpy because both are uint16
             break;
         }
         case TINYGLTF_PARAMETER_TYPE_UNSIGNED_BYTE: {
@@ -166,10 +167,10 @@ naughtyshit:
             .memoryUsage = BufferMemoryUsage::GPU_ONLY,
             .initialData
             = { reinterpret_cast<const byte*>(vertexData.data()), static_cast<uint32>(vertexData.size() * sizeof(VertexData)) } }),
-        .indexBuffer = rhi.createBuffer({ .size = static_cast<uint32>(indices.size() * sizeof(uint32)),
+        .indexBuffer = rhi.createBuffer({ .size = static_cast<uint32>(indices.size() * sizeof(uint16)),
             .usageFlags = BufferUsageFlagBits::INDEX_BUFFER_BIT | BufferUsageFlagBits::DST_TRANSFER_BIT,
             .memoryUsage = BufferMemoryUsage::GPU_ONLY,
-            .initialData = { reinterpret_cast<const byte*>(indices.data()), static_cast<uint32>(indices.size() * sizeof(uint32)) } }),
+            .initialData = { reinterpret_cast<const byte*>(indices.data()), static_cast<uint32>(indices.size() * sizeof(uint16)) } }),
         .objectAABB = AABB::fromMesh(vertexData, indices),
     };
     // TODO: load texture

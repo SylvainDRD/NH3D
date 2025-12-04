@@ -628,7 +628,7 @@ void VulkanRHI::render(Scene& scene) const
             objectData.vertexBuffer = VulkanBuffer::getDeviceAddress(*this, vertexBuffer);
             objectData.indexBuffer = VulkanBuffer::getDeviceAddress(*this, indexBuffer);
             objectData.material = renderComponent.getMaterial();
-            objectData.indexCount = indexBufferSize / sizeof(uint32);
+            objectData.indexCount = indexBufferSize / sizeof(uint16);
 
             aabbDataPtr[objectCount] = mesh.objectAABB;
             objectDataPtr[objectCount] = objectData;
@@ -1051,7 +1051,7 @@ VkDevice VulkanRHI::createLogicalDevice(const VkPhysicalDevice gpu, const Physic
     VkPhysicalDeviceFeatures features {};
     VkPhysicalDeviceVulkan11Features features11 {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
-        // .storageBuffer16BitAccess = VK_TRUE,
+        .storageBuffer16BitAccess = VK_TRUE,
         .shaderDrawParameters = VK_TRUE,
     };
     VkPhysicalDeviceVulkan12Features features12 {
@@ -1059,7 +1059,6 @@ VkDevice VulkanRHI::createLogicalDevice(const VkPhysicalDevice gpu, const Physic
         .pNext = &features11,
         .drawIndirectCount = VK_TRUE,
         // .storageBuffer8BitAccess = VK_TRUE,
-        // .shaderInt8 = VK_TRUE,
         .descriptorIndexing = VK_TRUE,
         .descriptorBindingSampledImageUpdateAfterBind = VK_TRUE,
         .descriptorBindingStorageImageUpdateAfterBind = VK_TRUE,

@@ -41,7 +41,7 @@ std::pair<GPUBuffer, BufferAllocationInfo> VulkanBuffer::create(IRHI& rhi, const
 
             std::memcpy(allocationInfo.pMappedData, info.initialData.data, std::min(info.initialData.size, info.size));
             if (info.memoryUsage != VMA_MEMORY_USAGE_CPU_ONLY) {
-                vmaFlushAllocation(vrhi.getAllocator(), allocation, 0, info.size);
+                vmaFlushAllocation(vrhi.getAllocator(), allocation, 0, info.initialData.size);
             }
         } else {
             if (stagingBuffer.buffer == VK_NULL_HANDLE) {
@@ -61,16 +61,17 @@ std::pair<GPUBuffer, BufferAllocationInfo> VulkanBuffer::create(IRHI& rhi, const
                 NH3D_ABORT("Initial data size is larger than maximum guaranteed staging buffer size.");
             }
 
-            if (stagingBufferWriteOffset + info.size > VulkanBuffer::maxGuaranteedStagingBufferSize) {
+            if (stagingBufferWriteOffset + info.initialData.size > VulkanBuffer::maxGuaranteedStagingBufferSize) {
                 vrhi.flushUploadCommands();
             }
             void* mappedAddress = VulkanBuffer::stagingBufferAllocation.allocationInfo.pMappedData;
-            std::memcpy(static_cast<byte*>(mappedAddress) + stagingBufferWriteOffset, info.initialData.data, info.size);
+            std::memcpy(static_cast<byte*>(mappedAddress) + stagingBufferWriteOffset, info.initialData.data, info.initialData.size);
 
             vrhi.recordBufferUploadCommands([&info, buffer](VkCommandBuffer cmdBuffer) {
-                VulkanBuffer::copyBuffer(cmdBuffer, VulkanBuffer::stagingBuffer.buffer, buffer, info.size, stagingBufferWriteOffset);
+                VulkanBuffer::copyBuffer(
+                    cmdBuffer, VulkanBuffer::stagingBuffer.buffer, buffer, info.initialData.size, stagingBufferWriteOffset);
             });
-            stagingBufferWriteOffset += info.size;
+            stagingBufferWriteOffset += info.initialData.size;
         }
     }
 
