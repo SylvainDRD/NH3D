@@ -67,8 +67,7 @@ void main()
 
     AABB viewAABB = transformAABB(viewSpaceTransform, objectAABBs.aabb[index]);
 
-    // if (inFrustum(viewAABB, cullingData.parameters)) {
-    if (true) { // TODO: remove after trying some optimizations
+    if (inFrustum(viewAABB, cullingData.parameters)) {
         uint drawIndex = atomicAdd(drawCounter.count, 1); // To be reset by CPU before dispatch
 
         drawIndirectCommands.commands[drawIndex].vertexCount = obj.indexCount;
