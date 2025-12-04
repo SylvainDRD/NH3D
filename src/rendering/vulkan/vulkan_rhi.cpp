@@ -675,12 +675,12 @@ void VulkanRHI::render(Scene& scene) const
 
     // Compute updated culling parameters
     const Entity mainCameraEntity = scene.getMainCamera();
-    const CameraComponent& cameraSettings = scene.get<CameraComponent>(mainCameraEntity);
+    const CameraComponent& cameraComponent = scene.get<CameraComponent>(mainCameraEntity);
     const TransformComponent& cameraTransform = scene.get<TransformComponent>(mainCameraEntity);
     const VkExtent3D rtExtent = _textureManager.get<TextureMetadata>(_gbufferRTs[frameInFlightId].albedoRT).extent;
     const float aspectRatio = rtExtent.width / static_cast<float>(rtExtent.height);
 
-    const mat4 projectionMatrix = perspective(cameraSettings.fovY, aspectRatio, cameraSettings.near, cameraSettings.far);
+    const mat4 projectionMatrix = cameraComponent.getProjectionMatrix(aspectRatio);
     const mat4 viewMatrix = inverse(mat4(cameraTransform)); // assumes scale is uniform and non-zero
 
     // Frustum culling dispatch
