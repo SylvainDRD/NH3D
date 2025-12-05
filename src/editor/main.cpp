@@ -47,13 +47,13 @@ int main()
         });
     }
 
-    for (int i = 0; i < 14; ++i) {
-        for (int j = 0; j < 14; ++j) {
-            for (int k = 0; k < 200; ++k) {
+    for (int i = 0; i < 25; ++i) {
+        for (int j = 0; j < 25; ++j) {
+            for (int k = 0; k < 250; ++k) {
                 MeshData meshData;
                 (void)resourceMapper.loadModel(rhi, NH3D_DIR "src/editor/assets/cube.glb", meshData);
                 scene.create(RenderComponent { meshData.mesh, { .albedoTexture = textures[k % std::size(textures)] } },
-                    TransformComponent { { 8.0f * i - 56.0f, 8.0f * j - 56.0f, 8.0f * k - 200.0f } });
+                    TransformComponent { { 8.0f * i - 96.0f, 8.0f * j - 96.0f, 8.0f * k - 600.0f } });
             }
         }
     }
