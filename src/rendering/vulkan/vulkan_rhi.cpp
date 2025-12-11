@@ -772,10 +772,9 @@ void VulkanRHI::render(Scene& scene)
     }
 
     vkEndCommandBuffer(commandBuffer);
-    const VkPipelineStageFlags2 waitStage = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
-    const VkPipelineStageFlags2 signalStage = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
-    submitCommandBuffer(_graphicsQueue, makeSemaphoreSubmitInfo(_presentSemaphores[frameInFlightId], waitStage),
-        makeSemaphoreSubmitInfo(_renderSemaphores[swapchainImageId], signalStage), commandBuffer, _frameFences[frameInFlightId]);
+    submitCommandBuffer(_graphicsQueue, makeSemaphoreSubmitInfo(_presentSemaphores[frameInFlightId], VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT),
+        makeSemaphoreSubmitInfo(_renderSemaphores[swapchainImageId], VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT), commandBuffer,
+        _frameFences[frameInFlightId]);
 
     const VkPresentInfoKHR presentInfo {
         .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
