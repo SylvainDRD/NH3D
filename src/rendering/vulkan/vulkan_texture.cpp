@@ -280,31 +280,6 @@ void VulkanTexture::insertMemoryBarrier(VkCommandBuffer commandBuffer, const VkI
     vkCmdPipelineBarrier2(commandBuffer, &depInfo);
 }
 
-void VulkanTexture::clearColor(VkCommandBuffer commandBuffer, VkImage image, const color4 color, const VkImageLayout layout)
-{
-    const VkImageSubresourceRange imageRange = VkImageSubresourceRange {
-        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-        .levelCount = VK_REMAINING_MIP_LEVELS,
-        .layerCount = VK_REMAINING_ARRAY_LAYERS,
-    };
-    vkCmdClearColorImage(commandBuffer, image, layout, reinterpret_cast<const VkClearColorValue*>(&color), 1, &imageRange);
-}
-
-void VulkanTexture::clearDepth(VkCommandBuffer commandBuffer, VkImage image, const float depth, const VkImageLayout layout)
-{
-    const VkImageSubresourceRange imageRange = VkImageSubresourceRange {
-        .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
-        .levelCount = VK_REMAINING_MIP_LEVELS,
-        .layerCount = VK_REMAINING_ARRAY_LAYERS,
-    };
-
-    const VkClearDepthStencilValue clearValue {
-        .depth = depth,
-    };
-
-    vkCmdClearDepthStencilImage(commandBuffer, image, layout, &clearValue, 1, &imageRange);
-}
-
 void VulkanTexture::blit(
     VkCommandBuffer commandBuffer, const VkImage srcImage, const VkExtent3D srcExtent, VkImage dstImage, const VkExtent3D dstExtent)
 {

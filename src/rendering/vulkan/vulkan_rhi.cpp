@@ -638,35 +638,20 @@ void VulkanRHI::render(Scene& scene)
 
     const auto& albedoRTImageViewData = _textureManager.get<ImageView>(_gbufferRTs[frameInFlightId].albedoRT);
     const auto& albedoRTMetadata = _textureManager.get<TextureMetadata>(_gbufferRTs[frameInFlightId].albedoRT);
-    VulkanTexture::insertMemoryBarrier(commandBuffer, albedoRTImageViewData.image, VK_ACCESS_2_SHADER_READ_BIT,
-        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    VulkanTexture::clearColor(
-        commandBuffer, albedoRTImageViewData.image, color4 { 0.0f, 0.0f, 0.0f, 1.0f }, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    VulkanTexture::insertMemoryBarrier(commandBuffer, albedoRTImageViewData.image, VK_ACCESS_2_TRANSFER_WRITE_BIT,
-        VK_PIPELINE_STAGE_2_CLEAR_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    VulkanTexture::insertMemoryBarrier(commandBuffer, albedoRTImageViewData.image, VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_NONE,
+        VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
     const auto& normalRTImageViewData = _textureManager.get<ImageView>(_gbufferRTs[frameInFlightId].normalRT);
     const auto& normalRTMetadata = _textureManager.get<TextureMetadata>(_gbufferRTs[frameInFlightId].normalRT);
-    VulkanTexture::insertMemoryBarrier(commandBuffer, normalRTImageViewData.image, VK_ACCESS_2_SHADER_READ_BIT,
-        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    VulkanTexture::clearColor(commandBuffer, normalRTImageViewData.image, color4 { 0.0f }, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    VulkanTexture::insertMemoryBarrier(commandBuffer, normalRTImageViewData.image, VK_ACCESS_2_TRANSFER_WRITE_BIT,
-        VK_PIPELINE_STAGE_2_CLEAR_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    VulkanTexture::insertMemoryBarrier(commandBuffer, normalRTImageViewData.image, VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_NONE,
+        VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
     const auto& depthRTViewData = _textureManager.get<ImageView>(_gbufferRTs[frameInFlightId].depthRT);
     const auto& depthRTMetadata = _textureManager.get<TextureMetadata>(_gbufferRTs[frameInFlightId].depthRT);
-    VulkanTexture::insertMemoryBarrier(commandBuffer, depthRTViewData.image, VK_ACCESS_2_SHADER_READ_BIT,
-        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_CLEAR_BIT,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_UNDEFINED, true);
-    VulkanTexture::clearDepth(commandBuffer, depthRTViewData.image, 1.0f, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL); // 0 for reverse Z?
-    VulkanTexture::insertMemoryBarrier(commandBuffer, depthRTViewData.image, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_CLEAR_BIT,
+    VulkanTexture::insertMemoryBarrier(commandBuffer, depthRTViewData.image, VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_NONE,
         VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
         VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
-        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, true);
+        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_UNDEFINED, true);
 
     vkCmdPushConstants(commandBuffer, graphicsLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mat4), &projectionMatrix);
 
@@ -676,12 +661,18 @@ void VulkanRHI::render(Scene& scene)
             .imageView = normalRTImageViewData.view,
             .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .clearValue = {
+                .color = { .float32 = { 0.0f, 0.0f, 0.0f, 0.0f } },
+            },
         },
         {
             .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
             .imageView = albedoRTImageViewData.view,
             .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .clearValue = {
+                .color = { .float32 = { 0.0f, 0.0f, 0.0f, 1.0f } },
+            },
         },
     };
 
@@ -699,6 +690,10 @@ void VulkanRHI::render(Scene& scene)
                         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
                         .imageView = depthRTViewData.view,
                         .imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                        .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                        .clearValue = {
+                            .depthStencil = { 1.0f, 0 }, // 0 for reverse depth?
+                        },
                     },
                 },
             });
@@ -777,9 +772,10 @@ void VulkanRHI::render(Scene& scene)
     }
 
     vkEndCommandBuffer(commandBuffer);
-    submitCommandBuffer(_graphicsQueue, makeSemaphoreSubmitInfo(_presentSemaphores[frameInFlightId], VK_PIPELINE_STAGE_2_NONE),
-        makeSemaphoreSubmitInfo(_renderSemaphores[swapchainImageId], VK_PIPELINE_STAGE_2_BLIT_BIT), commandBuffer,
-        _frameFences[frameInFlightId]);
+    const VkPipelineStageFlags2 waitStage = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+    const VkPipelineStageFlags2 signalStage = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+    submitCommandBuffer(_graphicsQueue, makeSemaphoreSubmitInfo(_presentSemaphores[frameInFlightId], waitStage),
+        makeSemaphoreSubmitInfo(_renderSemaphores[swapchainImageId], signalStage), commandBuffer, _frameFences[frameInFlightId]);
 
     const VkPresentInfoKHR presentInfo {
         .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
@@ -1419,5 +1415,4 @@ void VulkanRHI::updateGBufferDescriptorSets()
             VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3);
     }
 }
-
 }
