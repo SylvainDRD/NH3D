@@ -253,8 +253,7 @@ VulkanRHI::VulkanRHI(const Window& Window)
             .bindingTypes = textureBindingTypes,
             .finalBindingCount = 1000,
         });
-    _linearSampler = createSampler(_device, false);
-    _nearestSampler = createSampler(_device, true);
+    _linearSampler = createSampler(_device, true);
     auto& textureDescriptorSets = _bindGroupManager.get<DescriptorSets>(_albedoTextureBindGroup);
     for (int i = 0; i < IRHI::MaxFramesInFlight; ++i) {
         VulkanBindGroup::updateDescriptorSet(_device, textureDescriptorSets.sets[i],
@@ -267,9 +266,9 @@ VulkanRHI::VulkanRHI(const Window& Window)
     }
 
     const VkDescriptorType deferredShadingBindingTypes[] = {
-        VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, // Normal RT
-        VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, // Albedo RT
-        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, // Depth RT
+        VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, // Normal RT
+        VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, // Albedo RT
+        VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, // Depth RT
         VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, // Final output RT
     };
     _deferredShadingBindGroup = _bindGroupManager.create(*this,
@@ -364,7 +363,6 @@ VulkanRHI::~VulkanRHI()
     _debugDrawer.reset();
 
     vkDestroySampler(_device, _linearSampler, nullptr);
-    vkDestroySampler(_device, _nearestSampler, nullptr);
     _textureManager.clear(*this);
     _bufferManager.clear(*this);
     _shaderManager.clear(*this);
@@ -666,7 +664,7 @@ void VulkanRHI::render(Scene& scene)
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_UNDEFINED, true);
     VulkanTexture::clearDepth(commandBuffer, depthRTViewData.image, 1.0f, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL); // 0 for reverse Z?
     VulkanTexture::insertMemoryBarrier(commandBuffer, depthRTViewData.image, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_CLEAR_BIT,
-        VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+        VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
         VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
         VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, true);
 
@@ -677,11 +675,13 @@ void VulkanRHI::render(Scene& scene)
             .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
             .imageView = normalRTImageViewData.view,
             .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
         },
         {
             .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
             .imageView = albedoRTImageViewData.view,
             .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
         },
     };
 
@@ -755,8 +755,9 @@ void VulkanRHI::render(Scene& scene)
 
     if (EnableDebugDraw) {
         VulkanTexture::insertMemoryBarrier(commandBuffer, scImageViewData.image, VK_ACCESS_2_TRANSFER_WRITE_BIT,
-            VK_PIPELINE_STAGE_2_BLIT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+            VK_PIPELINE_STAGE_2_BLIT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT,
+            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
         // _debugDrawer->renderAABBs(commandBuffer, frameInFlightId, viewMatrix, projectionMatrix, objectCount,
         //     _gbufferRTs[frameInFlightId].depthRT, _swapchainTextures[swapchainImageId]);
 
@@ -776,7 +777,7 @@ void VulkanRHI::render(Scene& scene)
     }
 
     vkEndCommandBuffer(commandBuffer);
-    submitCommandBuffer(_graphicsQueue, makeSemaphoreSubmitInfo(_presentSemaphores[frameInFlightId], VK_PIPELINE_STAGE_2_BLIT_BIT),
+    submitCommandBuffer(_graphicsQueue, makeSemaphoreSubmitInfo(_presentSemaphores[frameInFlightId], VK_PIPELINE_STAGE_2_NONE),
         makeSemaphoreSubmitInfo(_renderSemaphores[swapchainImageId], VK_PIPELINE_STAGE_2_BLIT_BIT), commandBuffer,
         _frameFences[frameInFlightId]);
 
@@ -1344,7 +1345,7 @@ void VulkanRHI::handleResize()
             {
                 .format = normalRTFormat,
                 .extent = { framebufferExtent.width, framebufferExtent.height, 1 },
-                .usageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+                .usageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                 .aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
             });
 
@@ -1352,7 +1353,7 @@ void VulkanRHI::handleResize()
             {
                 .format = albedoRTFormat,
                 .extent = { framebufferExtent.width, framebufferExtent.height, 1 },
-                .usageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+                .usageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                 .aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
             });
 
@@ -1368,7 +1369,7 @@ void VulkanRHI::handleResize()
             {
                 .format = VK_FORMAT_R16G16B16A16_SFLOAT, // Alpha?
                 .extent = { framebufferExtent.width, framebufferExtent.height, 1 },
-                .usageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+                .usageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
                 .aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT,
             });
     }
@@ -1394,21 +1395,21 @@ void VulkanRHI::updateGBufferDescriptorSets()
                 .imageView = normalRTImageViewData.view,
                 .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
             },
-            VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 0);
+            VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 0);
         VulkanBindGroup::updateDescriptorSet(_device, deferredShadingDescriptorSets.sets[i],
             VkDescriptorImageInfo {
                 .sampler = VK_NULL_HANDLE,
                 .imageView = albedoRTImageViewData.view,
                 .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
             },
-            VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1);
+            VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1);
         VulkanBindGroup::updateDescriptorSet(_device, deferredShadingDescriptorSets.sets[i],
             VkDescriptorImageInfo {
-                .sampler = _nearestSampler,
+                .sampler = VK_NULL_HANDLE,
                 .imageView = depthRTImageViewData.view,
                 .imageLayout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL,
             },
-            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2);
+            VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 2);
         VulkanBindGroup::updateDescriptorSet(_device, deferredShadingDescriptorSets.sets[i],
             VkDescriptorImageInfo {
                 .sampler = VK_NULL_HANDLE,

@@ -179,7 +179,6 @@ private:
     std::vector<VkSemaphore> _renderSemaphores;
 
     VkSampler _linearSampler;
-    VkSampler _nearestSampler;
     mutable ResourceManager<VulkanTexture> _textureManager;
     mutable ResourceManager<VulkanBuffer> _bufferManager;
     mutable ResourceManager<VulkanShader> _shaderManager;
