@@ -43,7 +43,7 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_compile_options(${NH3D_LIB} PRIVATE -Wswitch)
+    target_compile_options(${NH3D_LIB} PRIVATE -Wswitch -mavx2)
 else()
     message(FATAL_ERROR "What kind of compiler is that?")
 endif()
